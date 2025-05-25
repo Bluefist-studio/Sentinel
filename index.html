@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-    <title>Sentinel v1.4</title>
+    <title>Sentinel v1.5</title>
   <style>
     body { margin: 0; background: #111; }
     canvas { display: block; margin: auto; background: #222; }
@@ -141,7 +141,7 @@ window.onload = function () {
       laserSound.play();
       nearest.health -= player.damage;
       createParticles(nearest.x, nearest.y, "magenta");
-      drawLine(player.x, player.y, nearest.x, nearest.y, "yellow");
+      drawLine(player.x, player.y, nearest.x, nearest.y, "lightskyblue");
       player.attackCooldown = player.cooldownBase;
       if (nearest.health <= 0) {
         xpDrops.push({ x: nearest.x, y: nearest.y + 2 });
@@ -375,10 +375,10 @@ function gameLoop() {
       ctx.textBaseline = "middle";
       ctx.fillStyle = "white";
       ctx.font = "bold 32px sans-serif";
-      ctx.fillText("Sentinel v1.4", canvas.width / 2, canvas.height / 2 - 20);
+      ctx.fillText("Sentinel v1.5", canvas.width / 2, canvas.height / 2 - 20);
       ctx.font = "bold 20px sans-serif";
       ctx.fillText("Prepare for battle...", canvas.width / 2, canvas.height / 2 + 20);
-
+	ctx.fillText("Bluefist", canvas.width / 2, canvas.height / 2 + 200);
       ctx.fillStyle = "white";
       
     } else {
@@ -461,14 +461,20 @@ function gameLoop() {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "red";
-        ctx.font = "bold 40px sans-serif";
-        ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+        ctx.font = "bold 30px sans-serif";
+        ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 140);
         ctx.font = "bold 20px sans-serif";
-        ctx.fillText("Press R to Restart", canvas.width / 2, canvas.height / 2 + 40);
-
-        requestAnimationFrame(gameLoop);
-        return;
-      }
+        ctx.fillText("Press R to Restart", canvas.width/2, canvas.height/2 - 115); 
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "white";
+        ctx.font = "bold 20px sans-serif";
+        // Display unspent and per-stat breakdown
+        ctx.fillText("Range: " + player.stats.Range, canvas.width/2, canvas.height/2 - 80);
+        ctx.fillText("Power: " + player.stats.Power, canvas.width/2, canvas.height/2 - 40);
+        ctx.fillText("Attack Speed: " + player.stats.AttackSpeed, canvas.width/2, canvas.height/2 + 0);
+        ctx.fillText("Movement: " + player.stats.Movement, canvas.width/2, canvas.height/2 + 40);
+        ctx.fillText("Vitality: " + player.stats.Vitality, canvas.width/2, canvas.height/2 + 80);      }
     }
 
     requestAnimationFrame(gameLoop);
