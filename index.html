@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-    <title>Sentinel v1.3ex</title>
+    <title>Sentinel v1.4ex</title>
   <style>
     body { margin: 0; background: #111; }
     canvas { display: block; margin: auto; background: #222; }
@@ -33,7 +33,7 @@ window.onload = function () {
     damage: 1,
     attackCooldown: 0, cooldownBase: 20,
     range: 60,
-    stats: { Range: 0, Strength: 0, AttackSpeed: 0, Movement: 0, Vitality: 0 }
+    stats: { Range: 0, Power: 0, AttackSpeed: 0, Movement: 0, Vitality: 0 }
   };
 
   const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], particles = [];
@@ -58,7 +58,7 @@ window.onload = function () {
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
   function applyStatPoint(k) {
-    const statKeys = ["Range", "Strength", "AttackSpeed", "Movement", "Vitality"];
+    const statKeys = ["Range", "Power", "AttackSpeed", "Movement", "Vitality"];
     const stat = statKeys[parseInt(k) - 1];
     player.stats[stat]++;
     statPoints--;
@@ -67,7 +67,7 @@ window.onload = function () {
 
   function applyStats() {
     player.range = 60 + player.stats.Range * 10;
-    player.damage = 1 + player.stats.Strength;
+    player.damage = 1 + player.stats.Power;
     player.cooldownBase = 20 - player.stats.AttackSpeed * 2;
     player.speed = player.baseSpeed + player.stats.Movement * 0.3;
     player.maxHealth = 5 + player.stats.Vitality * 2;
@@ -141,7 +141,7 @@ window.onload = function () {
       laserSound.play();
       nearest.health -= player.damage;
       createParticles(nearest.x, nearest.y, "magenta");
-      drawLine(player.x, player.y, nearest.x, nearest.y, "yellow");
+      drawLine(player.x, player.y, nearest.x, nearest.y, "LightBlue");
       player.attackCooldown = player.cooldownBase;
       if (nearest.health <= 0) {
         xpDrops.push({ x: nearest.x, y: nearest.y + 2 });
@@ -249,7 +249,7 @@ window.onload = function () {
       ctx.fillStyle = "white";
       ctx.fillText("STATS", 340, 120);
       ctx.fillText("[1] Range (" + player.stats.Range + ")", 300, 150);
-      ctx.fillText("[2] Strength (" + player.stats.Strength + ")", 300, 170);
+      ctx.fillText("[2] Power (" + player.stats.Power + ")", 300, 170);
       ctx.fillText("[3] Atk Speed (" + player.stats.AttackSpeed + ")", 300, 190);
       ctx.fillText("[4] Movement (" + player.stats.Movement + ")", 300, 210);
       ctx.fillText("[5] Vitality (" + player.stats.Vitality + ")", 300, 230);
@@ -259,7 +259,7 @@ window.onload = function () {
   function restartGame() {
     Object.assign(player, {
       x: 400, y: 300, health: 5, attackCooldown: 0,
-      stats: { Range: 0, Strength: 0, AttackSpeed: 0, Movement: 0, Vitality: 0 }
+      stats: { Range: 0, Power: 0, AttackSpeed: 0, Movement: 0, Vitality: 0 }
     });
     applyStats();
     xp = 0; xpToLevel = 10; level = 1; statPoints = 0;
@@ -375,7 +375,7 @@ function gameLoop() {
       ctx.textBaseline = "middle";
       ctx.fillStyle = "white";
       ctx.font = "bold 32px sans-serif";
-      ctx.fillText("Sentinel v1.3ex", canvas.width / 2, canvas.height / 2 - 20);
+      ctx.fillText("Sentinel v1.4ex", canvas.width / 2, canvas.height / 2 - 20);
       ctx.font = "bold 20px sans-serif";
       ctx.fillText("Prepare for battle...", canvas.width / 2, canvas.height / 2 + 20);
 
@@ -442,7 +442,7 @@ function gameLoop() {
       ctx.font = "bold 14px sans-serif";
       ctx.textAlign = "center";
       ctx.fillStyle = "white";
-      ctx.fillText("Hotkeys: [1] Range  [2] Strength  [3] Atk Speed  [4] Movement  [5] Vitality", canvas.width / 2, canvas.height - 10);
+      ctx.fillText("Hotkeys: [1] Range  [2] Power  [3] Atk Speed  [4] Movement  [5] Vitality", canvas.width / 2, canvas.height - 10);
 
       ctx.fillStyle = "white";
       ctx.font = "bold 14px sans-serif";
