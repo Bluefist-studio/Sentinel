@@ -68,7 +68,7 @@ window.onload = function () {
 
 
   /////////////-========= GAME STATE =========-/////////////////
-  let wave = 14, xp = 0, xpToLevel = 84, level = 14, statPoints = 32; // Start at wave 1
+  let wave = 1, xp = 0, xpToLevel = 10, level = 1, statPoints = 5; // Start at wave 1
   let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
@@ -2376,3 +2376,4 @@ const droplifelenght = 280;
   requestAnimationFrame(gameLoop);
 
 }
+
