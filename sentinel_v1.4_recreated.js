@@ -1,3 +1,8 @@
+  // Global speed multiplier for delta time scaling
+  const SPEED_MULTIPLIER = 120; // Increase for faster game, decrease for slower
+  // Load mine sprite for mines
+  const mineImg = new window.Image();
+  mineImg.src = "mine.png";
 // Sentinel v1.4 Recreated
 // Core game logic
 
@@ -53,13 +58,17 @@ window.onload = function () {
   const slingerImg = new window.Image();
   slingerImg.src = "slinger.png";
 
+  // Load kamikaze sprite for kamikaze enemy
+  const kamikazeImg = new window.Image();
+  kamikazeImg.src = "kamikaze.png";
+
 
 
 
 
 
   /////////////-========= GAME STATE =========-/////////////////
-  let wave = 1, xp = 0, xpToLevel = 10, level = 1, statPoints = 5; // Start at wave 1
+  let wave = 14, xp = 0, xpToLevel = 84, level = 14, statPoints = 32; // Start at wave 1
   let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
@@ -85,7 +94,134 @@ window.onload = function () {
     pickupRadius: 48
   };
 
-  const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], slingerDrops = [], bruteDrops = [], particles = [];
+  const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], slingerDrops = [], bruteDrops = [], particles = [], mines = [];
+  // Update mines: explode when player enters zone, remove after explosion
+  function updateMines(delta) {
+    for (let i = mines.length - 1; i >= 0; i--) {
+      const m = mines[i];
+      // Check if player is in explosion zone
+      const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
+      if (!m.exploded && distToPlayer < 52 + player.radius) {
+        m.exploded = true;
+        // Damage player
+        player.health -= 2;
+        playerHurtTimer = 44;
+        // Draw explosion ring
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255, 187, 0, 0.55)";
+        ctx.lineWidth = 8;
+        ctx.shadowColor = "#ffbb00";
+        ctx.shadowBlur = 32;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+        // Dramatic explosion particles (like kamikaze)
+        for (let j = 0; j < 32; j++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3.2 + Math.random() * 2.2;
+          const color = ["#ffbb00","#fff200","#ff4444"][Math.floor(Math.random()*3)];
+          const size = 3 + Math.random() * 4;
+          const life = 32 + Math.random() * 18;
+          const decay = 0.89 + Math.random() * 0.04;
+          particles.push({
+            x: m.x,
+            y: m.y,
+            dx: Math.cos(angle) * speed,
+            dy: Math.sin(angle) * speed,
+            life,
+            color,
+            decay,
+            size,
+            type: "enemyDeath"
+          });
+        }
+        mines.splice(i, 1);
+        continue;
+      }
+      // Remove mine after timer runs out
+      m.timer -= delta * SPEED_MULTIPLIER;
+      if (m.timer <= 0) {
+        // Mine explodes visually and damages player if in range
+        const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
+        if (distToPlayer < 52 + player.radius) {
+          player.health -= 2;
+          playerHurtTimer = 44;
+        }
+        // Draw explosion ring
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255, 187, 0, 0.55)";
+        ctx.lineWidth = 8;
+        ctx.shadowColor = "#ffbb00";
+        ctx.shadowBlur = 32;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+        // Dramatic explosion particles (like kamikaze)
+        for (let j = 0; j < 32; j++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 3.2 + Math.random() * 2.2;
+          const color = ["#ffbb00","#fff200","#ff4444"][Math.floor(Math.random()*3)];
+          const size = 3 + Math.random() * 4;
+          const life = 32 + Math.random() * 18;
+          const decay = 0.89 + Math.random() * 0.04;
+          particles.push({
+            x: m.x,
+            y: m.y,
+            dx: Math.cos(angle) * speed,
+            dy: Math.sin(angle) * speed,
+            life,
+            color,
+            decay,
+            size,
+            type: "enemyDeath"
+          });
+        }
+        mines.splice(i, 1);
+      }
+    }
+  }
+
+  // Draw mines with visible trigger zone
+  function drawMines() {
+    for (let m of mines) {
+      ctx.save();
+      // Draw trigger zone ring
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 187, 0, 0.28)";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 8]);
+      ctx.shadowColor = "#ffbb00";
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
+
+      // Draw soft shadow under mine
+      ctx.save();
+      ctx.globalAlpha = 0.38;
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y + m.radius * 0.55, m.radius * 1.05, m.radius * 0.45, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(40, 40, 40, 1)';
+      ctx.filter = 'blur(2.5px)';
+      ctx.fill();
+      ctx.filter = 'none';
+      ctx.restore();
+
+      // Draw mine image core (larger)
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.translate(m.x, m.y);
+      ctx.drawImage(mineImg, -m.radius * 1.50, -m.radius * 1.50, m.radius * 3, m.radius * 3);
+      ctx.restore();
+
+      ctx.restore();
+    }
+  }
 
   document.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
@@ -189,7 +325,7 @@ window.onload = function () {
     }
   }
 
-  function updatePlayer() {
+  function updatePlayer(delta) {
     if (followMouse) {
     }
     // Track previous position for dust
@@ -203,8 +339,8 @@ window.onload = function () {
       if (dist > 1) {
         const dirX = dx / dist;
         const dirY = dy / dist;
-        player.x += dirX * player.speed;
-        player.y += dirY * player.speed;
+        player.x += dirX * player.speed * delta * SPEED_MULTIPLIER;
+        player.y += dirY * player.speed * delta * SPEED_MULTIPLIER;
         moved = true;
       }
     }
@@ -212,9 +348,9 @@ window.onload = function () {
     player._prevX = player.x;
     player._prevY = player.y;
     constrainPlayer();
-    if (player.attackCooldown > 0) player.attackCooldown--;
-    if (playerHurtTimer > 0) playerHurtTimer--;
-    if (playerLevelUpTimer > 0) playerLevelUpTimer--;
+    if (player.attackCooldown > 0) player.attackCooldown -= delta * SPEED_MULTIPLIER;
+    if (playerHurtTimer > 0) playerHurtTimer -= delta * SPEED_MULTIPLIER;
+    if (playerLevelUpTimer > 0) playerLevelUpTimer -= delta * SPEED_MULTIPLIER;
   }
 
   function autoAttack() {
@@ -555,8 +691,8 @@ const droplifelenght = 280;
     function spawnGruntBoss() {
       // Add properties for spawning grunts
       let gruntSpawnTimer = 0;
-      let gruntSpawnInterval = 300; // 4 sec at 60 FPS
-      let gruntSpawnCount = 2 + Math.floor(Math.random() * 3); // 2-4 grunts per spawn
+      let gruntSpawnInterval = 420; // 7 sec at 60 FPS (slower)
+      let gruntSpawnCount = 1 + Math.floor(Math.random() * 2); // 1-2 grunts per spawn (fewer)
       const side = Math.floor(Math.random() * 4);
       let x, y;
       if (side === 0) { x = -30; y = Math.random() * 600; }
@@ -567,7 +703,14 @@ const droplifelenght = 280;
       let radius = 26, collisionRadius = 30, speed = 0.4, health = 300, damage = 1, attackRange = 20, color = "magenta";
       const spinAngle = Math.random() * Math.PI * 2;
       const spinSpeed = (Math.random() - 0.5) * 0.02;
-      enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "gruntBoss", spinAngle, spinSpeed, sprite: gruntImg });
+      enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "gruntBoss", spinAngle, spinSpeed, sprite: gruntImg,
+        projectileCooldown: 0,
+        projectileInterval: 120, // 2 sec at 60 FPS (slower than slinger)
+        projectileRadius: 22, // bigger projectile
+        burstMode: false, // false = single shot, true = 3-round burst
+        burstShotsLeft: 0,
+        burstTimer: 0
+      });
       enemies[enemies.length - 1].gruntSpawnTimer = gruntSpawnTimer;
       enemies[enemies.length - 1].gruntSpawnInterval = gruntSpawnInterval;
       enemies[enemies.length - 1].gruntSpawnCount = gruntSpawnCount;
@@ -585,7 +728,7 @@ const droplifelenght = 280;
       else if (side === 2) { x = Math.random() * 1024; y = -30; }
       else { x = Math.random() * 1024; y = 798; }
       // Weaker stats: less health, smaller radius, slower, but still magenta
-      let radius = 22, collisionRadius = 24, speed = 0.32, health = 180 + (wave*2), damage = 1, attackRange = 20, color = "magenta";
+      let radius = 22, collisionRadius = 24, speed = 0.32, health = 150 + (wave*1.5), damage = 1, attackRange = 20, color = "magenta";
       const spinAngle = Math.random() * Math.PI * 2;
       const spinSpeed = (Math.random() - 0.5) * 0.02;
       enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "gruntBossMinor", spinAngle, spinSpeed, sprite: gruntImg });
@@ -604,11 +747,33 @@ const droplifelenght = 280;
       else if (side === 1) { x = 1054; y = Math.random() * 768; }
       else if (side === 2) { x = Math.random() * 1024; y = -30; }
       else { x = Math.random() * 1024; y = 798; }
-      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave*2), damage = 1, attackRange = 20, color = "magenta";
+      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave*1.6), damage = 1, attackRange = 20, color = "magenta";
       const spinAngle = Math.random() * Math.PI * 2;
       const spinSpeed = (Math.random() - 0.5) * 0.02;
       enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "grunt", spinAngle, spinSpeed });
     }
+    }
+
+    // Spawns the requested number of kamikaze mobs at random edges
+    function spawnKamikazeBurst(count) {
+      for (let i = 0; i < count; i++) {
+        const side = Math.floor(Math.random() * 4);
+        let x, y;
+        if (side === 0) { x = -30; y = Math.random() * 600; }
+        else if (side === 1) { x = 1054; y = Math.random() * 768; }
+        else if (side === 2) { x = Math.random() * 1024; y = -30; }
+        else { x = Math.random() * 1024; y = 798; }
+        let radius = 16, collisionRadius = 18, speed = 2, color = "#ff4444", damage = 3, health = 12 + (wave * 1.2);
+        enemies.push({
+          x, y, radius, collisionRadius, speed, color, damage, health,
+          type: "kamikaze",
+          timer: 60, // 1 second per mine
+          exploded: false,
+          minesPlaced: 0,
+          mineInterval: 60, // 1 second
+          nextMineTime: 60 // countdown to next mine
+        });
+      }
   }
 
   // SLINGERS
@@ -688,14 +853,64 @@ const droplifelenght = 280;
       burstCount = Infinity;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
-      // Remove custom arrays for infinite bursts; handle logic in burst handler
       window._customSlingers = null;
       window._bossMinorBursts = null;
+      // Spawn exactly 3 gruntBossMinors at the start of wave 10
+      if (!window._wave10MinorsSpawned) {
+        spawnBossMinorBurst(3);
+        window._wave10MinorsSpawned = true;
+      }
+    } else if (wave === 11) {
+      burstCount = 15;
+      burstInterval = 250; // 5 sec
+      window._customBursts = null;
+      window._customSlingers = null;
+      window._customKamikazes = [1, 1, 2, 2, 3, 3, 1, 2, 3, 4, 4, 2, 3, 4, 5];
+
+    } else if (wave === 12) {
+      burstCount = 15;
+      burstInterval = 300; // 5 sec
+      window._customBursts = null;
+      window._customSlingers = [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
+      window._customKamikazes = [0, 1, 0, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
+      window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0];
+
+    } else if (wave === 13) {
+      burstCount = 15;
+      burstInterval = 300; // 5 sec
+      window._customBursts = null;
+      window._customSlingers = [0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0];
+      window._customKamikazes = [0, 1, 0, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
+      window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0];
+    } else if (wave === 14) {
+      burstCount = 12;
+      burstInterval = 320; // 5.33 sec
+      // Combo bursts: slingers first, then kamikazes, then boss minors, then mixed
+      window._customSlingers = [2, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 1];
+      window._customKamikazes = [0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 1];
+      window._customBossMinors = [0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2];
+      // In mixed bursts, slingers and kamikazes overlap, forcing movement and dodging
+    } else if (wave === 15) {
+      burstCount = 14;
+      burstInterval = 300; // 5 sec
+      // Pincer and crossfire: slingers and kamikazes together, boss minors in the middle
+      window._customSlingers = [1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2];
+      window._customKamikazes = [2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1];
+      window._customBossMinors = [0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0];
+      // Some bursts have all three, requiring target prioritization
+    } else if (wave === 16) {
+      burstCount = 16;
+      burstInterval = 300; // 4.67 sec
+      // Advanced combos: more grunts, fewer boss minors
+      window._customBursts = [4, 5, 6, 7, 8, 9, 10, 10, 9, 8, 7, 6, 5, 4, 6, 8];
+      window._customSlingers = [2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 2, 3];
+      window._customKamikazes = [0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 2, 3, 3];
+      window._customBossMinors = [0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0];
+      // Final bursts: more grunts, moderate boss minors, still challenging
     } else {
       // For now, do nothing for later waves (old system removed)
       burstCount = 0;
       burstInterval = 300;
-      window._customBursts = null;
     }
     burstIndex = 0;
     burstTimer = 0;
@@ -707,49 +922,60 @@ const droplifelenght = 280;
 
   function handleWaveSpawning() {
     // Custom burst logic for waves 1-4, infinite for wave 5, and controlled bursts for waves 6-10
-    if (((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5)) || (wave >= 6 && wave <= 10 && burstIndex < burstCount)) {
-      burstTimer++;
-      if (burstTimer >= burstInterval) {
-        burstTimer = 0;
-        let grunts = 1;
-        let slingers = 0;
-        if (wave === 1) {
-          grunts = window._customBursts[burstIndex];
-        } else if (wave === 2) {
-          grunts = window._customBursts[burstIndex];
-        } else if (wave === 3) {
-          grunts = window._customBursts[burstIndex];
-        } else if (wave === 4) {
-          grunts = window._customBursts[burstIndex];
-        } else if (wave === 5) { // first boss
-          grunts = 2 + Math.floor(Math.random() * 3); // 2-4 grunts
-        } else if (wave >= 6 && wave <= 9) {
-          // Always spawn 2-4 grunts per burst
-          grunts = 2 + Math.floor(Math.random() * 3);
-          // Use custom array for slingers per burst
-          if (window._customSlingers) {
-            slingers = window._customSlingers[burstIndex] || 0;
-          }
-        }
-        // For wave 10, spawn grunts, slingers, and boss minor
-        if (wave === 10) {
-          const gruntCount = 2 + Math.floor(Math.random() * 3);
-          const slingerCount = 1 + Math.floor(Math.random() * 2);
-          spawnBurst(gruntCount);
-          spawnSlingerBurst(slingerCount);
-          if (burstIndex % 2 === 1) {
-            if (!window._bossMinorCount) window._bossMinorCount = 0;
-            if (window._bossMinorCount < 3) {
-              spawnBossMinorBurst(1);
-              window._bossMinorCount++;
+    // Prevent further spawning after wave 10 ends
+    if (window._wave10MinorsSpawned && wave > 10) return;
+    // For wave 10, set burstCount to number of alive gruntBossMinors
+    if (wave === 10) {
+      burstCount = enemies.filter(en => en.type === "gruntBossMinor").length;
+    }
+    if ((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5) || (wave >= 6 && wave <= 10 && burstIndex < burstCount) || (wave >= 11 && wave <= 16)) {
+          burstTimer++;
+          if (burstTimer >= burstInterval) {
+            burstTimer = 0;
+            let grunts = 0;
+            let slingers = 0;
+            // Only assign grunts for specific waves
+            if (wave === 1 || wave === 2 || wave === 3 || wave === 4) {
+              grunts = window._customBursts[burstIndex] || 0;
+            } else if (wave === 5) {
+              grunts = 2 + Math.floor(Math.random() * 3); // 2-4 grunts
+            } else if (wave >= 6 && wave <= 9) {
+              grunts = 2 + Math.floor(Math.random() * 3); // 2-4 grunts
+              if (window._customSlingers) {
+                slingers = window._customSlingers[burstIndex] || 0;
+              }
             }
-          }
-        } else {
-          spawnBurst(grunts);
-          if (slingers > 0) {
-            spawnSlingerBurst(slingers);
-          }
-        }
+            // For wave 10, spawn only slingers and boss minors
+            if (wave === 10) {
+              const slingerCount = 1 + Math.floor(Math.random() * 2);
+              spawnSlingerBurst(slingerCount);
+            } else {
+              if (grunts > 0) spawnBurst(grunts);
+              if (slingers > 0) spawnSlingerBurst(slingers);
+            }
+            if (wave === 11) {
+              // Only kamikazes, handled here
+              if (window._customKamikazes && window._customKamikazes[burstIndex]) {
+                spawnKamikazeBurst(window._customKamikazes[burstIndex]);
+              }
+            }
+            if (wave === 12 || wave === 13 || wave === 14 || wave === 15 || wave === 16) {
+              grunts = 1 + Math.floor(Math.random() * 2); 
+              if (window._customSlingers && window._customSlingers[burstIndex]) {
+                spawnSlingerBurst(window._customSlingers[burstIndex]);
+              }
+              if (window._customKamikazes && window._customKamikazes[burstIndex]) {
+                spawnKamikazeBurst(window._customKamikazes[burstIndex]);
+              }
+              if (window._customBossMinors && window._customBossMinors[burstIndex]) {
+                for (let i = 0; i < window._customBossMinors[burstIndex]; i++) {
+                  spawnGruntBossMinor();
+                }
+              }
+              if (grunts > 0) spawnBurst(grunts);
+            }
+
+
         burstIndex++;
       }
     }
@@ -758,6 +984,14 @@ const droplifelenght = 280;
     
   }
 
+
+
+
+
+
+  ////////////////////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////-========= MISC FUNCTIONS =========-////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////////////////
   function drawLine(x1, y1, x2, y2, color) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 3;
@@ -931,7 +1165,7 @@ const droplifelenght = 280;
     startTime = Date.now();
   }
 
-  function updateEnemies() {
+  function updateEnemies(delta) {
                         // Decrease noBossCollision timer for grunts
                         for (let e of enemies) {
                           if (e.type === "grunt" && e.noBossCollision > 0) {
@@ -994,7 +1228,51 @@ const droplifelenght = 280;
                               }
                             }
                           }
-                    }
+                          // GruntBoss projectile attack
+                          if (e.type === "gruntBoss" && e.health > 0) {
+                            // Handle burst logic
+                            if (e.burstMode) {
+                              // In burst mode, fire 3 shots with short delay
+                              if (e.burstShotsLeft > 0) {
+                                e.burstTimer = (e.burstTimer || 0) + 1;
+                                if (e.burstTimer >= 12) { // 0.2 sec between shots
+                                  e.burstTimer = 0;
+                                  e.burstShotsLeft--;
+                                  // Fire single projectile
+                                  const dx = player.x - e.x;
+                                  const dy = player.y - e.y;
+                                  const dist = Math.hypot(dx, dy);
+                                  if (dist > 0) {
+                                    const angle = Math.atan2(dy, dx);
+                                    const speed = 2.2;
+                                    projectiles.push({
+                                      x: e.x,
+                                      y: e.y,
+                                      dx: Math.cos(angle) * speed,
+                                      dy: Math.sin(angle) * speed,
+                                      damage: 2,
+                                      radius: e.projectileRadius,
+                                      color: "#ff33ff",
+                                      type: "gruntBossProjectile"
+                                    });
+                                  }
+                                }
+                              } else {
+                                // Burst finished, reset for next interval
+                                e.burstMode = false;
+                                e.projectileCooldown = 0;
+                              }
+                            } else {
+                              e.projectileCooldown = (e.projectileCooldown || 0) + 1;
+                              if (e.projectileCooldown >= e.projectileInterval) {
+                                // Always start burst mode (rifle 3-round burst)
+                                e.burstMode = true;
+                                e.burstShotsLeft = 3;
+                                e.burstTimer = 0;
+                              }
+                            }
+                          }
+                        }
                 // Brute nova visual particles
                 for (let e of enemies) {
                   if (e.type === "brute") {
@@ -1097,7 +1375,7 @@ const droplifelenght = 280;
                   e.novaPlayerInside = false;
                   e.novaPlayerTick = 0;
                 }
-                if (e.novaPlayerTick > 0) e.novaPlayerTick--;
+                if (e.novaPlayerTick > 0) e.novaPlayerTick -= delta * SPEED_MULTIPLIER;;
               }
             }
             
@@ -1146,6 +1424,17 @@ const droplifelenght = 280;
               if (e.type === "gruntBoss") {
                 wave++;
                 spawnWave();
+              }
+              // End wave 10 only if all three gruntBossMinors are dead
+              if (e.type === "gruntBossMinor" && wave === 10) {
+                // Check if all gruntBossMinors are gone
+                const remainingMinors = enemies.filter(en => en.type === "gruntBossMinor").length;
+                if (remainingMinors === 0) {
+                  wave++;
+                  burstCount = 0;
+                  burstIndex = 0;
+                  spawnWave();
+                }
               }
               // Scatter 5 xpDrops around gruntBossMinor's location
               if (e.type === "gruntBossMinor") {
@@ -1215,9 +1504,9 @@ const droplifelenght = 280;
 
       // Grunt nova movement: if novaTimer > 0, move outward using vx/vy
       if (e.type === "grunt" && e.novaTimer > 0) {
-        e.x += e.vx;
-        e.y += e.vy;
-        e.novaTimer--;
+        e.x += e.vx * delta * SPEED_MULTIPLIER;
+        e.y += e.vy * delta * SPEED_MULTIPLIER;
+        e.novaTimer -= delta * SPEED_MULTIPLIER;
         // Slow down nova velocity for a smooth stop
         e.vx *= 0.92;
         e.vy *= 0.92;
@@ -1238,8 +1527,77 @@ const droplifelenght = 280;
           }
             if (e.type !== "slinger") drawLine(e.x, e.y, player.x, player.y, "gray");
         } else {
-          e.x += (dx / dist) * e.speed;
-          e.y += (dy / dist) * e.speed;
+            if (e.type === "kamikaze" && !e.exploded) {
+              // Draw visible explosion zone
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(e.x, e.y, e.radius + 52, 0, Math.PI * 2);
+              ctx.strokeStyle = "rgba(255, 68, 68, 0.35)";
+              ctx.lineWidth = 3;
+              ctx.setLineDash([8, 8]);
+              ctx.shadowColor = "#ff4444";
+              ctx.shadowBlur = 12;
+              ctx.stroke();
+              ctx.setLineDash([]);
+              ctx.shadowBlur = 0;
+              ctx.restore();
+
+              // Move toward player
+              e.x += (dx / dist) * e.speed * delta * SPEED_MULTIPLIER;
+              e.y += (dy / dist) * e.speed * delta * SPEED_MULTIPLIER;
+
+              // Handle mine placement and explosion timing
+              if (typeof e.minesPlaced === 'undefined') e.minesPlaced = 0;
+              if (typeof e.mineInterval === 'undefined') e.mineInterval = 60;
+              if (typeof e.nextMineTime === 'undefined') e.nextMineTime = 60;
+              if (typeof e.timer === 'undefined') e.timer = 60;
+
+              e.timer -= delta * SPEED_MULTIPLIER;
+              if (e.minesPlaced < 3) {
+                e.nextMineTime -= delta * SPEED_MULTIPLIER;
+                if (e.nextMineTime <= 0) {
+                  // Place a mine at current position
+                  mines.push({ x: e.x, y: e.y, radius: 18, timer: 360, color: '#ffbb00', active: true });
+                  e.minesPlaced++;
+                  e.nextMineTime = e.mineInterval;
+                  e.timer = e.mineInterval; // reset timer for next mine/explosion
+                }
+              } else if (e.timer <= 0) {
+                // Explode!
+                e.exploded = true;
+                // Damage player if in range
+                const distToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
+                if (distToPlayer < e.radius + player.radius + 52) {
+                  player.health -= e.damage;
+                  playerHurtTimer = 44;
+                }
+                // Explosion effect
+                for (let j = 0; j < 24; j++) {
+                  const angle = Math.random() * Math.PI * 2;
+                  const speed = 5.2 + Math.random() * 1.8;
+                  const color = ["#ff3c00","#fd8700","#fff200"][Math.floor(Math.random()*3)];
+                  const size = 3 + Math.random() * 4;
+                  const life = 42 + Math.random() * 2;
+                  const decay = 0.91 + Math.random() * 0.02;
+                  particles.push({
+                    x: e.x,
+                    y: e.y,
+                    dx: Math.cos(angle) * speed,
+                    dy: Math.sin(angle) * speed,
+                    life,
+                    color,
+                    decay,
+                    size,
+                    type: "enemyDeath"
+                  });
+                }
+                enemies.splice(i, 1);
+                continue;
+              }
+            } else {
+              e.x += (dx / dist) * e.speed * delta * SPEED_MULTIPLIER;
+              e.y += (dy / dist) * e.speed * delta * SPEED_MULTIPLIER;
+            }
         }
       }
       // Only decrement attackCooldown for mobs, not playerHurtTimer
@@ -1268,28 +1626,28 @@ const droplifelenght = 280;
           const minDist = r1 + r2;
           if (d < minDist && d > 0) {
             const overlap = (minDist - d) / 2;
-            // Make gruntBoss and brute harder to push
-            let pushFactorE = 1, pushFactorO = 1;
-            if (e.type === "gruntBoss") pushFactorE = 0.12;
-            else if (e.type === "brute") pushFactorE = 0.35;
-            if (o.type === "gruntBoss") pushFactorO = 0.12;
-            else if (o.type === "brute") pushFactorO = 0.35;
+            // Reduce push factor for all enemies for gentler separation
+            let pushFactorE = 0.25, pushFactorO = 0.25;
+            if (e.type === "gruntBoss") pushFactorE = 0.08;
+            else if (e.type === "brute") pushFactorE = 0.18;
+            if (o.type === "gruntBoss") pushFactorO = 0.08;
+            else if (o.type === "brute") pushFactorO = 0.18;
             // Each enemy moves by its push factor
-            e.x += (ox / d) * overlap * pushFactorE;
-            e.y += (oy / d) * overlap * pushFactorE;
-            o.x -= (ox / d) * overlap * pushFactorO;
-            o.y -= (oy / d) * overlap * pushFactorO;
+            e.x += (ox / d) * overlap * pushFactorE * delta * SPEED_MULTIPLIER;
+            e.y += (oy / d) * overlap * pushFactorE * delta * SPEED_MULTIPLIER;
+            o.x -= (ox / d) * overlap * pushFactorO * delta * SPEED_MULTIPLIER;
+            o.y -= (oy / d) * overlap * pushFactorO * delta * SPEED_MULTIPLIER;
           }
         }
         // Consistent spin speed for all enemies
         if (typeof e.spinAngle === "undefined") e.spinAngle = Math.random() * Math.PI * 2;
-        e.spinAngle += 0.003;
+        e.spinAngle += 0.003 * delta * SPEED_MULTIPLIER;
         // Slinger hover effect (visual only)
         let hoverY = e.y;
         if (e.type === "slinger") {
           if (typeof e.baseY === "undefined") e.baseY = e.y;
           if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
-          e.hoverOffset += 0.04;
+          e.hoverOffset += 0.04 * delta * SPEED_MULTIPLIER;
           hoverY = e.y + Math.sin(e.hoverOffset) * 0.2;
         }
       }
@@ -1390,8 +1748,14 @@ const droplifelenght = 280;
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
 
 
-  function gameLoop() {
+  let lastTimestamp = performance.now();
+
+  function gameLoop(currentTimestamp) {
+    // Calculate delta time in seconds
+    const delta = (currentTimestamp - lastTimestamp) / 1000;
+    lastTimestamp = currentTimestamp;
         // Draw wave announcement if timer is active
+        // (waveAnnouncementTimer update will be made delta-based in next step)
         if (waveAnnouncementTimer > 0) {
           ctx.save();
           ctx.textAlign = "center";
@@ -1403,7 +1767,7 @@ const droplifelenght = 280;
           ctx.globalAlpha = Math.min(1, waveAnnouncementTimer / WAVE_ANNOUNCE_DURATION);
           ctx.fillText("Wave " + wave, canvas.width / 2, canvas.height / 2);
           ctx.restore();
-          waveAnnouncementTimer--;
+          waveAnnouncementTimer -= delta * 60; // 60 = original FPS
         }
     if (!followMouse && !gameOver) {
       paused = true;
@@ -1488,9 +1852,10 @@ const droplifelenght = 280;
         updateXPDrops();
         updateslingerDrops();
         updateBruteDrops();
+        updateMines(delta);
         updateParticles();
-        updatePlayer();
-        updateEnemies();
+        updatePlayer(delta);
+        updateEnemies(delta);
         updateProjectiles();
         autoAttack();
         handleWaveSpawning();
@@ -1502,9 +1867,8 @@ const droplifelenght = 280;
 
 
 
-      //-======================DROPS AND PARTICLES======================-
+      //-======================DROPS, MINES, AND PARTICLES======================-
       // Draw drops with glow (drawn before player/enemies for z-index effect)
-      // Grunt XP drop glow
       xpDrops.forEach(d => {
         ctx.save();
         ctx.shadowColor = "#ff33ff";
@@ -1564,7 +1928,9 @@ const droplifelenght = 280;
         ctx.fill();
         ctx.restore();
       });
-      
+
+      // Draw mines before player/enemies for proper z-index
+      drawMines();
 
       //laser, enemyHit, levelUp, xpDrop, slingerDrop, bruteDrop, healthDrop, enemyDeath, 
       drawParticlesOfType("xpDrop")
@@ -1758,7 +2124,7 @@ const droplifelenght = 280;
         if (feedbackColor) {
           ctx.globalAlpha = feedbackAlpha;
           // Create a radial gradient for a blurry, bubble-like shield
-          const r = player.rad6ius;
+          const r = player.radius;
           const grad = ctx.createRadialGradient(player.x, player.y, r * 0.4, player.x, player.y, r);
           grad.addColorStop(0, feedbackColor + '55');
           grad.addColorStop(0.5, feedbackColor + '66');
@@ -1899,6 +2265,13 @@ const droplifelenght = 280;
           ctx.translate(e.x, hoverY);
           ctx.drawImage(slingerImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
+        } else if (e.type === "kamikaze") {
+          ctx.save();
+          ctx.shadowColor = "#ff4444";
+          ctx.shadowBlur = 12;
+          ctx.translate(e.x, e.y);
+          ctx.drawImage(kamikazeImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
+          ctx.restore();
         } else {
           ctx.fillStyle = e.color;
           ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
@@ -2000,6 +2373,6 @@ const droplifelenght = 280;
     requestAnimationFrame(gameLoop);
   }
 
-  gameLoop();
+  requestAnimationFrame(gameLoop);
 
 }
