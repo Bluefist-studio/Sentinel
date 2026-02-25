@@ -1,3 +1,37 @@
+  // Fade out and stop menu ambience
+  function fadeOutMenuAmbience(duration = 1000) {
+    const ambience = window._menuAmbienceAudio;
+    if (!ambience) return;
+    const startVol = ambience.volume;
+    const start = Date.now();
+    function step() {
+      const elapsed = Date.now() - start;
+      const t = Math.min(1, elapsed / duration);
+      ambience.volume = startVol * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        ambience.pause();
+        ambience.volume = startVol;
+        window._menuAmbienceAudio = null;
+      }
+    }
+    step();
+  }
+  // Play ambience scifi2.wav once on title/menu
+  function playMenuAmbience() {
+    try {
+      if (window._menuAmbienceAudio) {
+        window._menuAmbienceAudio.pause();
+        window._menuAmbienceAudio = null;
+      }
+      let ambience = new Audio('ambience scifi2.wav');
+      ambience.volume = 0.1;
+      ambience.loop = false;
+      ambience.play();
+      window._menuAmbienceAudio = ambience;
+    } catch (e) {}
+  }
   // Global speed multiplier for delta time scaling
   const SPEED_MULTIPLIER = 120; // Increase for faster game, decrease for slower
   // Load mine sprite for mines
@@ -7,6 +41,224 @@
 // Core game logic
 
 window.onload = function () {
+  // --- Loading/Menu Screen State ---
+  let showLoadingScreen = true;
+  let showMenuScreen = false;
+  const titleImg = new window.Image();
+  titleImg.src = "titlescreen.png";
+  // Create overlay elements
+  const loadingOverlay = document.createElement("div");
+  loadingOverlay.id = "loadingOverlay";
+  loadingOverlay.style.position = "fixed";
+  loadingOverlay.style.left = 0;
+  loadingOverlay.style.top = 0;
+  loadingOverlay.style.width = "100vw";
+  loadingOverlay.style.height = "100vh";
+  loadingOverlay.style.background = "#000";
+  loadingOverlay.style.display = "flex";
+  loadingOverlay.style.flexDirection = "column";
+  loadingOverlay.style.justifyContent = "center";
+  loadingOverlay.style.alignItems = "center";
+  loadingOverlay.style.zIndex = 1000;
+  // Canvas-fitted image
+  const loadingBg = document.createElement("img");
+  loadingBg.src = "titlescreen.png";
+  loadingBg.style.position = "absolute";
+  loadingBg.style.left = "50%";
+  loadingBg.style.top = "50%";
+  loadingBg.style.transform = "translate(-50%, -50%)";
+  loadingBg.style.width = "1024px";
+  loadingBg.style.height = "768px";
+  loadingBg.style.objectFit = "fill";
+
+  // Gradient overlay for bottom fade
+  const loadingGradient = document.createElement("div");
+  loadingGradient.style.position = "absolute";
+  loadingGradient.style.left = "0";
+  loadingGradient.style.bottom = "0";
+  loadingGradient.style.width = "1024px";
+  loadingGradient.style.height = "180px";
+  loadingGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
+  loadingGradient.style.pointerEvents = "none";
+  loadingGradient.style.zIndex = 1;
+  loadingOverlay.appendChild(loadingGradient);
+  loadingBg.style.zIndex = 0;
+  loadingOverlay.appendChild(loadingBg);
+  // Continue button (discreet, bottom, subtle)
+  const continueBtn = document.createElement("div");
+  continueBtn.textContent = "Click to continue";
+  continueBtn.style.position = "absolute";
+  continueBtn.style.bottom = "40px";
+  continueBtn.style.left = "50%";
+  continueBtn.style.transform = "translateX(-50%)";
+  continueBtn.style.fontSize = "1.2rem";
+  continueBtn.style.padding = "0.5rem 1.5rem";
+  continueBtn.style.background = "rgba(0,0,0,0.35)";
+  continueBtn.style.color = "#fff";
+  continueBtn.style.borderRadius = "8px";
+  continueBtn.style.opacity = "0.7";
+  continueBtn.style.zIndex = 2;
+  continueBtn.style.pointerEvents = "none";
+  loadingOverlay.appendChild(continueBtn);
+  document.body.appendChild(loadingOverlay);
+  playMenuAmbience();
+  // Continue on any click
+  loadingOverlay.addEventListener("click", function() {
+    loadingOverlay.style.display = "none";
+    showLoadingScreen = false;
+    showMenuScreen = true;
+    showMenu();
+  });
+  // --- Menu Screen ---
+  function showMenu() {
+    const menuOverlay = document.createElement("div");
+    menuOverlay.id = "menuOverlay";
+    menuOverlay.style.position = "fixed";
+    menuOverlay.style.left = 0;
+    menuOverlay.style.top = 0;
+    menuOverlay.style.width = "100vw";
+    menuOverlay.style.height = "100vh";
+    menuOverlay.style.background = "#000";
+    menuOverlay.style.display = "flex";
+    menuOverlay.style.flexDirection = "column";
+    menuOverlay.style.justifyContent = "center";
+    menuOverlay.style.alignItems = "center";
+    menuOverlay.style.zIndex = 1000;
+    // Canvas-fitted image
+    const menuBg = document.createElement("img");
+    menuBg.src = "titlescreen.png";
+    menuBg.style.position = "absolute";
+    menuBg.style.left = "50%";
+    menuBg.style.top = "50%";
+    menuBg.style.transform = "translate(-50%, -50%)";
+    menuBg.style.width = "1024px";
+    menuBg.style.height = "768px";
+    menuBg.style.objectFit = "fill";
+
+    // Gradient overlay for bottom fade
+    const menuGradient = document.createElement("div");
+    menuGradient.style.position = "absolute";
+    menuGradient.style.left = "0";
+    menuGradient.style.bottom = "0";
+    menuGradient.style.width = "1024px";
+    menuGradient.style.height = "180px";
+    menuGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
+    menuGradient.style.pointerEvents = "none";
+    menuGradient.style.zIndex = 1;
+    menuOverlay.appendChild(menuGradient);
+    menuBg.style.zIndex = 0;
+    menuOverlay.appendChild(menuBg);
+    // Title
+    const title = document.createElement("h1");
+    title.textContent = "";
+    title.style.color = "#fff";
+    title.style.fontSize = "4rem";
+    title.style.textShadow = "0 0 24px #00ffdd, 0 0 8px #000";
+    title.style.position = "relative";
+    title.style.zIndex = 1;
+    menuOverlay.appendChild(title);
+    // Difficulty buttons
+    const buttonContainer = document.createElement("div");
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.flexDirection = "column";
+    buttonContainer.style.gap = "1.2rem";
+    buttonContainer.style.marginTop = "2.5rem";
+    buttonContainer.style.position = "relative";
+    buttonContainer.style.zIndex = 1;
+
+    function makeMenuButton(label, color) {
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.style.fontSize = "2rem";
+      btn.style.padding = "1rem 2.5rem";
+      btn.style.background = "rgba(0,0,0,0.7)";
+      btn.style.color = color;
+      btn.style.border = `2px solid ${color}`;
+      btn.style.borderRadius = "12px";
+      btn.style.cursor = "pointer";
+      btn.style.boxShadow = "0 0 24px #000";
+      btn.style.transition = "background 0.2s, color 0.2s";
+      btn.addEventListener("mouseover",()=>{btn.style.background="rgba(0,0,0,0.9)";});
+      btn.addEventListener("mouseout",()=>{btn.style.background="rgba(0,0,0,0.7)";});
+      return btn;
+    }
+
+    // Add three buttons
+    const normalBtn = makeMenuButton("Normal", "#fff");
+    const hardcoreBtn = makeMenuButton("Hardcore", "#ffb300");
+    const apocalypseBtn = makeMenuButton("Apocalypse", "#ff3c3c");
+    buttonContainer.appendChild(normalBtn);
+    buttonContainer.appendChild(hardcoreBtn);
+    buttonContainer.appendChild(apocalypseBtn);
+    menuOverlay.appendChild(buttonContainer);
+    document.body.appendChild(menuOverlay);
+    if (window._playMenuAmbienceOnShowMenu) playMenuAmbience();
+
+    // Difficulty variable
+    window.sentinelDifficulty = "Normal";
+    normalBtn.addEventListener("click", function() {
+      window.sentinelDifficulty = "Normal";
+      menuOverlay.style.display = "none";
+      showMenuScreen = false;
+      fadeOutMenuAmbience();
+      restartGame();
+      statPoints = 5;
+      player.health = player.maxHealth = 10;
+      spawnWave();
+      gameStarted = true;
+    });
+    hardcoreBtn.addEventListener("click", function() {
+      window.sentinelDifficulty = "Hardcore";
+      menuOverlay.style.display = "none";
+      showMenuScreen = false;
+      fadeOutMenuAmbience();
+      restartGame();
+      statPoints = 0;
+      player.health = player.maxHealth = 5;
+      spawnWave();
+      gameStarted = true;
+    });
+    apocalypseBtn.addEventListener("click", function() {
+      window.sentinelDifficulty = "Apocalypse";
+      menuOverlay.style.display = "none";
+      showMenuScreen = false;
+      fadeOutMenuAmbience();
+      restartGame();
+      statPoints = 5;
+      player.health = player.maxHealth = 5;
+      spawnWave();
+      gameStarted = true;
+    });
+  }
+              // Draw a jagged lightning bolt between two points
+              function drawLightningBolt(x1, y1, x2, y2, color, segments = 8, jaggedness = 16) {
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                for (let i = 1; i < segments; i++) {
+                  const t = i / segments;
+                  // Linear interpolation
+                  let nx = x1 + (x2 - x1) * t;
+                  let ny = y1 + (y2 - y1) * t;
+                  // Add random jaggedness perpendicular to the main direction
+                  const dx = y2 - y1;
+                  const dy = x1 - x2;
+                  const mag = Math.sqrt(dx * dx + dy * dy);
+                  if (mag > 0) {
+                    nx += (dx / mag) * (Math.random() - 0.5) * jaggedness;
+                    ny += (dy / mag) * (Math.random() - 0.5) * jaggedness;
+                  }
+                  ctx.lineTo(nx, ny);
+                }
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.restore();
+              }
             function drawWaveAnnouncement() {
               if (waveAnnouncementTimer > 0) {
                 ctx.save();
@@ -72,6 +324,10 @@ window.onload = function () {
   let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
+  // Block game loop if loading/menu is active
+  function isGameBlocked() {
+    return showLoadingScreen || showMenuScreen;
+  }
   let startTime = Date.now();
   let mouseX = 512, mouseY = 425;
   let followMouse = false;
@@ -226,7 +482,12 @@ window.onload = function () {
   document.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
     keys[k] = true;
-    if (k === "r" && gameOver) restartGame();
+    if (k === "r" && gameOver) {
+      showMenuScreen = true;
+      window._playMenuAmbienceOnShowMenu = true;
+      showMenu();
+      window._playMenuAmbienceOnShowMenu = false;
+    }
     if (k === "e") { showStats = !showStats; paused = showStats; }
     if (statPoints > 0 && ["1", "2", "3", "4", "5", "6"].includes(k)) applyStatPoint(k);
   });
@@ -238,8 +499,30 @@ window.onload = function () {
     mouseX = e.clientX - rect.left;
     mouseY = e.clientY - rect.top;
   });
-  canvas.addEventListener("mousedown", (e) => { if (e.button === 2) followMouse = true; });
-  canvas.addEventListener("mouseup", (e) => { if (e.button === 2) followMouse = false; });
+  let firstRightClickDone = false;
+  canvas.addEventListener("mousedown", (e) => {
+    if (e.button === 2) {
+      followMouse = true;
+      if (!firstRightClickDone && wave === 1 && gameStarted) {
+        firstRightClickDone = true;
+        try {
+          let warnAudio = new Audio('warning.wav');
+          warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0;
+          warnAudio.playbackRate = 0.7;
+          warnAudio.play();
+        } catch (e) {}
+      }
+    }
+  });
+  canvas.addEventListener("mouseup", (e) => {
+    if (e.button === 2) {
+      followMouse = false;
+      if (window.laserAudio && !window.laserAudio.paused) {
+        window.laserAudio.pause();
+        window.laserAudio.currentTime = 0;
+      }
+    }
+  });
   // Hide cursor when holding right-click, show when released
   canvas.addEventListener("mousedown", (e) => {
     if (e.button === 2) canvas.style.cursor = "crosshair";
@@ -353,6 +636,21 @@ window.onload = function () {
     if (playerLevelUpTimer > 0) playerLevelUpTimer -= delta * SPEED_MULTIPLIER;
   }
 
+  // Persistent laser sound for player attack
+  // Use window-scoped laserAudio for global access
+  let laserAudio = null;
+  window.laserAudio = null;
+
+  //====VOLUME MIXER====//
+  // Volume mixer variables (edit these outside the game to adjust)
+  window.sentinelVolume = {
+    laser: 0.2, // sparky_laser.wav
+      click: 1.0, // click.wav (max for HTMLAudioElement)
+      clickBoost: 2.5, // Extra gain for click.wav (Web Audio API)
+      warning: 0.2, // warning.wav volume
+      enemyProjectile: 0.1 // laserhoned.wav volume (lowered)
+    // Add more as needed
+  };
   function autoAttack() {
     let nearest = null, minDist = Infinity;
     for (let e of enemies) {
@@ -374,9 +672,23 @@ window.onload = function () {
     playerVisualAngle += angleDiff * 0.15; // 0.15 = smoothing factor
     window._playerToEnemyAngle = playerVisualAngle;
     // Draw the attack line for the entire cooldown period after an attack
-    if (nearest && minDist < player.range + nearest.radius && player.attackCooldown > 0) {
-      // Burning red laser effect with 3 skinny, color-shifting lines
-      const laserColors = ["#ff2a00", "#ff7a00", "#fff200"];
+    let isAttacking = nearest && minDist < player.range + nearest.radius && player.attackCooldown > 0 && followMouse;
+    // Start or resume sparky_laser.wav sound when attacking
+    if (isAttacking) {
+      if (!laserAudio) {
+        laserAudio = new Audio('micro_crackle_sparkling_background.wav');
+        laserAudio.loop = true;
+        laserAudio.volume = window.sentinelVolume.laser;
+        window.laserAudio = laserAudio;
+      }
+      // Always update volume in case changed externally
+      laserAudio.volume = window.sentinelVolume.laser;
+      if (laserAudio.paused) {
+        laserAudio.currentTime = 0;
+        laserAudio.play();
+      }
+      // Blue laser effect with 3 skinny, color-shifting lines
+      const laserColors = ["#00bfff", "#00e6ff", "#aaf6ff"];
       const offsets = [-1, 0, 1]; // skinnier spacing
       const colorShift = Math.floor(Date.now() / 60) % 3;
       // Calculate direction and edge of enemy for both laser and particles
@@ -397,6 +709,19 @@ window.onload = function () {
         drawLine(player.x + offX, player.y + offY, edgeX + offX, edgeY + offY, color);
         ctx.restore();
       }
+      // Lightning sparks: draw a few random bolts branching from the laser
+      const sparkCount = 3 + Math.floor(Math.random() * 2); // 3-4 sparks
+      for (let s = 0; s < sparkCount; s++) {
+        const t = 0.2 + Math.random() * 0.6; // Position along the laser
+        const baseX = player.x + (edgeX - player.x) * t;
+        const baseY = player.y + (edgeY - player.y) * t;
+        const angle = Math.atan2(edgeY - player.y, edgeX - player.x) + (Math.random() - 0.5) * 1.2;
+        const length = 12 + Math.random() * 20;
+        const endX = baseX + Math.cos(angle) * length;
+        const endY = baseY + Math.sin(angle) * length;
+        const sparkColor = ["#aaf6ff", "#e0f7ff", "#00e6ff", "#ffffff"][Math.floor(Math.random() * 4)];
+        drawLightningBolt(baseX, baseY, endX, endY, sparkColor, 6 + Math.floor(Math.random() * 3), 10 + Math.random() * 10);
+      }
         // Attack line oval shadow behind player (fixed size)
         ctx.save();
         const shadowDirX = -dirX;
@@ -414,7 +739,7 @@ window.onload = function () {
         ctx.ellipse(0, 0, ovalLength, ovalWidth, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
-        // Laser light emission effect along the attack line
+        // Laser light emission effect along the attack line (blue theme)
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         const glowSteps = Math.max(8, Math.floor(dist / 18));
@@ -424,9 +749,9 @@ window.onload = function () {
           const py = player.y + (edgeY - player.y) * t;
           const glowRadius = 22 + 18 * (1 - Math.abs(t - 0.5) * 1.5); // Brighter in the middle
           const grad = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
-          grad.addColorStop(0, 'rgba(255, 120, 0, 0.02)');
-          grad.addColorStop(0.4, 'rgba(255, 220, 0, 0.03)');
-          grad.addColorStop(1, 'rgba(255, 42, 0, 0.0)');
+          grad.addColorStop(0, 'rgba(0, 180, 255, 0.08)');
+          grad.addColorStop(0.4, 'rgba(0, 230, 255, 0.10)');
+          grad.addColorStop(1, 'rgba(0, 120, 255, 0.0)');
           ctx.beginPath();
           ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
           ctx.fillStyle = grad;
@@ -434,17 +759,17 @@ window.onload = function () {
         }
         ctx.globalCompositeOperation = 'source-over';
         ctx.restore();
-        
-      // Emit burning laser particles: red, orange, yellow, white
+    
+      // Emit blue laser particles
       const steps = Math.floor(Math.hypot(edgeX - player.x, edgeY - player.y) / 65); // Greatly reduce particles
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const px = player.x + (edgeX - player.x) * t;
         const py = player.y + (edgeY - player.y) * t;
         const palette = [
-          "rgba(43, 43, 43, 0.7)",   // orange
-          "rgba(255, 255, 255, 0.6)",   // yellow
-          "rgba(37, 37, 37, 0.65)"  // white hot
+          "rgba(0, 191, 255, 0.7)",   // deep sky blue
+          "rgba(173, 216, 230, 0.6)", // light blue
+          "rgba(0, 255, 255, 0.65)"   // cyan
         ];
         const color = palette[Math.floor(Math.random() * palette.length)];
         const speed = 1.2 + Math.random() * .5;
@@ -463,9 +788,15 @@ window.onload = function () {
     }
     
     // Only attack if not on cooldown
-    if (nearest && minDist < player.range + nearest.radius && player.attackCooldown <= 0) {
+    let isAttackFrame = nearest && minDist < player.range + nearest.radius && player.attackCooldown <= 0 && followMouse;
+    if (isAttackFrame) {
       drawLine(player.x, player.y, nearest.x, nearest.y, "LightBlue");
       nearest.health -= player.damage;
+          // Stop the laser sound if not attacking
+          if (!isAttacking && laserAudio && !laserAudio.paused) {
+            laserAudio.pause();
+            laserAudio.currentTime = 0;
+          }
       // Fiery sparks when hitting enemies
       for (let i = 0; i < 8; i++) {
         const angle = Math.random() * Math.PI * 5;
@@ -494,15 +825,22 @@ window.onload = function () {
                   gainXP(xpToLevel);
                 }
         if (nearest.type === "grunt" && wave !== 5) {
-          xpDrops.push({ x: nearest.x, y: nearest.y + 2 });
+          // Only drop xp if not a boss-spawned grunt
+          if (!nearest.noXP) {
+            xpDrops.push({ x: nearest.x, y: nearest.y + 2 });
+          }
         }
         if (nearest.type === "slinger") {
+          slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
+        }
+        if (nearest.type === "kamikaze") {
+          // Only drop slingerDrop if killed by player (not self-explode)
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
         if (nearest.type === "brute") {
           bruteDrops.push({ x: nearest.x + 3, y: nearest.y + 5 });
         }
-         if (Math.random() < 0.05) {
+         if (Math.random() < 0.15) {
           healthDrops.push({ x: nearest.x + 4, y: nearest.y + 6 });
         }
       }
@@ -555,6 +893,18 @@ const droplifelenght = 280;
     for (let i = xpDrops.length - 1; i >= 0; i--) {
       const d = xpDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
+        try {
+          let clickAudio = new Audio('click.wav');
+          clickAudio.volume = window.sentinelVolume.click;
+          if (window.AudioContext || window.webkitAudioContext) {
+            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+            let src = ctx.createMediaElementSource(clickAudio);
+            let gain = ctx.createGain();
+            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
+            src.connect(gain).connect(ctx.destination);
+          }
+          clickAudio.play();
+        } catch (e) {}
         gainXP(1);
         // XP pickup feedback: explode into persistent blue pieces
         // Grunt tones
@@ -587,6 +937,18 @@ const droplifelenght = 280;
     for (let i = slingerDrops.length - 1; i >= 0; i--) {
       const d = slingerDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
+        try {
+          let clickAudio = new Audio('click.wav');
+          clickAudio.volume = window.sentinelVolume.click;
+          if (window.AudioContext || window.webkitAudioContext) {
+            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+            let src = ctx.createMediaElementSource(clickAudio);
+            let gain = ctx.createGain();
+            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
+            src.connect(gain).connect(ctx.destination);
+          }
+          clickAudio.play();
+        } catch (e) {}
         gainXP(2);
         // XP pickup feedback: explode into persistent blue pieces
         // Slinger tones
@@ -619,6 +981,18 @@ const droplifelenght = 280;
     for (let i = bruteDrops.length - 1; i >= 0; i--) {
       const d = bruteDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
+        try {
+          let clickAudio = new Audio('click.wav');
+          clickAudio.volume = window.sentinelVolume.click;
+          if (window.AudioContext || window.webkitAudioContext) {
+            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+            let src = ctx.createMediaElementSource(clickAudio);
+            let gain = ctx.createGain();
+            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
+            src.connect(gain).connect(ctx.destination);
+          }
+          clickAudio.play();
+        } catch (e) {}
         gainXP(1);
         player.health = Math.min(player.maxHealth, player.health + 1);
         // XP pickup feedback: explode into persistent red pieces
@@ -652,6 +1026,18 @@ const droplifelenght = 280;
     for (let i = healthDrops.length - 1; i >= 0; i--) {
       const d = healthDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
+        try {
+          let clickAudio = new Audio('click.wav');
+          clickAudio.volume = window.sentinelVolume.click;
+          if (window.AudioContext || window.webkitAudioContext) {
+            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
+            let src = ctx.createMediaElementSource(clickAudio);
+            let gain = ctx.createGain();
+            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
+            src.connect(gain).connect(ctx.destination);
+          }
+          clickAudio.play();
+        } catch (e) {}
         player.health = Math.min(player.maxHealth, player.health + 1);
         // Health pickup feedback: explode into persistent green pieces
         for (let j = 0; j < 18; j++) {
@@ -819,34 +1205,34 @@ const droplifelenght = 280;
     } else if (wave === 4) {
       burstCount = 5;
       burstInterval = 240;
-      window._customBursts = [3, 4, 5, 6, 7, 8].slice(0, 5); // 3-7 grunts, +1 per burst
+      window._customBursts = [3, 3, 4, 4, 5, 7].slice(0, 5); // 3-7 grunts, +1 per burst
     } else if (wave === 5) {
       burstCount = Infinity;
-      burstInterval = 300; // 5 sec
+      burstInterval = 400; // 5 sec
       // For infinite, just pick a new random for each burst in handleWaveSpawning
       window._customBursts = null;
       spawnGruntBoss();
     } else if (wave === 6) {
       burstCount = 6;
-      burstInterval = 300; // 5 sec
+      burstInterval = 150; // 5 sec
       window._customBursts = null;
-      window._customSlingers = [1, 0, 1, 1, 0, 2];
+      window._customSlingers = [1, 0, 0, 1, 0, 1];
     } else if (wave === 7) {
       burstCount = 7;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
-      window._customSlingers = [2, 0, 2, 0, 1, 3];
+      window._customSlingers = [2, 0, 0, 2, 0, 3];
     } else if (wave === 8) {
       burstCount = 7;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
-      window._customSlingers = [2, 0, 2, 0, 1, 3];
+      window._customSlingers = [3, 0, 0, 2, 0, 3];
       spawnGruntBossMinor();
     } else if (wave === 9) {
       burstCount = 8;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
-      window._customSlingers = [2, 0, 2, 1, 1, 3];
+      window._customSlingers = [4, 0, 1, 1, 1, 4];
       spawnGruntBossMinor();
       setTimeout(() => spawnGruntBossMinor(), 10000);
     } else if (wave === 10) {
@@ -872,7 +1258,7 @@ const droplifelenght = 280;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
       window._customSlingers = [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
-      window._customKamikazes = [0, 1, 0, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
+      window._customKamikazes = [0, 0, 1, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
       window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0];
 
     } else if (wave === 13) {
@@ -880,7 +1266,7 @@ const droplifelenght = 280;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
       window._customSlingers = [0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0];
-      window._customKamikazes = [0, 1, 0, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
+      window._customKamikazes = [0, 0, 2, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
       window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0];
     } else if (wave === 14) {
       burstCount = 12;
@@ -912,6 +1298,10 @@ const droplifelenght = 280;
       burstCount = 0;
       burstInterval = 300;
     }
+    // Ensure _customBursts is always an array for waves 1-4
+    if ((wave === 1 || wave === 2 || wave === 3 || wave === 4) && !Array.isArray(window._customBursts)) {
+      window._customBursts = [2, 3, 4, 5]; // Default values, adjust as needed
+    }
     burstIndex = 0;
     burstTimer = 0;
     window._bossMinorCount = 0;
@@ -920,60 +1310,77 @@ const droplifelenght = 280;
   
 
 
-  function handleWaveSpawning() {
+  function handleWaveSpawning(delta) {
     // Custom burst logic for waves 1-4, infinite for wave 5, and controlled bursts for waves 6-10
-    // Prevent further spawning after wave 10 ends
-    if (window._wave10MinorsSpawned && wave > 10) return;
+    // (Removed block that prevented spawning after wave 10)
     // For wave 10, set burstCount to number of alive gruntBossMinors
     if (wave === 10) {
       burstCount = enemies.filter(en => en.type === "gruntBossMinor").length;
     }
-    if ((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5) || (wave >= 6 && wave <= 10 && burstIndex < burstCount) || (wave >= 11 && wave <= 16)) {
-          burstTimer++;
+    // For waves 11-16, keep spawning kamikazes at interval until all mobs are cleared
+    const isKamikazeWave = (wave >= 12 && wave <= 16);
+    const shouldContinueKamikaze = isKamikazeWave && enemies.length > 0;
+    if ((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5) || (wave >= 6 && wave <= 10 && burstIndex < burstCount) || (wave >= 11 && wave <= 16 && (burstIndex < burstCount || shouldContinueKamikaze))) {
+          burstTimer += delta * SPEED_MULTIPLIER;
           if (burstTimer >= burstInterval) {
             burstTimer = 0;
             let grunts = 0;
             let slingers = 0;
             // Only assign grunts for specific waves
             if (wave === 1 || wave === 2 || wave === 3 || wave === 4) {
-              grunts = window._customBursts[burstIndex] || 0;
+              grunts = (window._customBursts && window._customBursts[burstIndex]) || 0;
             } else if (wave === 5) {
-              grunts = 2 + Math.floor(Math.random() * 3); // 2-4 grunts
+              grunts = 1 + Math.floor(Math.random() * 2); // 2-4 grunts
             } else if (wave >= 6 && wave <= 9) {
               grunts = 2 + Math.floor(Math.random() * 3); // 2-4 grunts
               if (window._customSlingers) {
                 slingers = window._customSlingers[burstIndex] || 0;
               }
             }
-            // For wave 10, spawn only slingers and boss minors
+            // Apocalypse mode: 1 kamikaze every burst, every wave
+            if (window.sentinelDifficulty === "Apocalypse") {
+              spawnKamikazeBurst(1);
+            }
+            // For wave 10, spawn slingers and grunts per burst
             if (wave === 10) {
-              const slingerCount = 1 + Math.floor(Math.random() * 2);
+              const slingerCount = 2 + Math.floor(Math.random() * 3);
               spawnSlingerBurst(slingerCount);
+              // Add grunt spawns (2-4 per burst, as in waves 6-9)
+              const gruntCount = 2 + Math.floor(Math.random() * 3);
+              spawnBurst(gruntCount);
             } else {
-              if (grunts > 0) spawnBurst(grunts);
+              // Only call spawnBurst(grunts) once per burst
               if (slingers > 0) spawnSlingerBurst(slingers);
             }
+            
             if (wave === 11) {
               // Only kamikazes, handled here
               if (window._customKamikazes && window._customKamikazes[burstIndex]) {
                 spawnKamikazeBurst(window._customKamikazes[burstIndex]);
               }
             }
+
+
             if (wave === 12 || wave === 13 || wave === 14 || wave === 15 || wave === 16) {
               grunts = 1 + Math.floor(Math.random() * 2); 
               if (window._customSlingers && window._customSlingers[burstIndex]) {
                 spawnSlingerBurst(window._customSlingers[burstIndex]);
               }
+              let count = 0;
               if (window._customKamikazes && window._customKamikazes[burstIndex]) {
-                spawnKamikazeBurst(window._customKamikazes[burstIndex]);
+                count = window._customKamikazes[burstIndex];
+              } else if (shouldContinueKamikaze) {
+                count = wave - 10; // Default to 1 kamikaze per interval after bursts
               }
+              if (count > 0) spawnKamikazeBurst(count);
+            }
               if (window._customBossMinors && window._customBossMinors[burstIndex]) {
                 for (let i = 0; i < window._customBossMinors[burstIndex]; i++) {
                   spawnGruntBossMinor();
                 }
               }
               if (grunts > 0) spawnBurst(grunts);
-            }
+            
 
 
         burstIndex++;
@@ -1158,6 +1565,17 @@ const droplifelenght = 280;
     bruteDrops.length = 0;
     particles.length = 0;
     projectiles.length = 0;
+    mines.length = 0;
+    // Reset wave spawn state
+    burstCount = 3;
+    burstIndex = 0;
+    burstTimer = 0;
+    window._customBursts = null;
+    window._customSlingers = null;
+    window._customKamikazes = null;
+    window._customBossMinors = null;
+    window._bossMinorBursts = null;
+    window._wave10MinorsSpawned = false;
     gameOver = false;
     showStats = false;
     paused = false;
@@ -1217,7 +1635,8 @@ const droplifelenght = 280;
                                   x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "grunt", spinAngle, spinSpeed, noBossCollision: 120,
                                   vx: Math.cos(angle) * novaSpeed,
                                   vy: Math.sin(angle) * novaSpeed,
-                                  novaTimer: 18 // frames to move outward before normal AI
+                                  novaTimer: 18, // frames to move outward before normal AI
+                                  noXP: true // Mark as no xp drop
                                 });
                               }
                               // Optionally randomize next spawn count
@@ -1423,6 +1842,12 @@ const droplifelenght = 280;
               // End wave if gruntBoss dies
               if (e.type === "gruntBoss") {
                 wave++;
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
                 spawnWave();
               }
               // End wave 10 only if all three gruntBossMinors are dead
@@ -1430,21 +1855,19 @@ const droplifelenght = 280;
                 // Check if all gruntBossMinors are gone
                 const remainingMinors = enemies.filter(en => en.type === "gruntBossMinor").length;
                 if (remainingMinors === 0) {
-                  wave++;
-                  burstCount = 0;
-                  burstIndex = 0;
-                  spawnWave();
-                }
-              }
-              // Scatter 5 xpDrops around gruntBossMinor's location
-              if (e.type === "gruntBossMinor") {
-                for (let k = 0; k < 5; k++) {
-                  const angle = Math.random() * Math.PI * 2;
-                  const dist = 18 + Math.random() * 22;
-                  xpDrops.push({
-                    x: e.x + Math.cos(angle) * dist,
-                    y: e.y + Math.sin(angle) * dist
-                  });
+                  // Only end wave 10 if ALL enemies are gone
+                  if (enemies.length === 0) {
+                    wave++;
+                    try {
+                      let warnAudio = new Audio('warning.wav');
+                      warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                      warnAudio.playbackRate = 0.7;
+                      warnAudio.play();
+                    } catch (e) {}
+                    burstCount = 0;
+                    burstIndex = 0;
+                    spawnWave();
+                  }
                 }
               }
             } else if (e.type === "brute") {
@@ -1591,6 +2014,7 @@ const droplifelenght = 280;
                     type: "enemyDeath"
                   });
                 }
+                // Do NOT drop slingerDrop here (self-explode)
                 enemies.splice(i, 1);
                 continue;
               }
@@ -1641,20 +2065,20 @@ const droplifelenght = 280;
         }
         // Consistent spin speed for all enemies
         if (typeof e.spinAngle === "undefined") e.spinAngle = Math.random() * Math.PI * 2;
-        e.spinAngle += 0.003 * delta * SPEED_MULTIPLIER;
+        e.spinAngle += 0.18 * delta;
         // Slinger hover effect (visual only)
         let hoverY = e.y;
         if (e.type === "slinger") {
           if (typeof e.baseY === "undefined") e.baseY = e.y;
           if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
-          e.hoverOffset += 0.04 * delta * SPEED_MULTIPLIER;
-          hoverY = e.y + Math.sin(e.hoverOffset) * 0.2;
+          e.hoverOffset += 0.8 * delta;
+          hoverY = e.y + Math.sin(e.hoverOffset) * 1;
         }
       }
     }
   }
 
-  function updateProjectiles() {
+  function updateProjectiles(delta) {
     for (let i = projectiles.length - 1; i >= 0; i--) {
       const p = projectiles[i];
       let moved = false;
@@ -1662,8 +2086,9 @@ const droplifelenght = 280;
       if (!p.trail) p.trail = [];
       p.trail.push({ x: p.x, y: p.y });
       if (p.trail.length > 12) p.trail.shift();
-      p.x += p.dx;
-      p.y += p.dy;
+      // Apply delta and SPEED_MULTIPLIER for frame-rate independence
+      p.x += p.dx * delta * SPEED_MULTIPLIER;
+      p.y += p.dy * delta * SPEED_MULTIPLIER;
 
       const dist = Math.hypot(player.x - p.x, player.y - p.y);
       if (dist < player.radius + 4) {
@@ -1751,6 +2176,10 @@ const droplifelenght = 280;
   let lastTimestamp = performance.now();
 
   function gameLoop(currentTimestamp) {
+    if (typeof isGameBlocked === 'function' && isGameBlocked()) {
+      requestAnimationFrame(gameLoop);
+      return;
+    }
     // Calculate delta time in seconds
     const delta = (currentTimestamp - lastTimestamp) / 1000;
     lastTimestamp = currentTimestamp;
@@ -1856,11 +2285,17 @@ const droplifelenght = 280;
         updateParticles();
         updatePlayer(delta);
         updateEnemies(delta);
-        updateProjectiles();
+        updateProjectiles(delta);
         autoAttack();
-        handleWaveSpawning();
+        handleWaveSpawning(delta);
         if (enemies.length === 0 && burstIndex >= burstCount) {
           wave++;
+          try {
+            let warnAudio = new Audio('warning.wav');
+            warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0;
+            warnAudio.playbackRate = 0.7;
+            warnAudio.play();
+          } catch (e) {}
           spawnWave();
         }
       }
@@ -2376,4 +2811,3 @@ const droplifelenght = 280;
   requestAnimationFrame(gameLoop);
 
 }
-
