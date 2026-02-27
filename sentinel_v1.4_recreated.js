@@ -1,4 +1,4 @@
-  // Fade out and stop menu ambience
+  // Fade out and stop menu ambience audio
   function fadeOutMenuAmbience(duration = 1000) {
     const ambience = window._menuAmbienceAudio;
     if (!ambience) return;
@@ -18,35 +18,40 @@
     }
     step();
   }
-  // Play ambience scifi2.wav once on title/menu
+  // Play menu ambience audio (scifi2.wav) once
   function playMenuAmbience() {
     try {
       if (window._menuAmbienceAudio) {
         window._menuAmbienceAudio.pause();
+        window._menuAmbienceAudio.currentTime = 0;
         window._menuAmbienceAudio = null;
       }
       let ambience = new Audio('ambience scifi2.wav');
       ambience.volume = 0.1;
       ambience.loop = false;
-      ambience.play();
+      let playPromise = ambience.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Audio play failed:', error);
+        });
+      }
       window._menuAmbienceAudio = ambience;
     } catch (e) {}
   }
-  // Global speed multiplier for delta time scaling
-  const SPEED_MULTIPLIER = 120; // Increase for faster game, decrease for slower
-  // Load mine sprite for mines
+  // Speed multiplier for game timing (higher = faster, lower = slower)
+  const SPEED_MULTIPLIER = 120;
+  // Mine sprite
   const mineImg = new window.Image();
   mineImg.src = "mine.png";
-// Sentinel v1.4 Recreated
-// Core game logic
+// Sentinel v1.4 Recreated - Core game logic
 
 window.onload = function () {
-  // --- Loading/Menu Screen State ---
+  // Loading/Menu screen state
   let showLoadingScreen = true;
   let showMenuScreen = false;
   const titleImg = new window.Image();
   titleImg.src = "titlescreen.png";
-  // Create overlay elements
+  // Create loading overlay elements
   const loadingOverlay = document.createElement("div");
   loadingOverlay.id = "loadingOverlay";
   loadingOverlay.style.position = "fixed";
@@ -60,7 +65,7 @@ window.onload = function () {
   loadingOverlay.style.justifyContent = "center";
   loadingOverlay.style.alignItems = "center";
   loadingOverlay.style.zIndex = 1000;
-  // Canvas-fitted image
+  // Loading background image
   const loadingBg = document.createElement("img");
   loadingBg.src = "titlescreen.png";
   loadingBg.style.position = "absolute";
@@ -71,7 +76,7 @@ window.onload = function () {
   loadingBg.style.height = "768px";
   loadingBg.style.objectFit = "fill";
 
-  // Gradient overlay for bottom fade
+  // Gradient overlay for bottom fade effect
   const loadingGradient = document.createElement("div");
   loadingGradient.style.position = "absolute";
   loadingGradient.style.left = "0";
@@ -84,7 +89,7 @@ window.onload = function () {
   loadingOverlay.appendChild(loadingGradient);
   loadingBg.style.zIndex = 0;
   loadingOverlay.appendChild(loadingBg);
-  // Continue button (discreet, bottom, subtle)
+  // Continue button (bottom, subtle)
   const continueBtn = document.createElement("div");
   continueBtn.textContent = "Click to continue";
   continueBtn.style.position = "absolute";
@@ -109,7 +114,7 @@ window.onload = function () {
     showMenuScreen = true;
     showMenu();
   });
-  // --- Menu Screen ---
+  // Menu screen
   function showMenu() {
     const menuOverlay = document.createElement("div");
     menuOverlay.id = "menuOverlay";
@@ -124,7 +129,7 @@ window.onload = function () {
     menuOverlay.style.justifyContent = "center";
     menuOverlay.style.alignItems = "center";
     menuOverlay.style.zIndex = 1000;
-    // Canvas-fitted image
+    // Menu background image
     const menuBg = document.createElement("img");
     menuBg.src = "titlescreen.png";
     menuBg.style.position = "absolute";
@@ -135,7 +140,7 @@ window.onload = function () {
     menuBg.style.height = "768px";
     menuBg.style.objectFit = "fill";
 
-    // Gradient overlay for bottom fade
+    // Gradient overlay for bottom fade effect
     const menuGradient = document.createElement("div");
     menuGradient.style.position = "absolute";
     menuGradient.style.left = "0";
@@ -148,7 +153,7 @@ window.onload = function () {
     menuOverlay.appendChild(menuGradient);
     menuBg.style.zIndex = 0;
     menuOverlay.appendChild(menuBg);
-    // Title
+    // Game title
     const title = document.createElement("h1");
     title.textContent = "";
     title.style.color = "#fff";
@@ -157,7 +162,7 @@ window.onload = function () {
     title.style.position = "relative";
     title.style.zIndex = 1;
     menuOverlay.appendChild(title);
-    // Difficulty buttons
+    // Difficulty selection buttons
     const buttonContainer = document.createElement("div");
     buttonContainer.style.display = "flex";
     buttonContainer.style.flexDirection = "column";
@@ -183,7 +188,7 @@ window.onload = function () {
       return btn;
     }
 
-    // Add three buttons
+    // Add difficulty buttons
     const normalBtn = makeMenuButton("Normal", "#fff");
     const hardcoreBtn = makeMenuButton("Hardcore", "#ffb300");
     const apocalypseBtn = makeMenuButton("Apocalypse", "#ff3c3c");
@@ -230,7 +235,7 @@ window.onload = function () {
       gameStarted = true;
     });
   }
-              // Draw a jagged lightning bolt between two points
+              // Draw jagged lightning bolt between two points
               function drawLightningBolt(x1, y1, x2, y2, color, segments = 8, jaggedness = 16) {
                 ctx.save();
                 ctx.strokeStyle = color;
@@ -259,6 +264,7 @@ window.onload = function () {
                 ctx.shadowBlur = 0;
                 ctx.restore();
               }
+            // Draw wave announcement with fade animation
             function drawWaveAnnouncement() {
               if (waveAnnouncementTimer > 0) {
                 ctx.save();
@@ -271,10 +277,8 @@ window.onload = function () {
                 // Animation: quick fade-in (first 20 frames), slower fade-out (last 40 frames)
                 let alpha = 1;
                 if (waveAnnouncementTimer > WAVE_ANNOUNCE_DURATION - 20) {
-                  // Fade in
                   alpha = 1 - ((WAVE_ANNOUNCE_DURATION - waveAnnouncementTimer) / 20);
                 } else {
-                  // Fade out
                   alpha = waveAnnouncementTimer / (WAVE_ANNOUNCE_DURATION - 20);
                 }
                 ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
@@ -284,33 +288,29 @@ window.onload = function () {
               }
             }
           let waveAnnouncementTimer = 60; // Show announcement at game start
-          const WAVE_ANNOUNCE_DURATION = 660; // 1 second
-        // Load HUD overlay image
+          const WAVE_ANNOUNCE_DURATION = 660; // Duration for wave announcement
+        // HUD overlay image
         const hudImg = new window.Image();
         hudImg.src = "liphud_slim2.png";
-      // Load background image
+      // Game background image
       const backgroundImg = new window.Image();
       backgroundImg.src = "background4.png";
     // For smooth player rotation
-    let playerVisualAngle = 0;
+    let playerVisualAngle = Math.PI / 2; // Start facing down
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
 
   let keys = {}, paused = false, gameOver = false;
-  // Load player sprite
+  // Player sprite
   const playerImg = new window.Image();
   playerImg.src = "player_drone.png";
-  // Load grunt sprite for magenta enemy
+  // Enemy sprites
   const gruntImg = new window.Image();
   gruntImg.src = "grunt.png";
-  // Load brute sprite for brute enemy
   const bruteImg = new window.Image();
   bruteImg.src = "brute.png";
-  // Load slinger sprite for slinger enemy
   const slingerImg = new window.Image();
   slingerImg.src = "slinger.png";
-
-  // Load kamikaze sprite for kamikaze enemy
   const kamikazeImg = new window.Image();
   kamikazeImg.src = "kamikaze.png";
 
@@ -319,7 +319,7 @@ window.onload = function () {
 
 
 
-  /////////////-========= GAME STATE =========-/////////////////
+  //========= GAME STATE =========//
   let wave = 1, xp = 0, xpToLevel = 10, level = 1, statPoints = 5; // Start at wave 1
   let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
@@ -332,10 +332,9 @@ window.onload = function () {
   let mouseX = 512, mouseY = 425;
   let followMouse = false;
 
-
   let burstCount = 3, burstIndex = 0, burstTimer = 0;
   // Burst interval in frames (higher = longer pause between bursts)
-  let burstInterval = 120; // Increased from 60 for a bigger cooldown
+  let burstInterval = 120; // Increased for bigger cooldown
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
 
@@ -396,7 +395,7 @@ window.onload = function () {
         mines.splice(i, 1);
         continue;
       }
-      // Remove mine after timer runs out
+      // Remove mine after timer expires
       m.timer -= delta * SPEED_MULTIPLIER;
       if (m.timer <= 0) {
         // Mine explodes visually and damages player if in range
@@ -530,17 +529,44 @@ window.onload = function () {
   canvas.addEventListener("mouseup", (e) => {
     if (e.button === 2) canvas.style.cursor = "default";
   });
-  // Also reset cursor if context menu is triggered (failsafe)
+  // Reset cursor if context menu is triggered (failsafe)
   canvas.addEventListener("contextmenu", (e) => {
     canvas.style.cursor = "default";
   });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
+  // Game Over click handler
+  canvas.addEventListener("click", (e) => {
+    if (gameOver && window._gameOverTime !== undefined) {
+      const elapsedSeconds = (Date.now() - window._gameOverTime) / 1000;
+      
+      // Second death - always return to menu on click
+      if (window._playerUsedContinue) {
+        showMenuScreen = true;
+        window._playMenuAmbienceOnShowMenu = true;
+        playMenuAmbience();
+        showMenu();
+        gameOver = false;
+        window._gameOverTime = undefined;
+        window._playerUsedContinue = false;
+        followMouse = false;
+      }
+      // First death - continue with full health if clicked before 5 seconds
+      else if (elapsedSeconds < 5) {
+        player.health = player.maxHealth;
+        gameOver = false;
+        window._gameOverTime = undefined;
+        window._playerUsedContinue = true;
+        followMouse = true;
+      }
+    }
+  });
+
   function applyStatPoint(k) {
     const statKeys = ["Range", "Power", "AttackSpeed", "Movement", "Vitality", "Pickup"];
     const stat = statKeys[parseInt(k) - 1];
     if (stat) {
-      // Enforce max stat value per stat to match current level
+      // Enforce max stat value per stat (max = current level + 1)
       if (player.stats[stat] < level+1) {
         player.stats[stat]++;
         statPoints--;
@@ -550,6 +576,7 @@ window.onload = function () {
   }
 
   function applyStats() {
+    // Update player stats based on upgrades
     player.range = 80 + player.stats.Range * 5;
     player.damage = 1 + player.stats.Power;
     player.speed = player.baseSpeed + player.stats.Movement * 0.5;
@@ -560,11 +587,13 @@ window.onload = function () {
   }
 
   function constrainPlayer() {
+    // Keep player within canvas bounds
     player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
     player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
   }
 
   function createParticles(x, y, color) {
+    // Create generic particles at (x, y)
     for (let i = 0; i < 10; i++) {
       particles.push({
         x, y,
@@ -578,6 +607,7 @@ window.onload = function () {
   }
 
   function drawParticles() {
+    // Draw all particles
     for (let p of particles) {
       ctx.save();
       ctx.shadowColor = p.color;
@@ -609,6 +639,7 @@ window.onload = function () {
   }
 
   function updatePlayer(delta) {
+    // Update player position and cooldowns
     if (followMouse) {
     }
     // Track previous position for dust
@@ -637,18 +668,16 @@ window.onload = function () {
   }
 
   // Persistent laser sound for player attack
-  // Use window-scoped laserAudio for global access
   let laserAudio = null;
   window.laserAudio = null;
 
-  //====VOLUME MIXER====//
-  // Volume mixer variables (edit these outside the game to adjust)
+  // Volume mixer variables (edit outside game to adjust)
   window.sentinelVolume = {
-    laser: 0.2, // sparky_laser.wav
-      click: 1.0, // click.wav (max for HTMLAudioElement)
-      clickBoost: 2.5, // Extra gain for click.wav (Web Audio API)
-      warning: 0.2, // warning.wav volume
-      enemyProjectile: 0.1 // laserhoned.wav volume (lowered)
+    laser: 0.05, // sparky_laser.wav
+    click: 1.0, // click.wav (max for HTMLAudioElement)
+    clickBoost: 1.5, // Extra gain for click.wav (Web Audio API)
+    warning: 0, // warning.wav volume
+    enemyProjectile: 0.1 // laser.wav volume (lowered)
     // Add more as needed
   };
   function autoAttack() {
@@ -661,19 +690,19 @@ window.onload = function () {
         nearest = e;
       }
     }
-    // Store nearest and angle globally for use in drawing
+    // Store nearest enemy and angle globally for drawing
     window._nearestEnemy = nearest;
     let targetAngle = 0;
     if (nearest) {
       targetAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
     }
-    // Smoothly interpolate the visual angle toward the target
+    // Smoothly interpolate player visual angle toward target
     const angleDiff = ((targetAngle - playerVisualAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
     playerVisualAngle += angleDiff * 0.15; // 0.15 = smoothing factor
     window._playerToEnemyAngle = playerVisualAngle;
-    // Draw the attack line for the entire cooldown period after an attack
+    // Draw attack line for entire cooldown period after attack
     let isAttacking = nearest && minDist < player.range + nearest.radius && player.attackCooldown > 0 && followMouse;
-    // Start or resume sparky_laser.wav sound when attacking
+    // Start or resume laser sound when attacking
     if (isAttacking) {
       if (!laserAudio) {
         laserAudio = new Audio('micro_crackle_sparkling_background.wav');
@@ -691,7 +720,7 @@ window.onload = function () {
       const laserColors = ["#00bfff", "#00e6ff", "#aaf6ff"];
       const offsets = [-1, 0, 1]; // skinnier spacing
       const colorShift = Math.floor(Date.now() / 60) % 3;
-      // Calculate direction and edge of enemy for both laser and particles
+      // Calculate direction and edge of enemy for laser and particles
       const dx = nearest.x - player.x;
       const dy = nearest.y - player.y;
       const dist = Math.hypot(dx, dy);
@@ -700,7 +729,7 @@ window.onload = function () {
       const edgeX = nearest.x - dirX * nearest.radius;
       const edgeY = nearest.y - dirY * nearest.radius;
       for (let l = 0; l < 3; l++) {
-        // Cycle the colors for a dynamic effect
+        // Cycle colors for dynamic effect
         const color = laserColors[(l + colorShift) % 3];
         const offX = -offsets[l] * (nearest.y - player.y) / Math.hypot(dx, dy);
         const offY = offsets[l] * (nearest.x - player.x) / Math.hypot(dx, dy);
@@ -709,7 +738,7 @@ window.onload = function () {
         drawLine(player.x + offX, player.y + offY, edgeX + offX, edgeY + offY, color);
         ctx.restore();
       }
-      // Lightning sparks: draw a few random bolts branching from the laser
+      // Lightning sparks: draw random bolts branching from laser
       const sparkCount = 3 + Math.floor(Math.random() * 2); // 3-4 sparks
       for (let s = 0; s < sparkCount; s++) {
         const t = 0.2 + Math.random() * 0.6; // Position along the laser
@@ -739,7 +768,7 @@ window.onload = function () {
         ctx.ellipse(0, 0, ovalLength, ovalWidth, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
-        // Laser light emission effect along the attack line (blue theme)
+        // Laser light emission effect along attack line (blue theme)
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         const glowSteps = Math.max(8, Math.floor(dist / 18));
@@ -857,16 +886,15 @@ window.onload = function () {
       statPoints += 2;
       // Restore health to max on level up
       player.health = player.maxHealth;
-      // XP curve: fast early, slow late
-      // Example: quadratic scaling
+      // XP curve: fast early, slow late (quadratic scaling)
       xpToLevel = Math.floor(10 + Math.pow(level, 1.8));
       playerLevelUpTimer = 24; // 24 frames of level up flash
       // Level up particles: denser close, looser far, more total
       const total = 68;
       for (let i = 0; i < total; i++) {
-        // Cluster more particles near the player, fewer far out
+        // Cluster more particles near player, fewer far out
         const angle = Math.random() * Math.PI * 2;
-        // Use a squared random for radius: more close, fewer far
+        // Use squared random for radius: more close, fewer far
         const t = Math.random();
         const speed = 1.5 + 8.5 * Math.pow(t, 2); // 1.5 to ~7.0, denser close, further spread
         particles.push({
@@ -951,7 +979,7 @@ const droplifelenght = 280;
         } catch (e) {}
         gainXP(2);
         // XP pickup feedback: explode into persistent blue pieces
-        // Slinger tones
+        // Slinger drop tones
         const palette = ["#FFA500", "#ffb84d", "#ff9900", "#ffcc80", "#8b5b00"];
         for (let j = 0; j < 18; j++) {
           const angle = Math.random() * Math.PI * 2;
@@ -996,7 +1024,7 @@ const droplifelenght = 280;
         gainXP(1);
         player.health = Math.min(player.maxHealth, player.health + 1);
         // XP pickup feedback: explode into persistent red pieces
-        // Brute tones
+        // Brute drop tones
         const palette = ["#8B0000", "#b22222", "#a52a2a", "#d11717", "#c80000"];
         for (let j = 0; j < 18; j++) {
           const angle = Math.random() * Math.PI * 2;
@@ -1068,9 +1096,9 @@ const droplifelenght = 280;
 
 
 
-  ///////////////////////////////////////////////////////////////////////////////////////////
-  ///////////////////////////////-========= WAVE =========-//////////////////////////////////
-  ///////////////////////////////////////////////////////////////////////////////////////////
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
+//-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=     WAVE     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
 
     // GRUNT BOSS
     // Spawns a grunt boss at a random edge
@@ -1133,7 +1161,7 @@ const droplifelenght = 280;
       else if (side === 1) { x = 1054; y = Math.random() * 768; }
       else if (side === 2) { x = Math.random() * 1024; y = -30; }
       else { x = Math.random() * 1024; y = 798; }
-      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave*1.6), damage = 1, attackRange = 20, color = "magenta";
+      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave*1.3), damage = 1, attackRange = 20, color = "magenta";
       const spinAngle = Math.random() * Math.PI * 2;
       const spinSpeed = (Math.random() - 0.5) * 0.02;
       enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "grunt", spinAngle, spinSpeed });
@@ -1189,50 +1217,50 @@ const droplifelenght = 280;
   // Main function to spawn waves based on the current wave number, with custom logic for each wave
   function spawnWave() {
     waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
-    // Only custom wave logic for waves 1-5 (and infinite for wave 5)
+
     if (wave === 1) {
       burstCount = 5;
-      burstInterval = 330; // 3 sec at 60 FPS
+      burstInterval = 330;
       window._customBursts = [1, 2, 3, 4, 5];
     } else if (wave === 2) {
       burstCount = 5;
-      burstInterval = 240; // 4 sec at 60 FPS
-      window._customBursts = Array.from({length: 5}, () => 2 + Math.floor(Math.random() * 3)); // 2-4 grunts
+      burstInterval = 240;
+      window._customBursts = Array.from({length: 5}, () => 2 + Math.floor(Math.random() * 3));
     } else if (wave === 3) {
       burstCount = 5;
-      burstInterval = 240; // 4 sec at 60 FPS
-      window._customBursts = Array.from({length: 5}, () => 3 + Math.floor(Math.random() * 3)); // 3-5 grunts
+      burstInterval = 240;
+      window._customBursts = Array.from({length: 5}, () => 3 + Math.floor(Math.random() * 3));
     } else if (wave === 4) {
       burstCount = 5;
       burstInterval = 240;
-      window._customBursts = [3, 3, 4, 4, 5, 7].slice(0, 5); // 3-7 grunts, +1 per burst
+      window._customBursts = [3, 3, 4, 4, 5, 7].slice(0, 5);
     } else if (wave === 5) {
       burstCount = Infinity;
-      burstInterval = 400; // 5 sec
-      // For infinite, just pick a new random for each burst in handleWaveSpawning
+      burstInterval = 400;
       window._customBursts = null;
       spawnGruntBoss();
+
     } else if (wave === 6) {
       burstCount = 6;
-      burstInterval = 150; // 5 sec
+      burstInterval = 150;
       window._customBursts = null;
       window._customSlingers = [1, 0, 0, 1, 0, 1];
     } else if (wave === 7) {
       burstCount = 7;
-      burstInterval = 300; // 5 sec
+      burstInterval = 300;
       window._customBursts = null;
-      window._customSlingers = [2, 0, 0, 2, 0, 3];
+      window._customSlingers = [2, 0, 0, 2, 0, 3, 0];
     } else if (wave === 8) {
       burstCount = 7;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
-      window._customSlingers = [3, 0, 0, 2, 0, 3];
+      window._customSlingers = [3, 0, 0, 2, 0, 3, 0];
       spawnGruntBossMinor();
     } else if (wave === 9) {
       burstCount = 8;
       burstInterval = 300; // 5 sec
       window._customBursts = null;
-      window._customSlingers = [4, 0, 1, 1, 1, 4];
+      window._customSlingers = [2, 1, 1, 1, 2, 1, 1, 2];
       spawnGruntBossMinor();
       setTimeout(() => spawnGruntBossMinor(), 10000);
     } else if (wave === 10) {
@@ -1256,43 +1284,41 @@ const droplifelenght = 280;
     } else if (wave === 12) {
       burstCount = 15;
       burstInterval = 300; // 5 sec
-      window._customBursts = null;
-      window._customSlingers = [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
-      window._customKamikazes = [0, 0, 1, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
+      window._customSlingers =   [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
+      window._customKamikazes =  [0, 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 1, 2, 3];
       window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0];
 
     } else if (wave === 13) {
       burstCount = 15;
       burstInterval = 300; // 5 sec
-      window._customBursts = null;
-      window._customSlingers = [0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0];
-      window._customKamikazes = [0, 0, 2, 2, 0, 3, 0, 2, 0, 4, 0, 2, 0, 2, 3];
-      window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0];
+      window._customSlingers =   [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
+      window._customKamikazes =  [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1];
+      window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0];
+
     } else if (wave === 14) {
-      burstCount = 12;
-      burstInterval = 320; // 5.33 sec
-      // Combo bursts: slingers first, then kamikazes, then boss minors, then mixed
-      window._customSlingers = [2, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 1];
-      window._customKamikazes = [0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 1];
-      window._customBossMinors = [0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2];
-      // In mixed bursts, slingers and kamikazes overlap, forcing movement and dodging
+      burstCount = 15;
+      burstInterval = 300; // 5.33 sec
+      window._customBursts =     [1, 1, 2, 1, 4, 1, 1, 6, 1, 1, 8, 0, 0, 0, 0];
+      window._customSlingers =   [0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0];
+      window._customKamikazes =  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      window._customBossMinors = [0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0];
+
     } else if (wave === 15) {
-      burstCount = 14;
+      burstCount = 15;
       burstInterval = 300; // 5 sec
-      // Pincer and crossfire: slingers and kamikazes together, boss minors in the middle
-      window._customSlingers = [1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2];
-      window._customKamikazes = [2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 1];
-      window._customBossMinors = [0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0];
-      // Some bursts have all three, requiring target prioritization
+      window._customBursts =     [1, 1, 2, 1, 1, 4, 1, 1, 6, 1, 1, 8, 2, 2, 2];
+      window._customSlingers =   [0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0];
+      window._customKamikazes =  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3];
+      window._customBossMinors = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0];
+
     } else if (wave === 16) {
-      burstCount = 16;
+      burstCount = 15;
       burstInterval = 300; // 4.67 sec
-      // Advanced combos: more grunts, fewer boss minors
-      window._customBursts = [4, 5, 6, 7, 8, 9, 10, 10, 9, 8, 7, 6, 5, 4, 6, 8];
-      window._customSlingers = [2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 2, 3];
-      window._customKamikazes = [0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 2, 2, 3, 3];
-      window._customBossMinors = [0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0];
-      // Final bursts: more grunts, moderate boss minors, still challenging
+      window._customBursts =     [1, 1, 2, 1, 1, 4, 1, 1, 6, 1, 1, 8, 2, 2, 2];
+      window._customSlingers =   [0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0];
+      window._customKamikazes =  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3];
+      window._customBossMinors = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0];
+
     } else {
       // For now, do nothing for later waves (old system removed)
       burstCount = 0;
@@ -1329,18 +1355,22 @@ const droplifelenght = 280;
             // Only assign grunts for specific waves
             if (wave === 1 || wave === 2 || wave === 3 || wave === 4) {
               grunts = (window._customBursts && window._customBursts[burstIndex]) || 0;
+
             } else if (wave === 5) {
               grunts = 1 + Math.floor(Math.random() * 2); // 2-4 grunts
+
             } else if (wave >= 6 && wave <= 9) {
               grunts = 2 + Math.floor(Math.random() * 3); // 2-4 grunts
               if (window._customSlingers) {
                 slingers = window._customSlingers[burstIndex] || 0;
               }
             }
+
             // Apocalypse mode: 1 kamikaze every burst, every wave
             if (window.sentinelDifficulty === "Apocalypse") {
               spawnKamikazeBurst(1);
             }
+
             // For wave 10, spawn slingers and grunts per burst
             if (wave === 10) {
               const slingerCount = 2 + Math.floor(Math.random() * 3);
@@ -1362,7 +1392,7 @@ const droplifelenght = 280;
 
 
             if (wave === 12 || wave === 13 || wave === 14 || wave === 15 || wave === 16) {
-              grunts = 1 + Math.floor(Math.random() * 2); 
+              grunts = 0 + Math.floor(Math.random() * 1); 
               if (window._customSlingers && window._customSlingers[burstIndex]) {
                 spawnSlingerBurst(window._customSlingers[burstIndex]);
               }
@@ -1394,11 +1424,10 @@ const droplifelenght = 280;
 
 
 
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
+//-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=MISC FUNCTIONS=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
 
-
-  ////////////////////////////////////////////////////////////////////////////////////////////
-  ///////////////////////////////-========= MISC FUNCTIONS =========-////////////////////////////
-  ////////////////////////////////////////////////////////////////////////////////////////////
   function drawLine(x1, y1, x2, y2, color) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 3;
@@ -1415,47 +1444,96 @@ const droplifelenght = 280;
       ctx.save();
       ctx.globalAlpha = 0.75;
       ctx.fillStyle = '#152c16';
-      ctx.fillRect(0, 240, 280, 200);
+      ctx.fillRect(0, 190, 240, 370);
       // Green glowing border
       ctx.globalAlpha = 1.0;
       ctx.shadowColor = '#00ffdd';
       ctx.shadowBlur = 18;
       ctx.strokeStyle = '#00ffdd';
       ctx.lineWidth = 3;
-      ctx.strokeRect(0, 240, 280, 200);
+      ctx.strokeRect(0, 190, 240, 370);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
       ctx.restore();
       ctx.fillStyle = "#00ffdd";
       ctx.textAlign = "left";
-      ctx.fillText("Level: " + level + " (" + xp + "/" + xpToLevel + ")", 90, 260);
-      ctx.fillText("Stat Points: " + statPoints, 90, 280);
-      ctx.fillText("Stat Max: " + (level+1), 90, 300);
-      // Draw clickable stat labels and store their bounding boxes
+      ctx.font = "bold 16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Level: " + level + " (" + xp + "/" + xpToLevel + ")", 140, 220);
+      ctx.fillText("Stat Points: " + statPoints, 140, 250);
+      ctx.fillText("Stat Max: " + (level+1), 140, 280);
+      ctx.textAlign = "left";
+      // Draw clickable stat labels with -/+ buttons and store their bounding boxes
       window._statButtonBoxes = [];
+      window._statMinusButtonBoxes = [];
+      window._statPlusButtonBoxes = [];
       const statLabels = [
-        { label: "[1]-> Range (" + player.stats.Range + ")", stat: 1 },
-        { label: "[2]-> Power (" + player.stats.Power + ")", stat: 2 },
-        { label: "[3]-> Atk Speed (" + player.stats.AttackSpeed + ")", stat: 3 },
-        { label: "[4]-> Movement (" + player.stats.Movement + ")", stat: 4 },
-        { label: "[5]-> Vitality (" + player.stats.Vitality + ")", stat: 5 },
-        { label: "[6]-> Pickup Range (" + player.stats.Pickup + ")", stat: 6 }
+        { label: "Range", value: player.stats.Range, stat: 1 },
+        { label: "Atk Power", value: player.stats.Power, stat: 2 },
+        { label: "Atk Intensity", value: player.stats.AttackSpeed, stat: 3 },
+        { label: "Movement", value: player.stats.Movement, stat: 4 },
+        { label: "Health", value: player.stats.Vitality, stat: 5 },
+        { label: "Pickup Range", value: player.stats.Pickup, stat: 6 }
       ];
       let y = 320;
       for (let i = 0; i < statLabels.length; i++) {
-        const text = statLabels[i].label;
-        ctx.fillText(text, 90, y);
-        // Measure text for bounding box
-        const metrics = ctx.measureText(text);
-        // Store bounding box for click detection
-        window._statButtonBoxes.push({
-          x: 90,
-          y: y - 16, // approx top
-          w: metrics.width,
-          h: 22, // approx height
-          stat: statLabels[i].stat
+        const stat = statLabels[i];
+        // Center group horizontally in panel
+        const panelCenter = 140; // Panel is 280px wide
+        ctx.font = "bold 16px sans-serif";
+        const statNameWidth = ctx.measureText(stat.label).width;
+        ctx.font = "16px sans-serif";
+        const statValueWidth = ctx.measureText("(" + stat.value + ")").width;
+        const groupWidth = 18 + 8 + statValueWidth + 8 + 18;
+        // Stat name centered
+        ctx.font = "bold 16px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#00ffdd";
+        ctx.fillText(stat.label, panelCenter, y);
+        // - button
+        const minusX = panelCenter - (groupWidth / 2);
+        ctx.fillStyle = statPoints > 0 && stat.value > 0 ? "#00ffdd" : "#555";
+        ctx.fillRect(minusX, y + 6, 18, 18);
+        ctx.fillStyle = "#152c16";
+        ctx.font = "bold 16px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("-", minusX + 9, y + 20);
+        window._statMinusButtonBoxes.push({
+          x: minusX,
+          y: y + 6,
+          w: 18,
+          h: 18,
+          stat: stat.stat
         });
-        y += 20;
+        // Stat value centered
+        ctx.font = "16px sans-serif";
+        ctx.fillStyle = "#00ffdd";
+        ctx.textAlign = "center";
+        const valueX = panelCenter;
+        ctx.fillText("(" + stat.value + ")", valueX, y + 20);
+        window._statButtonBoxes.push({
+          x: valueX - (statValueWidth / 2),
+          y: y + 4,
+          w: statValueWidth,
+          h: 22,
+          stat: stat.stat
+        });
+        // + button
+        const plusX = panelCenter + (groupWidth / 2) - 18;
+        ctx.fillStyle = statPoints > 0 && stat.value < (level+1) ? "#00ffdd" : "#555";
+        ctx.fillRect(plusX, y + 6, 18, 18);
+        ctx.fillStyle = "#152c16";
+        ctx.font = "bold 16px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("+", plusX + 9, y + 20);
+        window._statPlusButtonBoxes.push({
+          x: plusX,
+          y: y + 6,
+          w: 18,
+          h: 18,
+          stat: stat.stat
+        });
+        y += 40;
       }
         ctx.globalAlpha = 0.75;
         ctx.fillStyle = '#152c16';
@@ -1477,44 +1555,48 @@ const droplifelenght = 280;
     // ...existing code for drawing stat labels and storing bounding boxes...
     // Stat button click-and-release logic (register only once)
     if (!window._statButtonListenersAdded) {
-      window._statButtonPressed = null;
+      // Stat button click logic for -/+ buttons
       canvas.addEventListener("mousedown", function(e) {
-        if (!showStats || statPoints <= 0) return;
+        if (!showStats) return;
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
-        const boxes = window._statButtonBoxes || [];
-        for (let box of boxes) {
+        // Check minus buttons
+        const minusBoxes = window._statMinusButtonBoxes || [];
+        for (let box of minusBoxes) {
           if (
             mx >= box.x &&
             mx <= box.x + box.w &&
             my >= box.y &&
             my <= box.y + box.h
           ) {
-            window._statButtonPressed = box.stat;
-            break;
+            // Decrement stat if possible
+            const statKeys = ["Range", "Power", "AttackSpeed", "Movement", "Vitality", "Pickup"];
+            const stat = statKeys[box.stat - 1];
+            if (player.stats[stat] > 0) {
+              player.stats[stat]--;
+              statPoints++;
+              applyStats();
+            }
+            return;
           }
         }
-      });
-      canvas.addEventListener("mouseup", function(e) {
-        if (!showStats || statPoints <= 0 || window._statButtonPressed == null) return;
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const boxes = window._statButtonBoxes || [];
-        for (let box of boxes) {
+        // Check plus buttons
+        const plusBoxes = window._statPlusButtonBoxes || [];
+        for (let box of plusBoxes) {
           if (
-            box.stat === window._statButtonPressed &&
             mx >= box.x &&
             mx <= box.x + box.w &&
             my >= box.y &&
             my <= box.y + box.h
           ) {
-            applyStatPoint(String(box.stat));
-            break;
+            // Increment stat if possible
+            if (statPoints > 0) {
+              applyStatPoint(String(box.stat));
+            }
+            return;
           }
         }
-        window._statButtonPressed = null;
       });
       window._statButtonListenersAdded = true;
     }
@@ -1541,7 +1623,7 @@ const droplifelenght = 280;
     ctx.shadowBlur = 18;
     const wavetext = "Wave " + wave;
     const wavetextWidth = ctx.measureText(wavetext).wi3dth;
-    ctx.fillText(wavetext, canvas.width / 2, 35);
+    ctx.fillText(wavetext, canvas.width / 2, 45);
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
   }
@@ -1551,9 +1633,10 @@ const droplifelenght = 280;
   function restartGame() {
       waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
     Object.assign(player, {
-      x: 500, y: 360, health: 10, attackCooldown: 0,
+      x: 500, y: 430, health: 10, attackCooldown: 0,
       stats: { Range: 0, Power: 0, AttackSpeed: 0, Movement: 0, Vitality: 0, Pickup: 0 }
     });
+    playerVisualAngle = Math.PI / 2; // Start facing down on wave 1
     applyStats();
     xp = 0; xpToLevel = 10; level = 1;
     statPoints = 5; // TEMP: Start with 25 stat points
@@ -1581,6 +1664,7 @@ const droplifelenght = 280;
     paused = false;
     gameStarted = false;
     startTime = Date.now();
+    window._playerUsedContinue = false;
   }
 
   function updateEnemies(delta) {
@@ -1674,6 +1758,12 @@ const droplifelenght = 280;
                                       color: "#ff33ff",
                                       type: "gruntBossProjectile"
                                     });
+                                    // Play laser sound for enemy projectile
+                                    try {
+                                      let enemyLaserSound = new Audio('laser.wav');
+                                      enemyLaserSound.volume = window.sentinelVolume.enemyProjectile;
+                                      enemyLaserSound.play();
+                                    } catch (e) {}
                                   }
                                 }
                               } else {
@@ -1942,6 +2032,12 @@ const droplifelenght = 280;
               const angle = Math.atan2(player.y - e.y, player.x - e.x);
               const speed = 1.5;
               projectiles.push({ x: e.x, y: e.y, dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, damage: e.damage });
+              // Play laser sound for enemy projectile
+              try {
+                let enemyLaserSound = new Audio('laser.wav');
+                enemyLaserSound.volume = window.sentinelVolume.enemyProjectile;
+                enemyLaserSound.play();
+              } catch (e) {}
             } else {
               player.health -= e.damage;
               playerHurtTimer = 44; // 14 frames of red flash
@@ -2798,8 +2894,40 @@ const droplifelenght = 280;
         ctx.fillStyle = "red";
         ctx.font = "bold 40px sans-serif";
         ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
-        ctx.font = "bold 20px sans-serif";
-        ctx.fillText("Press R to Restart", canvas.width / 2, canvas.height / 2 + 40);
+        
+        // Initialize game over countdown timer on first render
+        if (typeof window._gameOverTime === "undefined") {
+          window._gameOverTime = Date.now();
+        }
+        
+        // Calculate elapsed time and remaining seconds
+        const elapsedSeconds = (Date.now() - window._gameOverTime) / 1000;
+        const remainingSeconds = Math.max(0, 5 - Math.floor(elapsedSeconds));
+        
+        // Check if this is a second death
+        if (window._playerUsedContinue) {
+          // Second death: show acknowledgment message
+          ctx.font = "bold 20px sans-serif";
+          ctx.fillStyle = "white";
+          ctx.fillText("Click to return to Menu", canvas.width / 2, canvas.height / 2 + 60);
+        } else {
+          // First death: show continue option with timer
+          ctx.font = "bold 20px sans-serif";
+          ctx.fillStyle = "white";
+          ctx.fillText(`Click to Continue in ${remainingSeconds} seconds`, canvas.width / 2, canvas.height / 2 + 60);
+        }
+        
+        // Auto-return to menu after 5 seconds (only on first death)
+        if (!window._playerUsedContinue && remainingSeconds === 0 && elapsedSeconds >= 5) {
+          showMenuScreen = true;
+          window._playMenuAmbienceOnShowMenu = true;
+          playMenuAmbience();
+          showMenu();
+          gameOver = false;
+          window._gameOverTime = undefined;
+          followMouse = false;
+        }
+        
         requestAnimationFrame(gameLoop);
         return;
       }
