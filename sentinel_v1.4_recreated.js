@@ -40,6 +40,8 @@
   }
   // Speed multiplier for game timing (higher = faster, lower = slower)
   const SPEED_MULTIPLIER = 120;
+
+  
   // Mine sprite
   const mineImg = new window.Image();
   mineImg.src = "mine.png";
@@ -162,7 +164,7 @@ window.onload = function () {
     title.style.position = "relative";
     title.style.zIndex = 1;
     menuOverlay.appendChild(title);
-    // Difficulty selection buttons
+    // Main menu buttons
     const buttonContainer = document.createElement("div");
     buttonContainer.style.display = "flex";
     buttonContainer.style.flexDirection = "column";
@@ -188,53 +190,388 @@ window.onload = function () {
       return btn;
     }
 
-    // Add difficulty buttons
-    const normalBtn = makeMenuButton("Normal", "#fff");
-    const hardcoreBtn = makeMenuButton("Hardcore", "#ffb300");
-    const apocalypseBtn = makeMenuButton("Apocalypse", "#ff3c3c");
-    buttonContainer.appendChild(normalBtn);
-    buttonContainer.appendChild(hardcoreBtn);
-    buttonContainer.appendChild(apocalypseBtn);
+    // Add main menu buttons (Play and Protocols)
+    const playBtn = makeMenuButton("Play", "#fff");
+    const protocolBtn = makeMenuButton("Protocols", "#00ffdd");
+    buttonContainer.appendChild(playBtn);
+    buttonContainer.appendChild(protocolBtn);
     menuOverlay.appendChild(buttonContainer);
     document.body.appendChild(menuOverlay);
     if (window._playMenuAmbienceOnShowMenu) playMenuAmbience();
 
-    // Difficulty variable
-    window.sentinelDifficulty = "Normal";
-    normalBtn.addEventListener("click", function() {
-      window.sentinelDifficulty = "Normal";
+    // Store reference to main menu for back button
+    window._showMainMenu = () => {
+      menuOverlay.style.display = "block";
+    };
+
+    // Play button: show difficulty selection
+    playBtn.addEventListener("click", function() {
       menuOverlay.style.display = "none";
-      showMenuScreen = false;
-      fadeOutMenuAmbience();
-      restartGame();
-      statPoints = 5;
-      player.health = player.maxHealth = 10;
-      spawnWave();
-      gameStarted = true;
+      showDifficultyMenu();
     });
-    hardcoreBtn.addEventListener("click", function() {
-      window.sentinelDifficulty = "Hardcore";
-      menuOverlay.style.display = "none";
-      showMenuScreen = false;
-      fadeOutMenuAmbience();
-      restartGame();
-      statPoints = 0;
-      player.health = player.maxHealth = 5;
-      spawnWave();
-      gameStarted = true;
-    });
-    apocalypseBtn.addEventListener("click", function() {
-      window.sentinelDifficulty = "Apocalypse";
-      menuOverlay.style.display = "none";
-      showMenuScreen = false;
-      fadeOutMenuAmbience();
-      restartGame();
-      statPoints = 5;
-      player.health = player.maxHealth = 5;
-      spawnWave();
-      gameStarted = true;
+
+    // Protocols button: show protocol menu
+    protocolBtn.addEventListener("click", function() {
+      menuOverlay.remove();
+      showProtocolMenu();
+      window._showMainMenu = () => {
+        showMenu();
+      };
     });
   }
+
+  // Difficulty selection menu
+  function showDifficultyMenu() {
+    const diffOverlay = document.createElement("div");
+    diffOverlay.id = "difficultyOverlay";
+    diffOverlay.style.position = "fixed";
+    diffOverlay.style.left = 0;
+    diffOverlay.style.top = 0;
+    diffOverlay.style.width = "100vw";
+    diffOverlay.style.height = "100vh";
+    diffOverlay.style.background = "#000";
+    diffOverlay.style.display = "flex";
+    diffOverlay.style.flexDirection = "column";
+    diffOverlay.style.justifyContent = "center";
+    diffOverlay.style.alignItems = "center";
+    diffOverlay.style.zIndex = 1000;
+    // Background image
+    const diffBg = document.createElement("img");
+    diffBg.src = "titlescreen.png";
+    diffBg.style.position = "absolute";
+    diffBg.style.left = "50%";
+    diffBg.style.top = "50%";
+    diffBg.style.transform = "translate(-50%, -50%)";
+    diffBg.style.width = "1024px";
+    diffBg.style.height = "768px";
+    diffBg.style.objectFit = "fill";
+
+    // Gradient overlay
+    const diffGradient = document.createElement("div");
+    diffGradient.style.position = "absolute";
+    diffGradient.style.left = "0";
+    diffGradient.style.bottom = "0";
+    diffGradient.style.width = "1024px";
+    diffGradient.style.height = "180px";
+    diffGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
+    diffGradient.style.pointerEvents = "none";
+    diffGradient.style.zIndex = 1;
+    diffOverlay.appendChild(diffGradient);
+    diffBg.style.zIndex = 0;
+    diffOverlay.appendChild(diffBg);
+
+    // Back button - positioned absolutely inside the menu area
+    const backBtn = document.createElement("button");
+    backBtn.textContent = "← Back";
+    backBtn.style.position = "absolute";
+    backBtn.style.top = "120px";
+    backBtn.style.left = "calc(50% - 512px + 16px)";
+    backBtn.style.transform = "none";
+    backBtn.style.fontSize = "1.2rem";
+    backBtn.style.padding = "0.5rem 1.5rem";
+    backBtn.style.background = "rgba(0,0,0,0.7)";
+    backBtn.style.color = "#fff";
+    backBtn.style.border = "2px solid #fff";
+    backBtn.style.borderRadius = "8px";
+    backBtn.style.cursor = "pointer";
+    backBtn.style.zIndex = 2;
+    backBtn.style.transition = "background 0.2s";
+    backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
+    backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
+    diffOverlay.appendChild(backBtn);
+
+    // Title
+    const title = document.createElement("h2");
+    title.textContent = "SELECT DIFFICULTY";
+    title.style.color = "#fff";
+    title.style.fontSize = "3rem";
+    title.style.textShadow = "0 0 24px #00ffdd, 0 0 8px #000";
+    title.style.position = "relative";
+    title.style.zIndex = 1;
+    title.style.marginBottom = "2rem";
+    diffOverlay.appendChild(title);
+
+    // Difficulty buttons
+    const buttonContainer = document.createElement("div");
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.flexDirection = "column";
+    buttonContainer.style.gap = "1.2rem";
+    buttonContainer.style.position = "relative";
+    buttonContainer.style.zIndex = 1;
+
+    function makeButton(label, color) {
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.style.fontSize = "2rem";
+      btn.style.padding = "1rem 2.5rem";
+      btn.style.background = "rgba(0,0,0,0.7)";
+      btn.style.color = color;
+      btn.style.border = `2px solid ${color}`;
+      btn.style.borderRadius = "12px";
+      btn.style.cursor = "pointer";
+      btn.style.boxShadow = "0 0 24px #000";
+      btn.style.transition = "background 0.2s";
+      btn.addEventListener("mouseover",()=>{btn.style.background="rgba(0,0,0,0.9)";});
+      btn.addEventListener("mouseout",()=>{btn.style.background="rgba(0,0,0,0.7)";});
+      return btn;
+    }
+
+    const normalBtn = makeButton("Normal", "#fff");
+    const hardcoreBtn = makeButton("Hardcore", "#ffb300");
+    const apocalypseBtn = makeButton("Apocalypse", "#ff3c3c");
+    buttonContainer.appendChild(normalBtn);
+    buttonContainer.appendChild(hardcoreBtn);
+    buttonContainer.appendChild(apocalypseBtn);
+    diffOverlay.appendChild(buttonContainer);
+    document.body.appendChild(diffOverlay);
+
+    function startGame(difficulty, startStatPoints, startHealth) {
+      window.sentinelDifficulty = difficulty;
+      diffOverlay.remove();
+      showMenuScreen = false;
+      fadeOutMenuAmbience();
+      restartGame();
+      statPoints = startStatPoints;
+      player.health = player.maxHealth = startHealth;
+      spawnWave();
+      gameStarted = true;
+    }
+
+    normalBtn.addEventListener("click", () => startGame("Normal", 5, 10));
+    hardcoreBtn.addEventListener("click", () => startGame("Hardcore", 0, 5));
+    apocalypseBtn.addEventListener("click", () => startGame("Apocalypse", 5, 5));
+
+    // Back button
+    backBtn.addEventListener("click", () => {
+      diffOverlay.remove();
+      showMenu();
+    });
+  }
+
+  // Protocol menu
+  function showProtocolMenu() {
+    const menuOverlay = document.createElement("div");
+    menuOverlay.id = "protocolMenuOverlay";
+    menuOverlay.style.position = "fixed";
+    menuOverlay.style.left = "50%";
+    menuOverlay.style.top = "50%";
+    menuOverlay.style.transform = "translate(-50%, -50%)";
+    menuOverlay.style.width = "1024px";
+    menuOverlay.style.height = "768px";
+    menuOverlay.style.background = "rgba(0, 20, 30, 0.98)";
+    menuOverlay.style.border = "2px solid #00ffdd";
+    menuOverlay.style.borderRadius = "8px";
+    menuOverlay.style.display = "flex";
+    menuOverlay.style.flexDirection = "column";
+    menuOverlay.style.justifyContent = "flex-start";
+    menuOverlay.style.alignItems = "center";
+    menuOverlay.style.zIndex = 1001;
+    menuOverlay.style.boxShadow = "0 0 30px rgba(0, 255, 221, 0.3)";
+    menuOverlay.style.fontFamily = "sans-serif";
+    menuOverlay.style.overflow = "visible";
+
+    // Hide scrollbar CSS for webkit browsers
+    const style = document.createElement("style");
+    style.textContent = ".protocol-scroll::-webkit-scrollbar { display: none; }";
+    menuOverlay.appendChild(style);
+
+    // Back button header section
+    const headerSection = document.createElement("div");
+    headerSection.style.width = "100%";
+    headerSection.style.height = "auto";
+    headerSection.style.padding = "10px 15px";
+    headerSection.style.display = "flex";
+    headerSection.style.alignItems = "center";
+    headerSection.style.justifyContent = "flex-start";
+    headerSection.style.position = "relative";
+    headerSection.style.zIndex = 10;
+
+    // Back button
+    const backBtn = document.createElement("button");
+    backBtn.textContent = "← Back to Menu";
+    backBtn.style.fontSize = "0.9rem";
+    backBtn.style.marginLeft = "12px";
+    backBtn.style.padding = "0.4rem 1rem";
+    backBtn.style.background = "rgba(0,0,0,0.7)";
+    backBtn.style.color = "#00ffdd";
+    backBtn.style.border = "2px solid #00ffdd";
+    backBtn.style.borderRadius = "6px";
+    backBtn.style.cursor = "pointer";
+    backBtn.style.transition = "background 0.2s";
+    backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
+    backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
+    headerSection.appendChild(backBtn);
+    menuOverlay.appendChild(headerSection);
+
+    // Title
+    const title = document.createElement("h2");
+    title.textContent = "PROTOCOL DATABASE";
+    title.style.color = "#00ffdd";
+    title.style.fontSize = "1.8rem";
+    title.style.margin = "30px 0 15px 0";
+    title.style.textShadow = "0 0 12px #00ffdd";
+    menuOverlay.appendChild(title);
+
+    // Scrollable content container
+    const scrollContent = document.createElement("div");
+    scrollContent.style.width = "100%";
+    scrollContent.style.overflowY = "auto";
+    scrollContent.style.flex = "1";
+    scrollContent.style.paddingRight = "10px";
+    scrollContent.style.paddingLeft = "15px";
+    scrollContent.style.paddingRight = "10px";
+    scrollContent.style.scrollbarWidth = "none"; // Firefox
+    scrollContent.style.msOverflowStyle = "none"; // IE/Edge
+    // Add webkit scrollbar hiding via CSS class
+    scrollContent.className = "protocol-scroll";
+
+    // Group protocols by family
+    const allProtocols = Object.keys(PROTOCOLS);
+    const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
+    
+    allProtocols.forEach(protocolName => {
+      const protocol = PROTOCOLS[protocolName];
+      if (familyGroups[protocol.family]) {
+        familyGroups[protocol.family].push(protocolName);
+      }
+    });
+
+    // Create family sections
+    Object.entries(familyGroups).forEach(([family, protocols]) => {
+      // Family header
+      const familyHeader = document.createElement("div");
+      familyHeader.style.color = "#00ffdd";
+      familyHeader.style.fontSize = "1.1rem";
+      familyHeader.style.fontWeight = "bold";
+      familyHeader.style.marginTop = "15px";
+      familyHeader.style.marginLeft = "15px";
+      familyHeader.style.marginBottom = "10px";
+      familyHeader.style.marginRight = "15px";
+      familyHeader.style.borderBottom = "2px solid #00ffdd";
+      familyHeader.style.paddingBottom = "5px";
+      familyHeader.textContent = family;
+      scrollContent.appendChild(familyHeader);
+
+      // Grid for this family
+      const gridContainer = document.createElement("div");
+      gridContainer.style.display = "grid";
+      gridContainer.style.gridTemplateColumns = "repeat(3, 1fr)";
+      gridContainer.style.gap = "12px";
+      gridContainer.style.width = "95%";
+      gridContainer.style.margin = "24px";
+      gridContainer.style.padding = "0";
+
+      protocols.forEach(protocolName => {
+        const protocol = PROTOCOLS[protocolName];
+        const state = ProtocolSystem.protocolBoard[protocolName] || { discovered: false, isNew: false };
+
+        const card = document.createElement("div");
+        card.style.borderRadius = "6px";
+        card.style.padding = "20px";
+        card.style.minHeight = "140px";
+        card.style.display = "flex";
+        card.style.flexDirection = "column";
+        card.style.justifyContent = "center";
+        card.style.cursor = "pointer";
+        card.style.transition = "all 0.2s";
+
+        const applyCardStyle = (isHovered) => {
+          const protocolState = ProtocolSystem.protocolBoard[protocolName] || { discovered: false, isNew: false };
+          const discovered = protocolState.discovered;
+          const isNew = protocolState.isNew;
+          if (discovered) {
+            card.style.background = isHovered ? "rgba(0, 100, 120, 0.9)" : "rgba(0, 77, 92, 0.8)";
+            card.style.border = isNew ? "2px solid #fff06a" : "2px solid #00ffdd";
+            card.style.boxShadow = isNew ? "0 0 14px rgba(255, 240, 106, 0.65)" : "0 0 10px rgba(0, 255, 221, 0.3)";
+          } else {
+            card.style.background = isHovered ? "rgba(50, 50, 50, 0.9)" : "rgba(30, 30, 30, 0.8)";
+            card.style.border = "2px solid #444";
+            card.style.boxShadow = "none";
+          }
+        };
+        applyCardStyle(false);
+
+        card.addEventListener("mouseover", () => {
+          if (ProtocolSystem.protocolBoard[protocolName]?.isNew) {
+            ProtocolSystem.markSeen(protocolName);
+          }
+          applyCardStyle(true);
+          card.style.transform = "scale(1.05)";
+        });
+        card.addEventListener("mouseout", () => {
+          applyCardStyle(false);
+          card.style.transform = "scale(1)";
+        });
+
+        // Protocol name
+        const nameEl = document.createElement("div");
+        nameEl.textContent = protocolName;
+        const discovered = state.discovered;
+        nameEl.style.color = discovered ? "#00ffdd" : "#888";
+        nameEl.style.fontWeight = "bold";
+        nameEl.style.fontSize = "1rem";
+        nameEl.style.marginBottom = "5px";
+        card.appendChild(nameEl);
+
+        if (state.isNew && discovered) {
+          const newEl = document.createElement("div");
+          newEl.textContent = "NEW";
+          newEl.style.color = "#fff06a";
+          newEl.style.fontWeight = "bold";
+          newEl.style.fontSize = "0.75rem";
+          newEl.style.marginBottom = "4px";
+          card.appendChild(newEl);
+        }
+
+        // Rarity
+        const rarityEl = document.createElement("div");
+        rarityEl.textContent = protocol.rarity;
+        rarityEl.style.color = discovered ? "#aaf6ff" : "#666";
+        rarityEl.style.fontSize = "0.85rem";
+        rarityEl.style.marginBottom = "5px";
+        card.appendChild(rarityEl);
+
+        // Stat mods
+        const statsEl = document.createElement("div");
+        const statTexts = [];
+        Object.entries(protocol.statMods).forEach(([stat, mod]) => {
+          if (mod > 0) statTexts.push(`+${stat}`);
+          if (mod < 0) statTexts.push(`-${stat}`);
+        });
+        statsEl.textContent = statTexts.join(", ") || "No mods";
+        statsEl.style.color = discovered ? "#00ff88" : "#555";
+        statsEl.style.fontSize = "0.8rem";
+        statsEl.style.marginTop = "auto";
+        card.appendChild(statsEl);
+
+        // Lock badge
+        if (!discovered) {
+          const lockEl = document.createElement("div");
+          lockEl.textContent = "🔒 Locked";
+          lockEl.style.color = "#ff6666";
+          lockEl.style.fontWeight = "bold";
+          lockEl.style.fontSize = "0.8rem";
+          lockEl.style.marginTop = "5px";
+          card.appendChild(lockEl);
+        }
+
+        gridContainer.appendChild(card);
+      });
+
+      scrollContent.appendChild(gridContainer);
+    });
+    menuOverlay.appendChild(scrollContent);
+    document.body.appendChild(menuOverlay);
+
+    // Back button functionality
+    backBtn.addEventListener("click", () => {
+      menuOverlay.remove();
+      showMenu();
+    });
+
+    return menuOverlay;
+  }
+
               // Draw jagged lightning bolt between two points
               function drawLightningBolt(x1, y1, x2, y2, color, segments = 8, jaggedness = 16) {
                 ctx.save();
@@ -324,6 +661,8 @@ window.onload = function () {
   let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
+  let selectedProtocol = -1;
+  let hoveredProtocol = -1;
   // Block game loop if loading/menu is active
   function isGameBlocked() {
     return showLoadingScreen || showMenuScreen;
@@ -349,7 +688,7 @@ window.onload = function () {
     pickupRadius: 48
   };
 
-  const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], slingerDrops = [], bruteDrops = [], particles = [], mines = [];
+  const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], slingerDrops = [], bruteDrops = [], protocolOrbs = [], particles = [], mines = [];
   // Update mines: explode when player enters zone, remove after explosion
   function updateMines(delta) {
     for (let i = mines.length - 1; i >= 0; i--) {
@@ -568,23 +907,156 @@ window.onload = function () {
     if (stat) {
       // Enforce max stat value per stat (max = current level + 1)
       if (player.stats[stat] < level+1) {
+        const oldMaxHealth = player.maxHealth;
+        const oldHealth = player.health;
         player.stats[stat]++;
         statPoints--;
         applyStats();
+        if (stat === "Vitality") {
+          const maxHealthDelta = player.maxHealth - oldMaxHealth;
+          player.health = Math.max(0, Math.min(player.maxHealth, oldHealth + maxHealthDelta));
+        }
       }
     }
   }
 
   function applyStats() {
-    // Update player stats based on upgrades
-    player.range = 80 + player.stats.Range * 5;
-    player.damage = 1 + player.stats.Power;
-    player.speed = player.baseSpeed + player.stats.Movement * 0.5;
-    player.cooldownBase = 20 - player.stats.AttackSpeed;
-    player.maxHealth = 10 + player.stats.Vitality * 2;
-    player.pickupRadius = 48 + player.stats.Pickup * 8;
+    const previousMaxHealth = player.maxHealth;
+    const wasFullHealth = player.health >= previousMaxHealth;
+    const previousHealthRatio = previousMaxHealth > 0 ? (player.health / previousMaxHealth) : 1;
+
+    // Get protocol stat modifiers from ProtocolSystem
+    const protocolMods = ProtocolSystem.getStatMods();
+    
+    // Update player stats based on level upgrades + protocols
+    // Range: +5 per level point, +protocol mod
+    player.range = 80 + (player.stats.Range + protocolMods.Range) * 5;
+    
+    // Power (Attack Power): +1 per level point, +protocol mod
+    player.damage = 1 + (player.stats.Power + protocolMods.Power);
+    
+    // Movement: +0.2 per level point, +protocol mod
+    player.speed = player.baseSpeed + (player.stats.Movement + protocolMods.Movement) * 0.25;
+    
+    // AttackSpeed (Intensity): base 20 - level points - protocol mod
+    player.cooldownBase = 20 - (player.stats.AttackSpeed + protocolMods.Intensity);
+    
+    // Vitality (Health): +2 per level point, +protocol mod
+    player.maxHealth = 10 + (player.stats.Vitality + protocolMods.Health) * 2;
+
+    if (player.maxHealth !== previousMaxHealth) {
+      if (wasFullHealth) {
+        player.health = player.maxHealth;
+      } else {
+        player.health = previousHealthRatio * player.maxHealth;
+      }
+    }
+    
+    // Pickup: +8 per level point, +protocol mod
+    player.pickupRadius = 48 + (player.stats.Pickup + protocolMods.Pickup) * 8;
+    
     if (player.health > player.maxHealth) player.health = player.maxHealth;
   }
+
+  function tryDiscoverProtocolFromEnemy(enemyType, x, y) {
+    const dropRules = {
+      grunt: { chance: 0.08 },
+      kamikaze: { chance: 0.1 },
+      slinger: { chance: 0.18 },
+      brute: { chance: 0.22 },
+      gruntBossMinor: { chance: 0.35 },
+      gruntBoss: { chance: 1.0 }
+    };
+
+    const rule = dropRules[enemyType] || { chance: 0.1 };
+    if (Math.random() > rule.chance) return;
+
+    const activeOrbProtocols = new Set(protocolOrbs.map(orb => orb.protocolName));
+    const droppableProtocols = Object.keys(PROTOCOLS)
+      .filter(name => !activeOrbProtocols.has(name));
+    if (droppableProtocols.length === 0) return;
+
+    const getPool = (rarity, tiers = null) => {
+      return droppableProtocols.filter(name => {
+        const proto = PROTOCOLS[name];
+        if (proto.rarity !== rarity) return false;
+        if (!tiers || tiers.length === 0) return true;
+        return tiers.includes(proto.tier);
+      });
+    };
+
+    const chooseRandom = (pool) => pool[Math.floor(Math.random() * pool.length)];
+
+    let pool = [];
+    if (enemyType === "grunt") {
+      // Common lower only
+      pool = getPool("Common", ["Lower"]);
+      if (pool.length === 0) pool = getPool("Common");
+    } else if (enemyType === "kamikaze") {
+      // Common lower only
+      pool = getPool("Common", ["Lower"]);
+      if (pool.length === 0) pool = getPool("Common");
+    } else if (enemyType === "slinger") {
+      // Any common
+      pool = getPool("Common");
+    } else if (enemyType === "brute") {
+      // Any common
+      pool = getPool("Common");
+    } else if (enemyType === "gruntBossMinor") {
+      // Common standard / higher, low chance rare lower
+      if (Math.random() < 0.2) {
+        pool = getPool("Rare", ["Lower"]);
+      }
+      if (pool.length === 0) pool = getPool("Common", ["Standard", "Higher"]);
+      if (pool.length === 0) pool = getPool("Common");
+    } else if (enemyType === "gruntBoss") {
+      // Guaranteed rare
+      pool = getPool("Rare");
+    }
+
+    if (pool.length === 0) pool = droppableProtocols;
+
+    const droppedProtocol = chooseRandom(pool);
+    if (!droppedProtocol) return;
+
+    const rarity = PROTOCOLS[droppedProtocol].rarity;
+    const requiredSeconds = rarity === "Rare" ? 4 : 3;
+    protocolOrbs.push({
+      x,
+      y,
+      radius: rarity === "Rare" ? 12 : 10,
+      type: "protocolOrb",
+      protocolName: droppedProtocol,
+      rarity,
+      requiredFrames: requiredSeconds * 60,
+      progressFrames: 0
+    });
+    console.log(`✓ Protocol orb dropped from ${enemyType}: ${droppedProtocol} (${rarity})`);
+  }
+
+  function completeProtocolOrb(orb) {
+    if (!orb) return;
+    if (ProtocolSystem.discover(orb.protocolName)) {
+      for (let i = 0; i < 18; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 2;
+        particles.push({
+          x: orb.x,
+          y: orb.y,
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed,
+          life: 35 + Math.floor(Math.random() * 35),
+          color: orb.rarity === "Rare" ? "#d896ff" : "#7bf4ff",
+          decay: 0.9 + Math.random() * 0.05,
+          size: 2 + Math.random() * 2,
+          type: "enemyDeath"
+        });
+      }
+      console.log(`✓ Protocol discovered from orb: ${orb.protocolName}`);
+    }
+  }
+
+
 
   function constrainPlayer() {
     // Keep player within canvas bounds
@@ -1087,6 +1559,23 @@ const droplifelenght = 280;
     }
   }
 
+  function updateProtocolOrbs(delta) {
+    const regressRate = 0.35;
+    for (let i = protocolOrbs.length - 1; i >= 0; i--) {
+      const orb = protocolOrbs[i];
+      const distToPlayer = Math.hypot(player.x - orb.x, player.y - orb.y);
+      if (distToPlayer <= player.pickupRadius) {
+        orb.progressFrames = Math.min(orb.requiredFrames, orb.progressFrames + (delta * SPEED_MULTIPLIER));
+        if (orb.progressFrames >= orb.requiredFrames) {
+          completeProtocolOrb(orb);
+          protocolOrbs.splice(i, 1);
+        }
+      } else {
+        orb.progressFrames = Math.max(0, orb.progressFrames - (delta * SPEED_MULTIPLIER * regressRate));
+      }
+    }
+  }
+
 
 
 
@@ -1285,7 +1774,7 @@ const droplifelenght = 280;
       burstCount = 15;
       burstInterval = 300; // 5 sec
       window._customSlingers =   [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
-      window._customKamikazes =  [0, 1, 0, 2, 0, 3, 0, 1, 0, 2, 0, 3, 1, 2, 3];
+      window._customKamikazes =  [0, 0, 0, 1, 0, 2, 0, 0, 0, 1, 0, 2, 0, 1, 2];
       window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0];
 
     } else if (wave === 13) {
@@ -1441,17 +1930,23 @@ const droplifelenght = 280;
     // ...existing code...
     if (showStats) {
       // ...existing code for stats panel...
+      const statsPanelWidth = 320;
+      const statsPanelHeight = 370;
+      const statsPanelX = 10;
+      const statsPanelY = 190;
+      const statsPanelCenterX = statsPanelX + statsPanelWidth / 2;
+
       ctx.save();
       ctx.globalAlpha = 0.75;
       ctx.fillStyle = '#152c16';
-      ctx.fillRect(0, 190, 240, 370);
+      ctx.fillRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
       // Green glowing border
       ctx.globalAlpha = 1.0;
       ctx.shadowColor = '#00ffdd';
       ctx.shadowBlur = 18;
       ctx.strokeStyle = '#00ffdd';
       ctx.lineWidth = 3;
-      ctx.strokeRect(0, 190, 240, 370);
+      ctx.strokeRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
       ctx.restore();
@@ -1459,82 +1954,99 @@ const droplifelenght = 280;
       ctx.textAlign = "left";
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Level: " + level + " (" + xp + "/" + xpToLevel + ")", 140, 220);
-      ctx.fillText("Stat Points: " + statPoints, 140, 250);
-      ctx.fillText("Stat Max: " + (level+1), 140, 280);
+      ctx.fillText("Level: " + level + " (" + xp + "/" + xpToLevel + ")", statsPanelCenterX, 220);
+      ctx.fillText("HP: " + Math.round(player.health) + "/" + Math.round(player.maxHealth), statsPanelCenterX, 240);
+      ctx.fillText("Stat Points: " + statPoints, statsPanelCenterX, 260);
+      ctx.fillText("Base Stat Max: " + (level+1), statsPanelCenterX, 280);
       ctx.textAlign = "left";
       // Draw clickable stat labels with -/+ buttons and store their bounding boxes
       window._statButtonBoxes = [];
       window._statMinusButtonBoxes = [];
       window._statPlusButtonBoxes = [];
+      const protocolModsForDisplay = ProtocolSystem.getStatMods();
       const statLabels = [
-        { label: "Range", value: player.stats.Range, stat: 1 },
-        { label: "Atk Power", value: player.stats.Power, stat: 2 },
-        { label: "Atk Intensity", value: player.stats.AttackSpeed, stat: 3 },
-        { label: "Movement", value: player.stats.Movement, stat: 4 },
-        { label: "Health", value: player.stats.Vitality, stat: 5 },
-        { label: "Pickup Range", value: player.stats.Pickup, stat: 6 }
+        { label: "Range", base: player.stats.Range, protocol: protocolModsForDisplay.Range, stat: 1 },
+        { label: "Atk Power", base: player.stats.Power, protocol: protocolModsForDisplay.Power, stat: 2 },
+        { label: "Atk Intensity", base: player.stats.AttackSpeed, protocol: protocolModsForDisplay.Intensity, stat: 3 },
+        { label: "Movement", base: player.stats.Movement, protocol: protocolModsForDisplay.Movement, stat: 4 },
+        { label: "Health", base: player.stats.Vitality, protocol: protocolModsForDisplay.Health, stat: 5 },
+        { label: "Pickup Range", base: player.stats.Pickup, protocol: protocolModsForDisplay.Pickup, stat: 6 }
       ];
-      let y = 320;
       for (let i = 0; i < statLabels.length; i++) {
         const stat = statLabels[i];
-        // Center group horizontally in panel
-        const panelCenter = 140; // Panel is 280px wide
+        const totalValue = stat.base + stat.protocol;
+        const protocolValue = stat.protocol >= 0 ? `+${stat.protocol}` : `${stat.protocol}`;
+        const bpValue = `B:${stat.base} P:${protocolValue}`;
+        const totalText = `${totalValue}`;
+
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const panelCenter = col === 0
+          ? statsPanelX + statsPanelWidth * 0.27
+          : statsPanelX + statsPanelWidth * 0.73;
+        const y = 320 + row * 74;
+
         ctx.font = "bold 16px sans-serif";
-        const statNameWidth = ctx.measureText(stat.label).width;
         ctx.font = "16px sans-serif";
-        const statValueWidth = ctx.measureText("(" + stat.value + ")").width;
-        const groupWidth = 18 + 8 + statValueWidth + 8 + 18;
+        const totalTextWidth = ctx.measureText(totalText).width;
+        const groupWidth = 18 + 8 + totalTextWidth + 8 + 18;
         // Stat name centered
-        ctx.font = "bold 16px sans-serif";
+        ctx.font = "bold 14px sans-serif";
         ctx.textAlign = "center";
         ctx.fillStyle = "#00ffdd";
         ctx.fillText(stat.label, panelCenter, y);
+        // Base / Protocol line
+        ctx.font = "11px sans-serif";
+        ctx.fillStyle = "#aaf6ff";
+        ctx.fillText(bpValue, panelCenter, y + 12);
         // - button
         const minusX = panelCenter - (groupWidth / 2);
-        ctx.fillStyle = statPoints > 0 && stat.value > 0 ? "#00ffdd" : "#555";
-        ctx.fillRect(minusX, y + 6, 18, 18);
+        ctx.fillStyle = stat.base > 0 ? "#00ffdd" : "#555";
+        ctx.fillRect(minusX, y + 18, 18, 16);
         ctx.fillStyle = "#152c16";
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("-", minusX + 9, y + 20);
+        ctx.fillText("-", minusX + 9, y + 31);
         window._statMinusButtonBoxes.push({
           x: minusX,
-          y: y + 6,
+          y: y + 18,
           w: 18,
-          h: 18,
+          h: 16,
           stat: stat.stat
         });
-        // Stat value centered
+        // Total value centered between buttons
         ctx.font = "16px sans-serif";
         ctx.fillStyle = "#00ffdd";
         ctx.textAlign = "center";
         const valueX = panelCenter;
-        ctx.fillText("(" + stat.value + ")", valueX, y + 20);
+        ctx.fillText(totalText, valueX, y + 31);
         window._statButtonBoxes.push({
-          x: valueX - (statValueWidth / 2),
-          y: y + 4,
-          w: statValueWidth,
-          h: 22,
+          x: valueX - (totalTextWidth / 2),
+          y: y + 18,
+          w: totalTextWidth,
+          h: 16,
           stat: stat.stat
         });
         // + button
         const plusX = panelCenter + (groupWidth / 2) - 18;
-        ctx.fillStyle = statPoints > 0 && stat.value < (level+1) ? "#00ffdd" : "#555";
-        ctx.fillRect(plusX, y + 6, 18, 18);
+        ctx.fillStyle = statPoints > 0 && stat.base < (level+1) ? "#00ffdd" : "#555";
+        ctx.fillRect(plusX, y + 18, 18, 16);
         ctx.fillStyle = "#152c16";
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("+", plusX + 9, y + 20);
+        ctx.fillText("+", plusX + 9, y + 31);
         window._statPlusButtonBoxes.push({
           x: plusX,
-          y: y + 6,
+          y: y + 18,
           w: 18,
-          h: 18,
+          h: 16,
           stat: stat.stat
         });
-        y += 40;
       }
+      ctx.font = "12px sans-serif";
+      ctx.fillStyle = "#aaf6ff";
+      ctx.textAlign = "center";
+      ctx.fillText("B: Base   P: Protocol   T: Total", statsPanelCenterX, statsPanelY + statsPanelHeight - 10);
         ctx.globalAlpha = 0.75;
         ctx.fillStyle = '#152c16';
         ctx.fillRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
@@ -1550,6 +2062,260 @@ const droplifelenght = 280;
         ctx.textAlign = "center";
         ctx.fillText("[1]-> Range  [2]-> Power  [3]-> Atk Speed  [4]-> Movement  [5]-> Vitality  [6]-> Pickup", canvas.width / 2, canvas.height - 85);
         ctx.restore();
+
+    // Protocol Selection Panel (right side, wider with scrolling, organized by families)
+    if (showStats) {
+      const panelWidth = 320;
+      const panelHeight = 370;
+      const panelX = canvas.width - panelWidth - 10;
+      const panelY = 190;
+      const contentY = panelY + 45;
+      const contentHeight = panelHeight - 55;
+      
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = '#152c16';
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      // Green glowing border
+      ctx.globalAlpha = 1.0;
+      ctx.shadowColor = '#00ffdd';
+      ctx.shadowBlur = 18;
+      ctx.strokeStyle = '#00ffdd';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+      ctx.restore();
+      
+      ctx.fillStyle = "#00ffdd";
+      ctx.textAlign = "center";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText("Active Protocols", panelX + panelWidth / 2, panelY + 20);
+      
+      // Display active protocol count
+      ctx.fillStyle = "#aaf6ff";
+      ctx.font = "16px sans-serif";
+      const activeCount = ProtocolSystem.activeProtocols.length;
+      ctx.fillText(`${activeCount}/6`, panelX + panelWidth / 2, panelY + 42);
+      
+      // Initialize scroll offset
+      if (typeof window._protocolScrollOffset === 'undefined') {
+        window._protocolScrollOffset = 0;
+      }
+      const discoveredSet = new Set(ProtocolSystem.getDiscovered());
+      
+      // Organize ALL protocols by family (discovered and undiscovered)
+      const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
+      const globalIndex = {};
+      let globalIdx = 0;
+      Object.keys(PROTOCOLS).forEach(protocolName => {
+        const proto = PROTOCOLS[protocolName];
+        if (familyGroups[proto.family]) {
+          familyGroups[proto.family].push(protocolName);
+          globalIndex[protocolName] = globalIdx++;
+        }
+      });
+      
+      // Apply clipping before rendering scrollable content
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(panelX, contentY, panelWidth, contentHeight);
+      ctx.clip();
+      
+      // Render protocol selector boxes with family headers
+      window._protocolSelectorBoxes = [];
+      let y = contentY - window._protocolScrollOffset;
+      
+      Object.entries(familyGroups).forEach(([family, protocols]) => {
+        if (protocols.length === 0) return;
+        
+        // Family header
+        ctx.save();
+        ctx.fillStyle = "#00ffdd";
+        ctx.font = "bold 12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(family, panelX + panelWidth / 2, y + 15);
+        ctx.restore();
+        y += 22;
+        
+        // Protocol boxes for this family
+        protocols.forEach(protocolName => {
+          if (y + 26 < contentY || y > contentY + contentHeight) {
+            y += 27;
+            return;
+          }
+          
+          const cardWidth = 240;
+          const cardX = panelX + (panelWidth - cardWidth) / 2;
+          const isDiscovered = discoveredSet.has(protocolName);
+          const isActive = ProtocolSystem.activeProtocols.includes(protocolName);
+          ctx.save();
+          ctx.globalAlpha = 0.92;
+          ctx.fillStyle = isActive ? "#00ffdd" : (isDiscovered ? "#222" : "#1a1a1a");
+          ctx.fillRect(cardX, y, cardWidth, 26);
+          ctx.strokeStyle = isActive ? "#00ffdd" : (isDiscovered ? "#00ffdd" : "#4a5a56");
+          ctx.lineWidth = 2;
+          ctx.strokeRect(cardX, y, cardWidth, 26);
+          
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillStyle = isActive ? "#152c16" : (isDiscovered ? "#00ffdd" : "#7f8f8b");
+          ctx.textAlign = "center";
+          ctx.fillText(protocolName.substr(0, 28), cardX + cardWidth / 2, y + 16);
+          ctx.restore();
+          
+          window._protocolSelectorBoxes.push({
+            x: cardX,
+            y: y,
+            w: cardWidth,
+            h: 26,
+            index: globalIndex[protocolName],
+            name: protocolName,
+            discovered: isDiscovered
+          });
+          y += 27;
+        });
+        y += 6;
+      });
+      
+      // Restore from clipping
+      ctx.restore();
+      
+      // Scrollbar indicator
+      const totalContentHeight = Object.values(familyGroups).reduce((sum, arr) => sum + (arr.length > 0 ? 22 + arr.length * 27 + 6 : 0), 0);
+      const maxProtocolScroll = Math.max(0, totalContentHeight - contentHeight);
+      window._protocolScrollOffset = Math.max(0, Math.min(window._protocolScrollOffset, maxProtocolScroll));
+      if (totalContentHeight > contentHeight) {
+        const scrollRatio = contentHeight / totalContentHeight;
+        const scrollbarHeight = Math.max(20, contentHeight * scrollRatio);
+        const scrollbarY = contentY + (window._protocolScrollOffset / totalContentHeight) * contentHeight;
+        
+        ctx.fillStyle = "rgba(0, 255, 221, 0.5)";
+        ctx.fillRect(panelX + panelWidth - 8, scrollbarY, 6, scrollbarHeight);
+      }
+      
+      // Display hovered protocol details following mouse cursor
+      if (hoveredProtocol >= 0) {
+        const hoveredBox = (window._protocolSelectorBoxes || []).find(box => box.index === hoveredProtocol);
+        if (hoveredBox && hoveredBox.name) {
+          const proto = PROTOCOLS[hoveredBox.name];
+          const tooltipWidth = 230;
+          const contentWidth = tooltipWidth - 16;
+
+          const wrapText = (text, maxWidth, font) => {
+            ctx.font = font;
+            const words = text.split(" ");
+            const lines = [];
+            let line = "";
+            for (let i = 0; i < words.length; i++) {
+              const testLine = line ? line + " " + words[i] : words[i];
+              if (ctx.measureText(testLine).width <= maxWidth) {
+                line = testLine;
+              } else {
+                if (line) lines.push(line);
+                line = words[i];
+              }
+            }
+            if (line) lines.push(line);
+            return lines;
+          };
+
+          const titleLines = wrapText(hoveredBox.name, contentWidth, "bold 11px sans-serif");
+          const familyLine = proto.family + " • " + proto.rarity + " • " + proto.tier;
+          const modTokens = Object.entries(proto.statMods)
+            .filter(([_, v]) => v !== 0)
+            .map(([k, v]) => (v > 0 ? "+" : "-") + k);
+          const modsText = modTokens.join(", ");
+          const modLines = modsText ? wrapText(modsText, contentWidth, "10px sans-serif") : [];
+
+          const orderedStats = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+          const formatDiffText = (hoveredMods, activeMods) => {
+            const tokens = orderedStats
+              .map(stat => {
+                const diff = (hoveredMods[stat] || 0) - (activeMods[stat] || 0);
+                if (diff === 0) return null;
+                return `${diff > 0 ? "+" : ""}${diff} ${stat}`;
+              })
+              .filter(Boolean);
+            return tokens.length ? tokens.join(", ") : "No stat diff";
+          };
+
+          const activeProtocolNames = ProtocolSystem.activeProtocols.filter(name => name !== hoveredBox.name);
+          const compareHeaderLines = wrapText(
+            activeProtocolNames.length ? "1:1 vs Active:" : "1:1 vs Active: none",
+            contentWidth,
+            "10px sans-serif"
+          );
+          const oneToOneCompareLines = [];
+          activeProtocolNames.forEach(activeName => {
+            const activeProto = PROTOCOLS[activeName];
+            if (!activeProto || !activeProto.statMods) return;
+            const compareText = `vs ${activeName}: ${formatDiffText(proto.statMods, activeProto.statMods)}`;
+            oneToOneCompareLines.push(...wrapText(compareText, contentWidth, "10px sans-serif"));
+          });
+
+          const tooltipHeight =
+            14 +
+            (titleLines.length * 14) +
+            14 +
+            (modLines.length * 12) +
+            8 +
+            (compareHeaderLines.length * 12) +
+            (oneToOneCompareLines.length * 12) +
+            10;
+          let tooltipX = mouseX - tooltipWidth - 10;
+          let tooltipY = mouseY + 10;
+          
+          // Keep tooltip within canvas bounds
+          if (tooltipX < 0) {
+            tooltipX = 10;
+          }
+          if (tooltipY + tooltipHeight > canvas.height) {
+            tooltipY = mouseY - tooltipHeight - 10;
+          }
+          if (tooltipY < 0) {
+            tooltipY = 10;
+          }
+          
+          ctx.save();
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = '#152c16';
+          ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+          ctx.strokeStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+          
+          ctx.font = "bold 11px sans-serif";
+          ctx.fillStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
+          ctx.textAlign = "center";
+          let textY = tooltipY + 16;
+          titleLines.forEach(line => {
+            ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
+            textY += 14;
+          });
+          ctx.fillText(familyLine, tooltipX + tooltipWidth / 2, textY);
+          textY += 12;
+          
+          ctx.font = "10px sans-serif";
+          ctx.fillStyle = hoveredBox.discovered ? "#aaf6ff" : "#8ea6a0";
+          modLines.forEach(line => {
+            ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
+            textY += 12;
+          });
+
+          textY += 4;
+          compareHeaderLines.forEach(line => {
+            ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
+            textY += 12;
+          });
+          oneToOneCompareLines.forEach(line => {
+            ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
+            textY += 12;
+          });
+          ctx.restore();
+        }
+      }
+    }
+    ctx.restore();
 
 
     // ...existing code for drawing stat labels and storing bounding boxes...
@@ -1574,9 +2340,15 @@ const droplifelenght = 280;
             const statKeys = ["Range", "Power", "AttackSpeed", "Movement", "Vitality", "Pickup"];
             const stat = statKeys[box.stat - 1];
             if (player.stats[stat] > 0) {
+              const oldMaxHealth = player.maxHealth;
+              const oldHealth = player.health;
               player.stats[stat]--;
               statPoints++;
               applyStats();
+              if (stat === "Vitality") {
+                const maxHealthDelta = player.maxHealth - oldMaxHealth;
+                player.health = Math.max(0, Math.min(player.maxHealth, oldHealth + maxHealthDelta));
+              }
             }
             return;
           }
@@ -1598,6 +2370,63 @@ const droplifelenght = 280;
           }
         }
       });
+      // Protocol selector click handler
+      canvas.addEventListener("mousedown", function(e) {
+        if (!showStats) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const boxes = window._protocolSelectorBoxes || [];
+        for (let box of boxes) {
+          if (
+            mx >= box.x &&
+            mx <= box.x + box.w &&
+            my >= box.y &&
+            my <= box.y + box.h
+          ) {
+            if (box.discovered) {
+              if (ProtocolSystem.activeProtocols.includes(box.name)) {
+                ProtocolSystem.deactivate(box.name);
+                if (selectedProtocol === box.index) selectedProtocol = -1;
+                applyStats();
+              } else {
+                const activated = ProtocolSystem.activate(box.name);
+                if (activated) {
+                  selectedProtocol = box.index;
+                  applyStats();
+                }
+              }
+            }
+            return;
+          }
+        }
+      });
+      // Protocol scroll wheel handler
+      canvas.addEventListener("wheel", function(e) {
+        if (!showStats) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        // Check if mouse is over protocol panel (right side)
+        if (mx > canvas.width - 340 && my > 190 && my < 560) {
+          e.preventDefault();
+          const protocolCountsByFamily = { "Targeting": 0, "Overdrive": 0, "Utility": 0 };
+          Object.keys(PROTOCOLS).forEach(protocolName => {
+            const family = PROTOCOLS[protocolName].family;
+            if (protocolCountsByFamily[family] !== undefined) {
+              protocolCountsByFamily[family]++;
+            }
+          });
+          const protocolContentHeight = Object.values(protocolCountsByFamily)
+            .reduce((sum, count) => sum + (count > 0 ? 22 + count * 27 + 6 : 0), 0);
+          const protocolViewportHeight = 370 - 55;
+          const maxProtocolScroll = Math.max(0, protocolContentHeight - protocolViewportHeight);
+          window._protocolScrollOffset = Math.max(
+            0,
+            Math.min(maxProtocolScroll, window._protocolScrollOffset + (e.deltaY > 0 ? 30 : -30))
+          );
+        }
+      }, { passive: false });
       window._statButtonListenersAdded = true;
     }
     }
@@ -1640,12 +2469,15 @@ const droplifelenght = 280;
     applyStats();
     xp = 0; xpToLevel = 10; level = 1;
     statPoints = 5; // TEMP: Start with 25 stat points
+    selectedProtocol = -1; // Reset selected protocol
+    hoveredProtocol = -1; // Reset hovered protocol
     wave = 1;
     enemies.length = 0;
     healthDrops.length = 0;
     xpDrops.length = 0;
     slingerDrops.length = 0;
     bruteDrops.length = 0;
+    protocolOrbs.length = 0;
     particles.length = 0;
     projectiles.length = 0;
     mines.length = 0;
@@ -2011,6 +2843,7 @@ const droplifelenght = 280;
                 });
               }
             }
+            tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
             enemies.splice(i, 1);
             continue;
           }
@@ -2377,6 +3210,7 @@ const droplifelenght = 280;
         updateXPDrops();
         updateslingerDrops();
         updateBruteDrops();
+        updateProtocolOrbs(delta);
         updateMines(delta);
         updateParticles();
         updatePlayer(delta);
@@ -2457,6 +3291,43 @@ const droplifelenght = 280;
         ctx.arc(d.x, d.y, 6, 0, Math.PI * 2);
         ctx.fillStyle = grad;
         ctx.fill();
+        ctx.restore();
+      });
+
+      // Protocol orb glow (attackable discovery drops)
+      protocolOrbs.forEach(orb => {
+        const pulse = 0.85 + Math.sin(Date.now() * 0.008) * 0.15;
+        const progress = orb.requiredFrames > 0 ? Math.min(1, orb.progressFrames / orb.requiredFrames) : 0;
+        const coreRadius = orb.radius * pulse;
+        const outerRadius = orb.radius * (1.9 + progress * 0.5);
+        const coreColor = orb.rarity === "Rare" ? "#c87cff" : "#63f0ff";
+        const edgeColor = orb.rarity === "Rare" ? "#7a2bbd" : "#008ea8";
+
+        ctx.save();
+        ctx.shadowColor = coreColor;
+        ctx.shadowBlur = 20;
+        const grad = ctx.createRadialGradient(orb.x, orb.y, 1, orb.x, orb.y, outerRadius);
+        grad.addColorStop(0, coreColor);
+        grad.addColorStop(0.45, edgeColor);
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, outerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, coreRadius, 0, Math.PI * 2);
+        ctx.fillStyle = coreColor;
+        ctx.globalAlpha = 0.75;
+        ctx.fill();
+
+        // Progress ring while attacking over time
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#e8ffff";
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, orb.radius + 4, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * progress));
+        ctx.stroke();
         ctx.restore();
       });
 
@@ -2869,6 +3740,24 @@ const droplifelenght = 280;
         ctx.globalAlpha = 1;
       }
       drawHUD();
+      
+      // Update hovered protocol based on mouse position
+      hoveredProtocol = -1;
+      if (showStats && window._protocolSelectorBoxes) {
+        const boxes = window._protocolSelectorBoxes;
+        for (let box of boxes) {
+          if (
+            mouseX >= box.x &&
+            mouseX <= box.x + box.w &&
+            mouseY >= box.y &&
+            mouseY <= box.y + box.h
+          ) {
+            hoveredProtocol = box.index;
+            break;
+          }
+        }
+      }
+      
       if (gameStarted && !gameOver && !followMouse) {
         ctx.save();
         ctx.fillStyle = "white";
