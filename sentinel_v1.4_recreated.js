@@ -327,7 +327,7 @@ window.onload = function () {
 
     function startGame(difficulty, startStatPoints, startHealth) {
       window.sentinelDifficulty = difficulty;
-      diffOverlay.remove();
+      ProtocolSystem.setStarters(window._pendingStarterProtocols || []);
       showMenuScreen = false;
       fadeOutMenuAmbience();
       restartGame();
@@ -337,9 +337,218 @@ window.onload = function () {
       gameStarted = true;
     }
 
-    normalBtn.addEventListener("click", () => startGame("Normal", 5, 10));
-    hardcoreBtn.addEventListener("click", () => startGame("Hardcore", 0, 5));
-    apocalypseBtn.addEventListener("click", () => startGame("Apocalypse", 5, 5));
+    function showStarterProtocolModal(difficulty, startStatPoints, startHealth) {
+      const discoveredProtocols = ProtocolSystem.getDiscovered();
+      const starterOverlay = document.createElement("div");
+      starterOverlay.id = "starterProtocolOverlay";
+      starterOverlay.style.position = "fixed";
+      starterOverlay.style.left = 0;
+      starterOverlay.style.top = 0;
+      starterOverlay.style.width = "100vw";
+      starterOverlay.style.height = "100vh";
+      starterOverlay.style.background = "rgba(0,0,0,0.95)";
+      starterOverlay.style.display = "flex";
+      starterOverlay.style.flexDirection = "column";
+      starterOverlay.style.justifyContent = "center";
+      starterOverlay.style.alignItems = "center";
+      starterOverlay.style.zIndex = 1002;
+
+      const panel = document.createElement("div");
+      panel.style.width = "860px";
+      panel.style.maxHeight = "680px";
+      panel.style.background = "rgba(0, 20, 30, 0.98)";
+      panel.style.border = "2px solid #00ffdd";
+      panel.style.borderRadius = "10px";
+      panel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      panel.style.display = "flex";
+      panel.style.flexDirection = "column";
+      panel.style.padding = "20px";
+      starterOverlay.appendChild(panel);
+
+      const title = document.createElement("h2");
+      title.textContent = "SELECT STARTER PROTOCOLS";
+      title.style.color = "#00ffdd";
+      title.style.margin = "0 0 8px 0";
+      title.style.textAlign = "center";
+      panel.appendChild(title);
+
+      const subtitle = document.createElement("div");
+      subtitle.textContent = "Choose up to 2 permanently discovered protocols to start this run.";
+      subtitle.style.color = "#aaf6ff";
+      subtitle.style.fontSize = "0.95rem";
+      subtitle.style.textAlign = "center";
+      subtitle.style.marginBottom = "14px";
+      panel.appendChild(subtitle);
+
+      const selectionCount = document.createElement("div");
+      selectionCount.style.color = "#00ffdd";
+      selectionCount.style.textAlign = "center";
+      selectionCount.style.marginBottom = "10px";
+      panel.appendChild(selectionCount);
+
+      const content = document.createElement("div");
+      content.style.flex = "1";
+      content.style.overflowY = "auto";
+      content.style.border = "1px solid rgba(0,255,221,0.25)";
+      content.style.borderRadius = "8px";
+      content.style.padding = "12px";
+      panel.appendChild(content);
+
+      let selected = Array.isArray(ProtocolSystem.starterProtocols)
+        ? ProtocolSystem.starterProtocols.filter(name => discoveredProtocols.includes(name)).slice(0, 2)
+        : [];
+      const refreshCount = () => {
+        selectionCount.textContent = `Selected: ${selected.length}/2`;
+      };
+
+      if (discoveredProtocols.length === 0) {
+        const noneMsg = document.createElement("div");
+        noneMsg.textContent = "No protocols discovered yet. Start run with 0 starter protocols.";
+        noneMsg.style.color = "#ffcc88";
+        noneMsg.style.textAlign = "center";
+        noneMsg.style.padding = "24px";
+        content.appendChild(noneMsg);
+      } else {
+        const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
+        discoveredProtocols.forEach(protocolName => {
+          const family = PROTOCOLS[protocolName]?.family;
+          if (familyGroups[family]) {
+            familyGroups[family].push(protocolName);
+          }
+        });
+
+        Object.entries(familyGroups).forEach(([familyName, protocols]) => {
+          if (protocols.length === 0) return;
+
+          const familyHeader = document.createElement("div");
+          familyHeader.textContent = familyName;
+          familyHeader.style.color = "#00ffdd";
+          familyHeader.style.fontSize = "1rem";
+          familyHeader.style.fontWeight = "bold";
+          familyHeader.style.margin = "8px 4px 8px 4px";
+          familyHeader.style.borderBottom = "1px solid rgba(0,255,221,0.45)";
+          familyHeader.style.paddingBottom = "4px";
+          content.appendChild(familyHeader);
+
+          const grid = document.createElement("div");
+          grid.style.display = "grid";
+          grid.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+          grid.style.gap = "10px";
+          grid.style.marginBottom = "12px";
+          content.appendChild(grid);
+
+          protocols.forEach(protocolName => {
+            const proto = PROTOCOLS[protocolName];
+            const rawUpgradeTier = ProtocolSystem.protocolBoard[protocolName]?.upgradeTier;
+            const upgradeTier = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
+              ? ProtocolSystem.normalizeUpgradeTier(rawUpgradeTier)
+              : (rawUpgradeTier || (ProtocolSystem.upgradeTiers?.[0] || "Trivial"));
+            const effectiveStarterMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+              ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+              : proto.statMods;
+            const card = document.createElement("button");
+            card.type = "button";
+            card.style.textAlign = "left";
+            card.style.padding = "10px";
+            card.style.borderRadius = "8px";
+            card.style.border = "2px solid #00ffdd";
+            card.style.background = "rgba(0, 77, 92, 0.7)";
+            card.style.color = "#00ffdd";
+            card.style.cursor = "pointer";
+            card.style.transition = "all 0.15s";
+
+            const mods = Object.entries(effectiveStarterMods)
+              .filter(([_, v]) => v !== 0)
+              .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k}`)
+              .join(", ");
+
+            card.innerHTML = `<div style="font-weight:bold; margin-bottom:4px;">${protocolName}</div>
+                              <div style="font-size:0.8rem; color:#c8ffff; margin-top:3px;">${upgradeTier}</div>            
+                              <div style="font-size:0.85rem; color:#aaf6ff; margin-top:3px;">${proto.rarity} • ${proto.tier}</div>
+                              <div style="font-size:0.8rem; color:#aaf6ff; margin-top:4px;">${mods || "No mods"}</div>`;
+
+            const renderCardState = () => {
+              const isSelected = selected.includes(protocolName);
+              card.style.background = isSelected ? "rgba(0, 255, 221, 0.22)" : "rgba(0, 77, 92, 0.7)";
+              card.style.borderColor = isSelected ? "#ffffff" : "#00ffdd";
+              card.style.boxShadow = isSelected ? "0 0 14px rgba(255,255,255,0.35)" : "none";
+            };
+            renderCardState();
+
+            card.addEventListener("click", () => {
+              const idx = selected.indexOf(protocolName);
+              if (idx >= 0) {
+                selected.splice(idx, 1);
+              } else {
+                if (selected.length >= 2) return;
+                selected.push(protocolName);
+              }
+              renderCardState();
+              refreshCount();
+            });
+
+            grid.appendChild(card);
+          });
+        });
+      }
+
+      refreshCount();
+
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.justifyContent = "space-between";
+      actions.style.gap = "12px";
+      actions.style.marginTop = "14px";
+      panel.appendChild(actions);
+
+      const backBtn2 = document.createElement("button");
+      backBtn2.textContent = "← Back";
+      backBtn2.style.fontSize = "1rem";
+      backBtn2.style.padding = "0.7rem 1.2rem";
+      backBtn2.style.background = "rgba(0,0,0,0.7)";
+      backBtn2.style.color = "#fff";
+      backBtn2.style.border = "2px solid #fff";
+      backBtn2.style.borderRadius = "8px";
+      backBtn2.style.cursor = "pointer";
+      actions.appendChild(backBtn2);
+
+      const startBtn = document.createElement("button");
+      startBtn.textContent = "Start Run";
+      startBtn.style.fontSize = "1rem";
+      startBtn.style.padding = "0.7rem 1.2rem";
+      startBtn.style.background = "rgba(0,0,0,0.7)";
+      startBtn.style.color = "#00ffdd";
+      startBtn.style.border = "2px solid #00ffdd";
+      startBtn.style.borderRadius = "8px";
+      startBtn.style.cursor = "pointer";
+      actions.appendChild(startBtn);
+
+      backBtn2.addEventListener("click", () => {
+        starterOverlay.remove();
+        showDifficultyMenu();
+      });
+
+      startBtn.addEventListener("click", () => {
+        window._pendingStarterProtocols = [...selected];
+        starterOverlay.remove();
+        startGame(difficulty, startStatPoints, startHealth);
+      });
+
+      document.body.appendChild(starterOverlay);
+    }
+
+    normalBtn.addEventListener("click", () => {
+      diffOverlay.remove();
+      showStarterProtocolModal("Normal", 5, 10);
+    });
+    hardcoreBtn.addEventListener("click", () => {
+      diffOverlay.remove();
+      showStarterProtocolModal("Hardcore", 0, 5);
+    });
+    apocalypseBtn.addEventListener("click", () => {
+      diffOverlay.remove();
+      showStarterProtocolModal("Apocalypse", 5, 5);
+    });
 
     // Back button
     backBtn.addEventListener("click", () => {
@@ -351,13 +560,14 @@ window.onload = function () {
   // Protocol menu
   function showProtocolMenu() {
     const menuOverlay = document.createElement("div");
+    const canvasRect = canvas.getBoundingClientRect();
     menuOverlay.id = "protocolMenuOverlay";
     menuOverlay.style.position = "fixed";
-    menuOverlay.style.left = "50%";
-    menuOverlay.style.top = "50%";
-    menuOverlay.style.transform = "translate(-50%, -50%)";
-    menuOverlay.style.width = "1024px";
-    menuOverlay.style.height = "768px";
+    menuOverlay.style.left = `${canvasRect.left}px`;
+    menuOverlay.style.top = `${canvasRect.top}px`;
+    menuOverlay.style.transform = "none";
+    menuOverlay.style.width = `${canvasRect.width}px`;
+    menuOverlay.style.height = `${canvasRect.height}px`;
     menuOverlay.style.background = "rgba(0, 20, 30, 0.98)";
     menuOverlay.style.border = "2px solid #00ffdd";
     menuOverlay.style.borderRadius = "8px";
@@ -401,6 +611,21 @@ window.onload = function () {
     backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
     backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
     headerSection.appendChild(backBtn);
+
+    const bytesBadge = document.createElement("div");
+    const bytesValue = Math.max(0, Math.floor(typeof totalCollectedBytes === "number" ? totalCollectedBytes : loadCollectedBytes()));
+    bytesBadge.textContent = `Bytes: ${bytesValue}`;
+    bytesBadge.style.position = "absolute";
+    bytesBadge.style.right = "18px";
+    bytesBadge.style.top = "10px";
+    bytesBadge.style.color = "#00ffdd";
+    bytesBadge.style.fontWeight = "bold";
+    bytesBadge.style.fontSize = "1rem";
+    bytesBadge.style.background = "rgba(0, 0, 0, 0)";
+    bytesBadge.style.borderRadius = "6px";
+    bytesBadge.style.padding = "6px 20px";
+    headerSection.appendChild(bytesBadge);
+
     menuOverlay.appendChild(headerSection);
 
     // Title
@@ -468,7 +693,7 @@ window.onload = function () {
         const card = document.createElement("div");
         card.style.borderRadius = "6px";
         card.style.padding = "20px";
-        card.style.minHeight = "140px";
+        card.style.minHeight = "190px";
         card.style.display = "flex";
         card.style.flexDirection = "column";
         card.style.justifyContent = "center";
@@ -531,18 +756,126 @@ window.onload = function () {
         rarityEl.style.marginBottom = "5px";
         card.appendChild(rarityEl);
 
-        // Stat mods
-        const statsEl = document.createElement("div");
+        const currentUpgradeLevel = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
+          ? ProtocolSystem.normalizeUpgradeTier(state.upgradeTier)
+          : (state.upgradeTier || (ProtocolSystem.upgradeTiers?.[0] || "Trivial"));
+        const currentTierIndex = (typeof ProtocolSystem.getUpgradeTierIndex === "function")
+          ? ProtocolSystem.getUpgradeTierIndex(currentUpgradeLevel)
+          : 0;
+        const totalTierCount = (Array.isArray(ProtocolSystem.upgradeTiers) && ProtocolSystem.upgradeTiers.length > 0)
+          ? ProtocolSystem.upgradeTiers.length
+          : 5;
+        const nextUpgradeCost = (typeof ProtocolSystem.getNextUpgradeCost === "function")
+          ? ProtocolSystem.getNextUpgradeCost(protocolName)
+          : null;
+
+        const upgradeLevelEl = document.createElement("div");
+        upgradeLevelEl.textContent = `Upgrade Level: ${currentUpgradeLevel} (${currentTierIndex + 1}/${totalTierCount})`;
+        upgradeLevelEl.style.color = discovered ? "#c8ffff" : "#666";
+        upgradeLevelEl.style.fontSize = "0.8rem";
+        upgradeLevelEl.style.marginBottom = "3px";
+        card.appendChild(upgradeLevelEl);
+
+        const nextCostEl = document.createElement("div");
+        nextCostEl.textContent = `Upgrade Cost: ${nextUpgradeCost === null ? "MAX" : `${nextUpgradeCost} Bytes`}`;
+        nextCostEl.style.color = discovered ? "#aaf6ff" : "#666";
+        nextCostEl.style.fontSize = "0.8rem";
+        nextCostEl.style.marginBottom = "4px";
+        card.appendChild(nextCostEl);
+
+        const intentEl = document.createElement("div");
+        intentEl.textContent = protocol.intent || "Unknown";
+        intentEl.style.color = discovered ? "#aaf6ff" : "#666";
+        intentEl.style.fontSize = "0.8rem";
+        intentEl.style.marginBottom = "12px";
+        card.appendChild(intentEl);
+
+        const effectiveMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+          ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+          : protocol.statMods;
+        const nextUpgradeEffects = (typeof ProtocolSystem.getProtocolNextUpgradeEffects === "function")
+          ? ProtocolSystem.getProtocolNextUpgradeEffects(protocolName)
+          : {};
+        const formatSigned = (num) => `${num > 0 ? "+" : ""}${num}`;
         const statTexts = [];
-        Object.entries(protocol.statMods).forEach(([stat, mod]) => {
-          if (mod > 0) statTexts.push(`+${stat}`);
-          if (mod < 0) statTexts.push(`-${stat}`);
+        Object.keys(protocol.statMods).forEach(stat => {
+          const effectiveValue = effectiveMods[stat] || 0;
+          if (effectiveValue === 0) return;
+          const nextEffect = nextUpgradeCost === null ? null : (nextUpgradeEffects[stat] || 0);
+          const nextTotalValue = nextEffect === null ? null : (effectiveValue + nextEffect);
+          const nextTotalText = nextTotalValue === null ? "MAX" : formatSigned(nextTotalValue);
+          statTexts.push(`${formatSigned(effectiveValue)} ${stat} (next ${nextTotalText})`);
         });
-        statsEl.textContent = statTexts.join(", ") || "No mods";
-        statsEl.style.color = discovered ? "#00ff88" : "#555";
-        statsEl.style.fontSize = "0.8rem";
-        statsEl.style.marginTop = "auto";
-        card.appendChild(statsEl);
+
+        const powerModifierLabelEl = document.createElement("div");
+        powerModifierLabelEl.textContent = "Power Modifier:";
+        powerModifierLabelEl.style.color = discovered ? "#00ff88" : "#555";
+        powerModifierLabelEl.style.fontSize = "0.8rem";
+        powerModifierLabelEl.style.fontWeight = "bold";
+        powerModifierLabelEl.style.marginTop = "0";
+        card.appendChild(powerModifierLabelEl);
+
+        const powerModifierListEl = document.createElement("div");
+        powerModifierListEl.textContent = statTexts.length > 0 ? statTexts.join("\n") : "No modifiers";
+        powerModifierListEl.style.color = discovered ? "#00ff88" : "#555";
+        powerModifierListEl.style.fontSize = "0.8rem";
+        powerModifierListEl.style.whiteSpace = "pre-line";
+        powerModifierListEl.style.lineHeight = "1.25";
+        card.appendChild(powerModifierListEl);
+
+        if (discovered) {
+          const upgradeBtn = document.createElement("button");
+          upgradeBtn.type = "button";
+          upgradeBtn.textContent = nextUpgradeCost === null ? "MAX" : "Upgrade";
+          upgradeBtn.style.marginTop = "8px";
+          upgradeBtn.style.padding = "0.35rem 0.6rem";
+          upgradeBtn.style.borderRadius = "6px";
+          upgradeBtn.style.border = "1px solid #00ffdd";
+          upgradeBtn.style.background = "rgba(0,0,0,0.4)";
+          upgradeBtn.style.color = "#00ffdd";
+          upgradeBtn.style.fontSize = "0.78rem";
+          upgradeBtn.style.cursor = nextUpgradeCost === null ? "default" : "pointer";
+          if (nextUpgradeCost === null) {
+            upgradeBtn.disabled = true;
+            upgradeBtn.style.opacity = "0.65";
+          }
+
+          upgradeBtn.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            if (nextUpgradeCost === null) return;
+
+            if (totalCollectedBytes < nextUpgradeCost) {
+              alert(`Not enough Bytes. Need ${nextUpgradeCost}, have ${totalCollectedBytes}.`);
+              return;
+            }
+
+            const nextTierName = (typeof ProtocolSystem.getNextUpgradeTierName === "function")
+              ? ProtocolSystem.getNextUpgradeTierName(protocolName)
+              : "Next";
+            const confirmed = window.confirm(
+              `Upgrade ${protocolName} to ${nextTierName} for ${nextUpgradeCost} Bytes?`
+            );
+            if (!confirmed) return;
+
+            const result = (typeof ProtocolSystem.upgradeProtocol === "function")
+              ? ProtocolSystem.upgradeProtocol(protocolName, totalCollectedBytes)
+              : { success: false };
+
+            if (!result.success) {
+              if (result.reason === "insufficient") {
+                alert(`Not enough Bytes. Need ${result.cost}, have ${totalCollectedBytes}.`);
+              }
+              return;
+            }
+
+            totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
+            saveCollectedBytes();
+            menuOverlay.remove();
+            showProtocolMenu();
+          });
+
+          card.appendChild(upgradeBtn);
+        }
 
         // Lock badge
         if (!discovered) {
@@ -658,6 +991,43 @@ window.onload = function () {
 
   //========= GAME STATE =========//
   let wave = 1, xp = 0, xpToLevel = 10, level = 1, statPoints = 5; // Start at wave 1
+  const COLLECTED_BYTES_STORAGE_KEY = "sentinel.collectedBytes.v1";
+  let runCollectedBytes = 0;
+  let totalCollectedBytes = 0;
+  let runBytesFinalized = false;
+
+  function loadCollectedBytes() {
+    try {
+      const raw = localStorage.getItem(COLLECTED_BYTES_STORAGE_KEY);
+      const parsed = raw ? parseInt(raw, 10) : 0;
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function saveCollectedBytes() {
+    try {
+      localStorage.setItem(COLLECTED_BYTES_STORAGE_KEY, String(Math.max(0, Math.floor(totalCollectedBytes))));
+    } catch (err) {}
+  }
+
+  function collectRunBytes(amount) {
+    const value = Math.max(0, Math.floor(amount || 0));
+    if (value <= 0) return;
+    runCollectedBytes += value;
+  }
+
+  function finalizeRunBytes() {
+    if (runBytesFinalized) return;
+    runBytesFinalized = true;
+    if (runCollectedBytes > 0) {
+      totalCollectedBytes += runCollectedBytes;
+      saveCollectedBytes();
+    }
+  }
+
+  totalCollectedBytes = loadCollectedBytes();
   let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
@@ -821,6 +1191,7 @@ window.onload = function () {
     const k = e.key.toLowerCase();
     keys[k] = true;
     if (k === "r" && gameOver) {
+      finalizeRunBytes();
       showMenuScreen = true;
       window._playMenuAmbienceOnShowMenu = true;
       showMenu();
@@ -881,6 +1252,7 @@ window.onload = function () {
       
       // Second death - always return to menu on click
       if (window._playerUsedContinue) {
+        finalizeRunBytes();
         showMenuScreen = true;
         window._playMenuAmbienceOnShowMenu = true;
         playMenuAmbience();
@@ -1036,6 +1408,10 @@ window.onload = function () {
 
   function completeProtocolOrb(orb) {
     if (!orb) return;
+    const protocolInfluence = Math.max(0, Math.floor((PROTOCOLS[orb.protocolName]?.influence) || 0));
+    if (protocolInfluence > 0) {
+      collectRunBytes(protocolInfluence);
+    }
     if (ProtocolSystem.discover(orb.protocolName)) {
       for (let i = 0; i < 18; i++) {
         const angle = Math.random() * Math.PI * 2;
@@ -1053,6 +1429,7 @@ window.onload = function () {
         });
       }
       console.log(`✓ Protocol discovered from orb: ${orb.protocolName}`);
+      console.log(`+${protocolInfluence} Bytes (Influence)`);
     }
   }
 
@@ -1162,19 +1539,17 @@ window.onload = function () {
         nearest = e;
       }
     }
-    // Store nearest enemy and angle globally for drawing
+
     window._nearestEnemy = nearest;
     let targetAngle = 0;
     if (nearest) {
       targetAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
     }
-    // Smoothly interpolate player visual angle toward target
     const angleDiff = ((targetAngle - playerVisualAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-    playerVisualAngle += angleDiff * 0.15; // 0.15 = smoothing factor
+    playerVisualAngle += angleDiff * 0.15;
     window._playerToEnemyAngle = playerVisualAngle;
-    // Draw attack line for entire cooldown period after attack
+
     let isAttacking = nearest && minDist < player.range + nearest.radius && player.attackCooldown > 0 && followMouse;
-    // Start or resume laser sound when attacking
     if (isAttacking) {
       if (!laserAudio) {
         laserAudio = new Audio('micro_crackle_sparkling_background.wav');
@@ -1182,17 +1557,15 @@ window.onload = function () {
         laserAudio.volume = window.sentinelVolume.laser;
         window.laserAudio = laserAudio;
       }
-      // Always update volume in case changed externally
       laserAudio.volume = window.sentinelVolume.laser;
       if (laserAudio.paused) {
         laserAudio.currentTime = 0;
         laserAudio.play();
       }
-      // Blue laser effect with 3 skinny, color-shifting lines
+
       const laserColors = ["#00bfff", "#00e6ff", "#aaf6ff"];
-      const offsets = [-1, 0, 1]; // skinnier spacing
+      const offsets = [-1, 0, 1];
       const colorShift = Math.floor(Date.now() / 60) % 3;
-      // Calculate direction and edge of enemy for laser and particles
       const dx = nearest.x - player.x;
       const dy = nearest.y - player.y;
       const dist = Math.hypot(dx, dy);
@@ -1200,8 +1573,8 @@ window.onload = function () {
       const dirY = dy / dist;
       const edgeX = nearest.x - dirX * nearest.radius;
       const edgeY = nearest.y - dirY * nearest.radius;
+
       for (let l = 0; l < 3; l++) {
-        // Cycle colors for dynamic effect
         const color = laserColors[(l + colorShift) % 3];
         const offX = -offsets[l] * (nearest.y - player.y) / Math.hypot(dx, dy);
         const offY = offsets[l] * (nearest.x - player.x) / Math.hypot(dx, dy);
@@ -1210,10 +1583,10 @@ window.onload = function () {
         drawLine(player.x + offX, player.y + offY, edgeX + offX, edgeY + offY, color);
         ctx.restore();
       }
-      // Lightning sparks: draw random bolts branching from laser
-      const sparkCount = 3 + Math.floor(Math.random() * 2); // 3-4 sparks
+
+      const sparkCount = 3 + Math.floor(Math.random() * 2);
       for (let s = 0; s < sparkCount; s++) {
-        const t = 0.2 + Math.random() * 0.6; // Position along the laser
+        const t = 0.2 + Math.random() * 0.6;
         const baseX = player.x + (edgeX - player.x) * t;
         const baseY = player.y + (edgeY - player.y) * t;
         const angle = Math.atan2(edgeY - player.y, edgeX - player.x) + (Math.random() - 0.5) * 1.2;
@@ -1223,54 +1596,53 @@ window.onload = function () {
         const sparkColor = ["#aaf6ff", "#e0f7ff", "#00e6ff", "#ffffff"][Math.floor(Math.random() * 4)];
         drawLightningBolt(baseX, baseY, endX, endY, sparkColor, 6 + Math.floor(Math.random() * 3), 10 + Math.random() * 10);
       }
-        // Attack line oval shadow behind player (fixed size)
-        ctx.save();
-        const shadowDirX = -dirX;
-        const shadowDirY = -dirY;
-        const ovalCenterX = player.x + shadowDirX * (player.radius * 1.2);
-        const ovalCenterY = player.y + shadowDirY * (player.radius * 1.2);
-        const ovalLength = player.radius * 1.8;
-        const ovalWidth = player.radius * 0.7;
-        const ovalAngle = Math.atan2(shadowDirY, shadowDirX);
-        ctx.globalAlpha = 0.32;
-        ctx.fillStyle = 'rgba(0,0,0,0.38)';
-        ctx.translate(ovalCenterX, ovalCenterY);
-        ctx.rotate(ovalAngle);
+
+      ctx.save();
+      const shadowDirX = -dirX;
+      const shadowDirY = -dirY;
+      const ovalCenterX = player.x + shadowDirX * (player.radius * 1.2);
+      const ovalCenterY = player.y + shadowDirY * (player.radius * 1.2);
+      const ovalLength = player.radius * 1.8;
+      const ovalWidth = player.radius * 0.7;
+      const ovalAngle = Math.atan2(shadowDirY, shadowDirX);
+      ctx.globalAlpha = 0.32;
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      ctx.translate(ovalCenterX, ovalCenterY);
+      ctx.rotate(ovalAngle);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, ovalLength, ovalWidth, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const glowSteps = Math.max(8, Math.floor(dist / 18));
+      for (let i = 0; i <= glowSteps; i++) {
+        const t = i / glowSteps;
+        const px = player.x + (edgeX - player.x) * t;
+        const py = player.y + (edgeY - player.y) * t;
+        const glowRadius = 22 + 18 * (1 - Math.abs(t - 0.5) * 1.5);
+        const grad = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
+        grad.addColorStop(0, 'rgba(0, 180, 255, 0.08)');
+        grad.addColorStop(0.4, 'rgba(0, 230, 255, 0.10)');
+        grad.addColorStop(1, 'rgba(0, 120, 255, 0.0)');
         ctx.beginPath();
-        ctx.ellipse(0, 0, ovalLength, ovalWidth, 0, 0, Math.PI * 2);
+        ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
         ctx.fill();
-        ctx.restore();
-        // Laser light emission effect along attack line (blue theme)
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        const glowSteps = Math.max(8, Math.floor(dist / 18));
-        for (let i = 0; i <= glowSteps; i++) {
-          const t = i / glowSteps;
-          const px = player.x + (edgeX - player.x) * t;
-          const py = player.y + (edgeY - player.y) * t;
-          const glowRadius = 22 + 18 * (1 - Math.abs(t - 0.5) * 1.5); // Brighter in the middle
-          const grad = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
-          grad.addColorStop(0, 'rgba(0, 180, 255, 0.08)');
-          grad.addColorStop(0.4, 'rgba(0, 230, 255, 0.10)');
-          grad.addColorStop(1, 'rgba(0, 120, 255, 0.0)');
-          ctx.beginPath();
-          ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
-          ctx.fillStyle = grad;
-          ctx.fill();
-        }
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.restore();
-    
-      // Emit blue laser particles
-      const steps = Math.floor(Math.hypot(edgeX - player.x, edgeY - player.y) / 65); // Greatly reduce particles
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
+
+      const steps = Math.floor(Math.hypot(edgeX - player.x, edgeY - player.y) / 65);
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const px = player.x + (edgeX - player.x) * t;
         const py = player.y + (edgeY - player.y) * t;
         const palette = [
-          "rgba(0, 191, 255, 0.7)",   // deep sky blue
-          "rgba(173, 216, 230, 0.6)", // light blue
-          "rgba(0, 255, 255, 0.65)"   // cyan
+          "rgba(0, 191, 255, 0.7)",
+          "rgba(173, 216, 230, 0.6)",
+          "rgba(0, 255, 255, 0.65)"
         ];
         const color = palette[Math.floor(Math.random() * palette.length)];
         const speed = 1.2 + Math.random() * .5;
@@ -1287,26 +1659,24 @@ window.onload = function () {
         });
       }
     }
-    
-    // Only attack if not on cooldown
+
     let isAttackFrame = nearest && minDist < player.range + nearest.radius && player.attackCooldown <= 0 && followMouse;
     if (isAttackFrame) {
       drawLine(player.x, player.y, nearest.x, nearest.y, "LightBlue");
       nearest.health -= player.damage;
-          // Stop the laser sound if not attacking
-          if (!isAttacking && laserAudio && !laserAudio.paused) {
-            laserAudio.pause();
-            laserAudio.currentTime = 0;
-          }
-      // Fiery sparks when hitting enemies
+      if (!isAttacking && laserAudio && !laserAudio.paused) {
+        laserAudio.pause();
+        laserAudio.currentTime = 0;
+      }
+
       for (let i = 0; i < 8; i++) {
         const angle = Math.random() * Math.PI * 5;
         const speed = 2.2 + Math.random() * 2.2;
         const color = [
-          "rgba(255,42,0,0.85)",   // intense red
-          "rgba(255,120,0,0.7)",   // orange
-          "rgba(255,220,0,0.6)",   // yellow
-          "rgb(248, 144, 144)"  // white hot
+          "rgba(255,42,0,0.85)",
+          "rgba(255,120,0,0.7)",
+          "rgba(255,220,0,0.6)",
+          "rgb(248, 144, 144)"
         ][Math.floor(Math.random() * 4)];
         particles.push({
           x: nearest.x,
@@ -1320,28 +1690,28 @@ window.onload = function () {
           type: "enemyHit"
         });
       }
+
       player.attackCooldown = player.cooldownBase;
       if (nearest.health <= 0) {
-                if (nearest.type === "gruntBoss") {
-                  gainXP(xpToLevel);
-                }
-        if (nearest.type === "grunt" && wave !== 5) {
-          // Only drop xp if not a boss-spawned grunt
+        const noLootDrop = !!(nearest.noLoot || nearest.noXP);
+        if (nearest.type === "gruntBoss") {
+          gainXP(xpToLevel);
+        }
+        if (!noLootDrop && nearest.type === "grunt" && wave !== 5) {
           if (!nearest.noXP) {
             xpDrops.push({ x: nearest.x, y: nearest.y + 2 });
           }
         }
-        if (nearest.type === "slinger") {
+        if (!noLootDrop && nearest.type === "slinger") {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
-        if (nearest.type === "kamikaze") {
-          // Only drop slingerDrop if killed by player (not self-explode)
+        if (!noLootDrop && nearest.type === "kamikaze") {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
-        if (nearest.type === "brute") {
+        if (!noLootDrop && nearest.type === "brute") {
           bruteDrops.push({ x: nearest.x + 3, y: nearest.y + 5 });
         }
-         if (Math.random() < 0.15) {
+        if (!noLootDrop && Math.random() < 0.15) {
           healthDrops.push({ x: nearest.x + 4, y: nearest.y + 6 });
         }
       }
@@ -1561,11 +1931,17 @@ const droplifelenght = 280;
 
   function updateProtocolOrbs(delta) {
     const regressRate = 0.35;
+    const pickupMod = (typeof ProtocolSystem !== "undefined" && ProtocolSystem.getStatMods)
+      ? (ProtocolSystem.getStatMods().Pickup || 0)
+      : 0;
+    const effectivePickupStat = player.stats.Pickup + pickupMod;
+    const pickupCaptureRate = Math.max(0.25, 1 + (effectivePickupStat * 0.12));
+
     for (let i = protocolOrbs.length - 1; i >= 0; i--) {
       const orb = protocolOrbs[i];
       const distToPlayer = Math.hypot(player.x - orb.x, player.y - orb.y);
       if (distToPlayer <= player.pickupRadius) {
-        orb.progressFrames = Math.min(orb.requiredFrames, orb.progressFrames + (delta * SPEED_MULTIPLIER));
+        orb.progressFrames = Math.min(orb.requiredFrames, orb.progressFrames + (delta * SPEED_MULTIPLIER * pickupCaptureRate));
         if (orb.progressFrames >= orb.requiredFrames) {
           completeProtocolOrb(orb);
           protocolOrbs.splice(i, 1);
@@ -1955,9 +2331,9 @@ const droplifelenght = 280;
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("Level: " + level + " (" + xp + "/" + xpToLevel + ")", statsPanelCenterX, 220);
-      ctx.fillText("HP: " + Math.round(player.health) + "/" + Math.round(player.maxHealth), statsPanelCenterX, 240);
-      ctx.fillText("Stat Points: " + statPoints, statsPanelCenterX, 260);
-      ctx.fillText("Base Stat Max: " + (level+1), statsPanelCenterX, 280);
+      ctx.fillText("Hit Points: " + Math.round(player.health) + "/" + Math.round(player.maxHealth), statsPanelCenterX, 240);
+      ctx.fillText("Power Allocation Points: " + statPoints, statsPanelCenterX, 260);
+      ctx.fillText("Base Power Allocation Max: " + (level+1), statsPanelCenterX, 280);
       ctx.textAlign = "left";
       // Draw clickable stat labels with -/+ buttons and store their bounding boxes
       window._statButtonBoxes = [];
@@ -2102,7 +2478,7 @@ const droplifelenght = 280;
       if (typeof window._protocolScrollOffset === 'undefined') {
         window._protocolScrollOffset = 0;
       }
-      const discoveredSet = new Set(ProtocolSystem.getDiscovered());
+      const discoveredSet = new Set(ProtocolSystem.getRunDiscovered());
       
       // Organize ALL protocols by family (discovered and undiscovered)
       const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
@@ -2198,7 +2574,7 @@ const droplifelenght = 280;
         const hoveredBox = (window._protocolSelectorBoxes || []).find(box => box.index === hoveredProtocol);
         if (hoveredBox && hoveredBox.name) {
           const proto = PROTOCOLS[hoveredBox.name];
-          const tooltipWidth = 230;
+          const tooltipWidth = 285;
           const contentWidth = tooltipWidth - 16;
 
           const wrapText = (text, maxWidth, font) => {
@@ -2219,48 +2595,138 @@ const droplifelenght = 280;
             return lines;
           };
 
-          const titleLines = wrapText(hoveredBox.name, contentWidth, "bold 11px sans-serif");
-          const familyLine = proto.family + " • " + proto.rarity + " • " + proto.tier;
-          const modTokens = Object.entries(proto.statMods)
-            .filter(([_, v]) => v !== 0)
-            .map(([k, v]) => (v > 0 ? "+" : "-") + k);
-          const modsText = modTokens.join(", ");
-          const modLines = modsText ? wrapText(modsText, contentWidth, "10px sans-serif") : [];
+          const positiveColor = "#66ff99";
+          const negativeColor = "#ff6b6b";
+          const neutralColor = "#b5d2d8";
+          const bodyColor = hoveredBox.discovered ? "#d6f8ff" : "#8ea6a0";
+          const tokenColor = (value) => value > 0 ? positiveColor : value < 0 ? negativeColor : neutralColor;
 
-          const orderedStats = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
-          const formatDiffText = (hoveredMods, activeMods) => {
-            const tokens = orderedStats
-              .map(stat => {
-                const diff = (hoveredMods[stat] || 0) - (activeMods[stat] || 0);
-                if (diff === 0) return null;
-                return `${diff > 0 ? "+" : ""}${diff} ${stat}`;
-              })
-              .filter(Boolean);
-            return tokens.length ? tokens.join(", ") : "No stat diff";
+          const buildTokenLines = (tokens, maxWidth, font) => {
+            if (!tokens || tokens.length === 0) return [];
+            ctx.font = font;
+            const lines = [];
+            let currentItems = [];
+            let currentWidth = 0;
+            tokens.forEach((token, idx) => {
+              const drawText = idx < tokens.length - 1 ? token.text + "  " : token.text;
+              const width = ctx.measureText(drawText).width;
+              if (currentItems.length > 0 && currentWidth + width > maxWidth) {
+                lines.push({ items: currentItems, width: currentWidth });
+                currentItems = [];
+                currentWidth = 0;
+              }
+              currentItems.push({ text: drawText, color: token.color, width });
+              currentWidth += width;
+            });
+            if (currentItems.length > 0) {
+              lines.push({ items: currentItems, width: currentWidth });
+            }
+            return lines;
           };
 
-          const activeProtocolNames = ProtocolSystem.activeProtocols.filter(name => name !== hoveredBox.name);
-          const compareHeaderLines = wrapText(
-            activeProtocolNames.length ? "1:1 vs Active:" : "1:1 vs Active: none",
-            contentWidth,
-            "10px sans-serif"
-          );
-          const oneToOneCompareLines = [];
+          const estimateTokenLines = (tokens, maxWidth, font) => {
+            const lines = buildTokenLines(tokens, maxWidth, font);
+            return lines.length || 1;
+          };
+
+          const drawTokenLines = (tokens, x, y, maxWidth, font, lineHeight, align = "left", centerX = 0) => {
+            const lines = buildTokenLines(tokens, maxWidth, font);
+            if (lines.length === 0) return y + lineHeight;
+            ctx.font = font;
+            const previousAlign = ctx.textAlign;
+            ctx.textAlign = "left";
+            let cursorY = y;
+            lines.forEach(line => {
+              let cursorX = align === "center" ? centerX - (line.width / 2) : x;
+              line.items.forEach(item => {
+                ctx.fillStyle = item.color;
+                ctx.fillText(item.text, cursorX, cursorY);
+                cursorX += item.width;
+              });
+              cursorY += lineHeight;
+            });
+            ctx.textAlign = previousAlign;
+            return cursorY;
+          };
+
+          const titleLines = wrapText(hoveredBox.name, contentWidth, "900 14px sans-serif");
+          const familyLine = proto.family + " • " + proto.rarity + " • " + proto.tier;
+          const orderedStats = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+          const statShort = {
+            Range: "Rng:",
+            Power: "Pwr:",
+            Intensity: "Int:",
+            Movement: "Mov:",
+            Health: "HP:",
+            Pickup: "Pick:"
+          };
+          const formatSignedValue = (num) => `${num > 0 ? "+" : num < 0 ? "-" : " "}${Math.abs(num)}`;
+          const hoveredEffectiveMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+            ? ProtocolSystem.getProtocolEffectiveMods(hoveredBox.name)
+            : proto.statMods;
+
+          const protocolModTokens = orderedStats.map(stat => {
+            const value = hoveredEffectiveMods[stat] || 0;
+            return {
+              text: `${statShort[stat]}${formatSignedValue(value)}`,
+              color: tokenColor(value)
+            };
+          });
+
+          const formatDiffTokens = (hoveredMods, activeMods) => {
+            return orderedStats.map(stat => {
+              const diff = (hoveredMods[stat] || 0) - (activeMods[stat] || 0);
+              return {
+                text: `${statShort[stat]}${formatSignedValue(diff)}`,
+                color: tokenColor(diff)
+              };
+            });
+          };
+
+          const hoveredIsActive = ProtocolSystem.activeProtocols.includes(hoveredBox.name);
+          const showComparison = !hoveredIsActive;
+          const activeProtocolNames = showComparison
+            ? ProtocolSystem.activeProtocols.filter(name => name !== hoveredBox.name)
+            : [];
+          const compareHeaderLines = showComparison
+            ? wrapText(
+                activeProtocolNames.length ? "1:1 Comparison" : "1:1 Comparison: none",
+                contentWidth,
+                "bold 11px sans-serif"
+              )
+            : [];
+          const compareRows = [];
           activeProtocolNames.forEach(activeName => {
             const activeProto = PROTOCOLS[activeName];
-            if (!activeProto || !activeProto.statMods) return;
-            const compareText = `vs ${activeName}: ${formatDiffText(proto.statMods, activeProto.statMods)}`;
-            oneToOneCompareLines.push(...wrapText(compareText, contentWidth, "10px sans-serif"));
+            if (!activeProto) return;
+            const activeEffectiveMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+              ? ProtocolSystem.getProtocolEffectiveMods(activeName)
+              : activeProto.statMods;
+            const nameLines = wrapText(`${activeName}`, contentWidth, "900 12px sans-serif");
+            const diffTokens = formatDiffTokens(hoveredEffectiveMods, activeEffectiveMods);
+            compareRows.push({ nameLines, diffTokens });
+          });
+
+          const titleLineHeight = 17;
+          const bodyLineHeight = 14;
+          const sectionGap = 10;
+          const protocolTokenLineCount = estimateTokenLines(protocolModTokens, contentWidth, "11px sans-serif");
+          let compareTokenLineCount = 0;
+          let compareNameLineCount = 0;
+          compareRows.forEach(row => {
+            compareNameLineCount += row.nameLines.length;
+            compareTokenLineCount += estimateTokenLines(row.diffTokens, contentWidth, "11px sans-serif");
           });
 
           const tooltipHeight =
-            14 +
-            (titleLines.length * 14) +
-            14 +
-            (modLines.length * 12) +
-            8 +
-            (compareHeaderLines.length * 12) +
-            (oneToOneCompareLines.length * 12) +
+            12 +
+            (titleLines.length * titleLineHeight) +
+            bodyLineHeight +
+            (protocolTokenLineCount * bodyLineHeight) +
+            (showComparison ? sectionGap : 0) +
+            (showComparison ? (compareHeaderLines.length * bodyLineHeight) : 0) +
+            (showComparison ? (compareNameLineCount * bodyLineHeight) : 0) +
+            (showComparison ? (compareTokenLineCount * bodyLineHeight) : 0) +
             10;
           let tooltipX = mouseX - tooltipWidth - 10;
           let tooltipY = mouseY + 10;
@@ -2277,40 +2743,52 @@ const droplifelenght = 280;
           }
           
           ctx.save();
-          ctx.globalAlpha = 0.85;
+          ctx.globalAlpha = 0.93;
           ctx.fillStyle = '#152c16';
           ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
           ctx.strokeStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 2.5;
           ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
           
-          ctx.font = "bold 11px sans-serif";
+          ctx.font = "900 14px sans-serif";
           ctx.fillStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
           ctx.textAlign = "center";
-          let textY = tooltipY + 16;
+          let textY = tooltipY + 18;
           titleLines.forEach(line => {
             ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
-            textY += 14;
-          });
-          ctx.fillText(familyLine, tooltipX + tooltipWidth / 2, textY);
-          textY += 12;
-          
-          ctx.font = "10px sans-serif";
-          ctx.fillStyle = hoveredBox.discovered ? "#aaf6ff" : "#8ea6a0";
-          modLines.forEach(line => {
-            ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
-            textY += 12;
+            textY += titleLineHeight;
           });
 
-          textY += 4;
-          compareHeaderLines.forEach(line => {
-            ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
-            textY += 12;
-          });
-          oneToOneCompareLines.forEach(line => {
-            ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
-            textY += 12;
-          });
+          ctx.font = "bold 11px sans-serif";
+          ctx.fillText(familyLine, tooltipX + tooltipWidth / 2, textY);
+          textY += bodyLineHeight;
+          
+          ctx.font = "11px sans-serif";
+          ctx.fillStyle = bodyColor;
+          ctx.textAlign = "center";
+          const bodyTextX = tooltipX + 8;
+          textY = drawTokenLines(protocolModTokens, bodyTextX, textY, contentWidth, "11px sans-serif", bodyLineHeight, "center", tooltipX + tooltipWidth / 2);
+
+          if (showComparison) {
+            textY += sectionGap;
+            ctx.font = "bold 11px sans-serif";
+            ctx.fillStyle = hoveredBox.discovered ? "#c8ffff" : "#90a8a0";
+            compareHeaderLines.forEach(line => {
+              ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
+              textY += bodyLineHeight;
+            });
+
+            compareRows.forEach(row => {
+              ctx.font = "900 12px sans-serif";
+              ctx.fillStyle = hoveredBox.discovered ? "#9fffe0" : "#8ea6a0";
+              row.nameLines.forEach(line => {
+                ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
+                textY += bodyLineHeight;
+              });
+              ctx.font = "11px sans-serif";
+              textY = drawTokenLines(row.diffTokens, bodyTextX, textY, contentWidth, "11px sans-serif", bodyLineHeight, "center", tooltipX + tooltipWidth / 2);
+            });
+          }
           ctx.restore();
         }
       }
@@ -2465,9 +2943,12 @@ const droplifelenght = 280;
       x: 500, y: 430, health: 10, attackCooldown: 0,
       stats: { Range: 0, Power: 0, AttackSpeed: 0, Movement: 0, Vitality: 0, Pickup: 0 }
     });
+    ProtocolSystem.initializeRun();
     playerVisualAngle = Math.PI / 2; // Start facing down on wave 1
     applyStats();
     xp = 0; xpToLevel = 10; level = 1;
+    runCollectedBytes = 0;
+    runBytesFinalized = false;
     statPoints = 5; // TEMP: Start with 25 stat points
     selectedProtocol = -1; // Reset selected protocol
     hoveredProtocol = -1; // Reset hovered protocol
@@ -2552,7 +3033,8 @@ const droplifelenght = 280;
                                   vx: Math.cos(angle) * novaSpeed,
                                   vy: Math.sin(angle) * novaSpeed,
                                   novaTimer: 18, // frames to move outward before normal AI
-                                  noXP: true // Mark as no xp drop
+                                  noXP: true, // Legacy marker
+                                  noLoot: true // Boss-spawned mobs should not drop loot
                                 });
                               }
                               // Optionally randomize next spawn count
@@ -2843,7 +3325,9 @@ const droplifelenght = 280;
                 });
               }
             }
-            tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
+            if (!(e.noLoot || e.noXP)) {
+              tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
+            }
             enemies.splice(i, 1);
             continue;
           }
@@ -3805,9 +4289,14 @@ const droplifelenght = 280;
           ctx.fillStyle = "white";
           ctx.fillText(`Click to Continue in ${remainingSeconds} seconds`, canvas.width / 2, canvas.height / 2 + 60);
         }
+
+        ctx.font = "bold 22px sans-serif";
+        ctx.fillStyle = "#00ffdd";
+        ctx.fillText(`Collected Bytes: ${runCollectedBytes}`, canvas.width / 2, canvas.height / 2 + 96);
         
         // Auto-return to menu after 5 seconds (only on first death)
         if (!window._playerUsedContinue && remainingSeconds === 0 && elapsedSeconds >= 5) {
+          finalizeRunBytes();
           showMenuScreen = true;
           window._playMenuAmbienceOnShowMenu = true;
           playMenuAmbience();
