@@ -193,8 +193,10 @@ window.onload = function () {
     // Add main menu buttons (Play and Protocols)
     const playBtn = makeMenuButton("Play", "#fff");
     const protocolBtn = makeMenuButton("Protocols", "#00ffdd");
+    const waveEditorBtn = makeMenuButton("Wave Editor", "#6cf0ff");
     buttonContainer.appendChild(playBtn);
     buttonContainer.appendChild(protocolBtn);
+    buttonContainer.appendChild(waveEditorBtn);
     menuOverlay.appendChild(buttonContainer);
     document.body.appendChild(menuOverlay);
     if (window._playMenuAmbienceOnShowMenu) playMenuAmbience();
@@ -214,6 +216,16 @@ window.onload = function () {
     protocolBtn.addEventListener("click", function() {
       menuOverlay.remove();
       showProtocolMenu();
+      window._showMainMenu = () => {
+        showMenu();
+      };
+    });
+
+    waveEditorBtn.addEventListener("click", function() {
+      menuOverlay.remove();
+      if (window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
+        window.SentinelEditor.showWaveEditor();
+      }
       window._showMainMenu = () => {
         showMenu();
       };
@@ -628,6 +640,183 @@ window.onload = function () {
 
     menuOverlay.appendChild(headerSection);
 
+    function showUpgradeConfirmModal(message, onConfirm) {
+      const confirmOverlay = document.createElement("div");
+      confirmOverlay.style.position = "fixed";
+      confirmOverlay.style.left = "0";
+      confirmOverlay.style.top = "0";
+      confirmOverlay.style.width = "100vw";
+      confirmOverlay.style.height = "100vh";
+      confirmOverlay.style.background = "rgba(0, 0, 0, 0.74)";
+      confirmOverlay.style.display = "flex";
+      confirmOverlay.style.alignItems = "center";
+      confirmOverlay.style.justifyContent = "center";
+      confirmOverlay.style.zIndex = "1105";
+
+      const confirmPanel = document.createElement("div");
+      confirmPanel.style.width = "min(460px, 90vw)";
+      confirmPanel.style.background = "rgba(0, 20, 30, 0.98)";
+      confirmPanel.style.border = "2px solid #00ffdd";
+      confirmPanel.style.borderRadius = "10px";
+      confirmPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      confirmPanel.style.padding = "16px";
+      confirmPanel.style.color = "#c8ffff";
+      confirmPanel.style.fontFamily = "sans-serif";
+      confirmOverlay.appendChild(confirmPanel);
+
+      const confirmTitle = document.createElement("div");
+      confirmTitle.textContent = "CONFIRM UPGRADE";
+      confirmTitle.style.color = "#00ffdd";
+      confirmTitle.style.fontWeight = "bold";
+      confirmTitle.style.fontSize = "1.05rem";
+      confirmTitle.style.marginBottom = "10px";
+      confirmPanel.appendChild(confirmTitle);
+
+      const confirmMessage = document.createElement("div");
+      confirmMessage.textContent = message;
+      confirmMessage.style.color = "#aaf6ff";
+      confirmMessage.style.fontSize = "0.95rem";
+      confirmMessage.style.lineHeight = "1.4";
+      confirmMessage.style.marginBottom = "14px";
+      confirmPanel.appendChild(confirmMessage);
+
+      const actionRow = document.createElement("div");
+      actionRow.style.display = "flex";
+      actionRow.style.justifyContent = "flex-end";
+      actionRow.style.gap = "8px";
+      confirmPanel.appendChild(actionRow);
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.style.padding = "0.5rem 0.85rem";
+      cancelBtn.style.borderRadius = "6px";
+      cancelBtn.style.border = "1px solid #ffffff";
+      cancelBtn.style.background = "rgba(0,0,0,0.55)";
+      cancelBtn.style.color = "#ffffff";
+      cancelBtn.style.cursor = "pointer";
+      actionRow.appendChild(cancelBtn);
+
+      const confirmBtn = document.createElement("button");
+      confirmBtn.type = "button";
+      confirmBtn.textContent = "Upgrade";
+      confirmBtn.style.padding = "0.5rem 0.85rem";
+      confirmBtn.style.borderRadius = "6px";
+      confirmBtn.style.border = "1px solid #00ffdd";
+      confirmBtn.style.background = "rgba(0,0,0,0.55)";
+      confirmBtn.style.color = "#00ffdd";
+      confirmBtn.style.cursor = "pointer";
+      actionRow.appendChild(confirmBtn);
+
+      let resolved = false;
+      const closeModal = (confirmed) => {
+        if (resolved) return;
+        resolved = true;
+        document.removeEventListener("keydown", onKeyDown);
+        confirmOverlay.remove();
+        if (confirmed && typeof onConfirm === "function") {
+          onConfirm();
+        }
+      };
+
+      const onKeyDown = (evt) => {
+        if (evt.key === "Escape") {
+          closeModal(false);
+        }
+      };
+
+      cancelBtn.addEventListener("click", () => closeModal(false));
+      confirmBtn.addEventListener("click", () => closeModal(true));
+      confirmOverlay.addEventListener("click", (evt) => {
+        if (evt.target === confirmOverlay) {
+          closeModal(false);
+        }
+      });
+      document.addEventListener("keydown", onKeyDown);
+      document.body.appendChild(confirmOverlay);
+    }
+
+    function showUpgradeInfoModal(titleText, message) {
+      const infoOverlay = document.createElement("div");
+      infoOverlay.style.position = "fixed";
+      infoOverlay.style.left = "0";
+      infoOverlay.style.top = "0";
+      infoOverlay.style.width = "100vw";
+      infoOverlay.style.height = "100vh";
+      infoOverlay.style.background = "rgba(0, 0, 0, 0.74)";
+      infoOverlay.style.display = "flex";
+      infoOverlay.style.alignItems = "center";
+      infoOverlay.style.justifyContent = "center";
+      infoOverlay.style.zIndex = "1105";
+
+      const infoPanel = document.createElement("div");
+      infoPanel.style.width = "min(460px, 90vw)";
+      infoPanel.style.background = "rgba(0, 20, 30, 0.98)";
+      infoPanel.style.border = "2px solid #00ffdd";
+      infoPanel.style.borderRadius = "10px";
+      infoPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      infoPanel.style.padding = "16px";
+      infoPanel.style.color = "#c8ffff";
+      infoPanel.style.fontFamily = "sans-serif";
+      infoOverlay.appendChild(infoPanel);
+
+      const infoTitle = document.createElement("div");
+      infoTitle.textContent = titleText;
+      infoTitle.style.color = "#00ffdd";
+      infoTitle.style.fontWeight = "bold";
+      infoTitle.style.fontSize = "1.05rem";
+      infoTitle.style.marginBottom = "10px";
+      infoPanel.appendChild(infoTitle);
+
+      const infoMessage = document.createElement("div");
+      infoMessage.textContent = message;
+      infoMessage.style.color = "#aaf6ff";
+      infoMessage.style.fontSize = "0.95rem";
+      infoMessage.style.lineHeight = "1.4";
+      infoMessage.style.marginBottom = "14px";
+      infoPanel.appendChild(infoMessage);
+
+      const actionRow = document.createElement("div");
+      actionRow.style.display = "flex";
+      actionRow.style.justifyContent = "flex-end";
+      actionRow.style.gap = "8px";
+      infoPanel.appendChild(actionRow);
+
+      const okBtn = document.createElement("button");
+      okBtn.type = "button";
+      okBtn.textContent = "OK";
+      okBtn.style.padding = "0.5rem 0.85rem";
+      okBtn.style.borderRadius = "6px";
+      okBtn.style.border = "1px solid #00ffdd";
+      okBtn.style.background = "rgba(0,0,0,0.55)";
+      okBtn.style.color = "#00ffdd";
+      okBtn.style.cursor = "pointer";
+      actionRow.appendChild(okBtn);
+
+      let resolved = false;
+      const closeModal = () => {
+        if (resolved) return;
+        resolved = true;
+        document.removeEventListener("keydown", onKeyDown);
+        infoOverlay.remove();
+      };
+
+      const onKeyDown = (evt) => {
+        if (evt.key === "Escape" || evt.key === "Enter") {
+          closeModal();
+        }
+      };
+
+      okBtn.addEventListener("click", closeModal);
+      infoOverlay.addEventListener("click", (evt) => {
+        if (evt.target === infoOverlay) {
+          closeModal();
+        }
+      });
+      document.addEventListener("keydown", onKeyDown);
+      document.body.appendChild(infoOverlay);
+    }
+
     // Title
     const title = document.createElement("h2");
     title.textContent = "PROTOCOL DATABASE";
@@ -845,33 +1034,39 @@ window.onload = function () {
             if (nextUpgradeCost === null) return;
 
             if (totalCollectedBytes < nextUpgradeCost) {
-              alert(`Not enough Bytes. Need ${nextUpgradeCost}, have ${totalCollectedBytes}.`);
+              showUpgradeInfoModal(
+                "INSUFFICIENT BYTES",
+                `Not enough Bytes. Need ${nextUpgradeCost}, have ${totalCollectedBytes}.`
+              );
               return;
             }
 
             const nextTierName = (typeof ProtocolSystem.getNextUpgradeTierName === "function")
               ? ProtocolSystem.getNextUpgradeTierName(protocolName)
               : "Next";
-            const confirmed = window.confirm(
-              `Upgrade ${protocolName} to ${nextTierName} for ${nextUpgradeCost} Bytes?`
-            );
-            if (!confirmed) return;
+            showUpgradeConfirmModal(
+              `Upgrade ${protocolName} to ${nextTierName} for ${nextUpgradeCost} Bytes?`,
+              () => {
+                const result = (typeof ProtocolSystem.upgradeProtocol === "function")
+                  ? ProtocolSystem.upgradeProtocol(protocolName, totalCollectedBytes)
+                  : { success: false };
 
-            const result = (typeof ProtocolSystem.upgradeProtocol === "function")
-              ? ProtocolSystem.upgradeProtocol(protocolName, totalCollectedBytes)
-              : { success: false };
+                if (!result.success) {
+                  if (result.reason === "insufficient") {
+                    showUpgradeInfoModal(
+                      "INSUFFICIENT BYTES",
+                      `Not enough Bytes. Need ${result.cost}, have ${totalCollectedBytes}.`
+                    );
+                  }
+                  return;
+                }
 
-            if (!result.success) {
-              if (result.reason === "insufficient") {
-                alert(`Not enough Bytes. Need ${result.cost}, have ${totalCollectedBytes}.`);
+                totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
+                saveCollectedBytes();
+                menuOverlay.remove();
+                showProtocolMenu();
               }
-              return;
-            }
-
-            totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
-            saveCollectedBytes();
-            menuOverlay.remove();
-            showProtocolMenu();
+            );
           });
 
           card.appendChild(upgradeBtn);
@@ -1031,6 +1226,8 @@ window.onload = function () {
   let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
+  window._editorSessionActive = false;
+  const protocolWarnings = [];
   let selectedProtocol = -1;
   let hoveredProtocol = -1;
   // Block game loop if loading/menu is active
@@ -1046,6 +1243,9 @@ window.onload = function () {
   let burstInterval = 120; // Increased for bigger cooldown
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
+  const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
+  const KAMIKAZE_DEATH_PARTICLE_COUNT = 8;
+  const MAX_PARTICLES = 1400;
 
   const player = {
     x: 512, y: 425, radius: 20,
@@ -1082,12 +1282,12 @@ window.onload = function () {
         ctx.shadowBlur = 0;
         ctx.restore();
         // Dramatic explosion particles (like kamikaze)
-        for (let j = 0; j < 32; j++) {
+        for (let j = 0; j < KAMIKAZE_MINE_PARTICLE_COUNT; j++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 3.2 + Math.random() * 2.2;
+          const speed = 2.1 + Math.random() * 1.5;
           const color = ["#ffbb00","#fff200","#ff4444"][Math.floor(Math.random()*3)];
-          const size = 3 + Math.random() * 4;
-          const life = 32 + Math.random() * 18;
+          const size = 2 + Math.random() * 2.5;
+          const life = 20 + Math.random() * 14;
           const decay = 0.89 + Math.random() * 0.04;
           particles.push({
             x: m.x,
@@ -1125,12 +1325,12 @@ window.onload = function () {
         ctx.shadowBlur = 0;
         ctx.restore();
         // Dramatic explosion particles (like kamikaze)
-        for (let j = 0; j < 32; j++) {
+        for (let j = 0; j < KAMIKAZE_MINE_PARTICLE_COUNT; j++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 3.2 + Math.random() * 2.2;
+          const speed = 2.1 + Math.random() * 1.5;
           const color = ["#ffbb00","#fff200","#ff4444"][Math.floor(Math.random()*3)];
-          const size = 3 + Math.random() * 4;
-          const life = 32 + Math.random() * 18;
+          const size = 2 + Math.random() * 2.5;
+          const life = 20 + Math.random() * 14;
           const decay = 0.89 + Math.random() * 0.04;
           particles.push({
             x: m.x,
@@ -1198,6 +1398,11 @@ window.onload = function () {
       window._playMenuAmbienceOnShowMenu = false;
     }
     if (k === "e") { showStats = !showStats; paused = showStats; }
+    if (k === "o") {
+      if (window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
+        window.SentinelEditor.showWaveEditor();
+      }
+    }
     if (statPoints > 0 && ["1", "2", "3", "4", "5", "6"].includes(k)) applyStatPoint(k);
   });
 
@@ -1330,6 +1535,147 @@ window.onload = function () {
     if (player.health > player.maxHealth) player.health = player.maxHealth;
   }
 
+  window.SentinelEditorBridge = {
+    getPaused: () => paused,
+    setPaused: (value) => {
+      paused = !!value;
+    },
+    getEditorSessionActive: () => !!window._editorSessionActive,
+    setEditorSessionActive: (value) => {
+      window._editorSessionActive = !!value;
+    },
+    getWaveEditorState: () => ({
+      wave,
+      burstCount,
+      burstInterval,
+      customBursts: window._customBursts,
+      customBrutes: window._customBrutes,
+      customSlingers: window._customSlingers,
+      customKamikazes: window._customKamikazes,
+      customBossMinors: window._customBossMinors,
+      customBosses: window._customBosses
+    }),
+    getWavePresetConfig: (targetWave) => {
+      const waveNumber = parseInt(targetWave, 10);
+      if (!Number.isFinite(waveNumber) || waveNumber < 1) return null;
+
+      const savedState = {
+        wave,
+        burstCount,
+        burstInterval,
+        burstIndex,
+        burstTimer,
+        waveAnnouncementTimer,
+        customBursts: Array.isArray(window._customBursts) ? window._customBursts.slice() : window._customBursts,
+        customBrutes: Array.isArray(window._customBrutes) ? window._customBrutes.slice() : window._customBrutes,
+        customSlingers: Array.isArray(window._customSlingers) ? window._customSlingers.slice() : window._customSlingers,
+        customKamikazes: Array.isArray(window._customKamikazes) ? window._customKamikazes.slice() : window._customKamikazes,
+        customBossMinors: Array.isArray(window._customBossMinors) ? window._customBossMinors.slice() : window._customBossMinors,
+        customBosses: Array.isArray(window._customBosses) ? window._customBosses.slice() : window._customBosses,
+        bossMinorBursts: Array.isArray(window._bossMinorBursts) ? window._bossMinorBursts.slice() : window._bossMinorBursts,
+        bossMinorCount: window._bossMinorCount,
+        wave10MinorsSpawned: window._wave10MinorsSpawned,
+        editorPreviewWave: window._editorPreviewWave,
+        editorPreviewOverride: window._editorPreviewOverride,
+        enemies: enemies.slice(),
+        mines: mines.slice()
+      };
+
+      const originalSetTimeout = window.setTimeout;
+      window.setTimeout = function () { return 0; };
+
+      try {
+        wave = waveNumber;
+        enemies.length = 0;
+        mines.length = 0;
+        spawnWave();
+
+        return {
+          burstCount,
+          burstInterval,
+          customBursts: Array.isArray(window._customBursts) ? window._customBursts.slice() : window._customBursts,
+          customBrutes: Array.isArray(window._customBrutes) ? window._customBrutes.slice() : window._customBrutes,
+          customSlingers: Array.isArray(window._customSlingers) ? window._customSlingers.slice() : window._customSlingers,
+          customKamikazes: Array.isArray(window._customKamikazes) ? window._customKamikazes.slice() : window._customKamikazes,
+          customBossMinors: Array.isArray(window._customBossMinors) ? window._customBossMinors.slice() : window._customBossMinors,
+          customBosses: Array.isArray(window._customBosses) ? window._customBosses.slice() : window._customBosses
+        };
+      } catch (_) {
+        return null;
+      } finally {
+        window.setTimeout = originalSetTimeout;
+
+        wave = savedState.wave;
+        burstCount = savedState.burstCount;
+        burstInterval = savedState.burstInterval;
+        burstIndex = savedState.burstIndex;
+        burstTimer = savedState.burstTimer;
+        waveAnnouncementTimer = savedState.waveAnnouncementTimer;
+        window._customBursts = savedState.customBursts;
+        window._customBrutes = savedState.customBrutes;
+        window._customSlingers = savedState.customSlingers;
+        window._customKamikazes = savedState.customKamikazes;
+        window._customBossMinors = savedState.customBossMinors;
+        window._customBosses = savedState.customBosses;
+        window._bossMinorBursts = savedState.bossMinorBursts;
+        window._bossMinorCount = savedState.bossMinorCount;
+        window._wave10MinorsSpawned = savedState.wave10MinorsSpawned;
+        window._editorPreviewWave = savedState.editorPreviewWave;
+        window._editorPreviewOverride = savedState.editorPreviewOverride;
+        enemies.length = 0;
+        enemies.push(...savedState.enemies);
+        mines.length = 0;
+        mines.push(...savedState.mines);
+      }
+    },
+    getPlayer: () => player,
+    getLevel: () => level,
+    setLevel: (value) => {
+      const maxLevel = Number.isFinite(MAX_LEVEL) ? MAX_LEVEL : 50;
+      const parsed = parseInt(value, 10);
+      if (!Number.isFinite(parsed)) return;
+      level = Math.max(1, Math.min(maxLevel, parsed));
+      xp = 0;
+      xpToLevel = level >= maxLevel ? Infinity : Math.floor(10 + Math.pow(level, 1.8));
+    },
+    getStatPoints: () => statPoints,
+    setStatPoints: (value) => {
+      statPoints = value;
+    },
+    applyStats,
+    spawnWaveNow: (targetWave, previewOverride) => {
+      if (!gameStarted || showMenuScreen || showLoadingScreen) {
+        if (typeof window.sentinelDifficulty !== "string") {
+          window.sentinelDifficulty = "Normal";
+        }
+        showLoadingScreen = false;
+        showMenuScreen = false;
+        restartGame();
+        gameStarted = true;
+      }
+      wave = targetWave;
+      enemies.length = 0;
+      mines.length = 0;
+      spawnWave();
+
+      if (previewOverride && typeof previewOverride === "object") {
+        window._editorPreviewWave = targetWave;
+        window._editorPreviewOverride = {
+          burstCount: previewOverride.burstCount,
+          burstInterval: previewOverride.burstInterval,
+          customBursts: Array.isArray(previewOverride.customBursts) ? previewOverride.customBursts.slice() : undefined,
+          customBrutes: Array.isArray(previewOverride.customBrutes) ? previewOverride.customBrutes.slice() : undefined,
+          customSlingers: Array.isArray(previewOverride.customSlingers) ? previewOverride.customSlingers.slice() : undefined,
+          customKamikazes: Array.isArray(previewOverride.customKamikazes) ? previewOverride.customKamikazes.slice() : undefined,
+          customBossMinors: Array.isArray(previewOverride.customBossMinors) ? previewOverride.customBossMinors.slice() : undefined,
+          customBosses: Array.isArray(previewOverride.customBosses) ? previewOverride.customBosses.slice() : undefined
+        };
+        burstCount = previewOverride.burstCount;
+        burstInterval = previewOverride.burstInterval;
+      }
+    }
+  };
+
   function tryDiscoverProtocolFromEnemy(enemyType, x, y) {
     const dropRules = {
       grunt: { chance: 0.08 },
@@ -1408,11 +1754,19 @@ window.onload = function () {
 
   function completeProtocolOrb(orb) {
     if (!orb) return;
+    const useRunOnlyDiscovery = !!window._editorSessionActive;
+    const wasPermanentlyDiscovered = !!(ProtocolSystem.protocolBoard && ProtocolSystem.protocolBoard[orb.protocolName] && ProtocolSystem.protocolBoard[orb.protocolName].discovered);
+    const wasRunDiscovered = typeof ProtocolSystem.isRunDiscovered === "function"
+      ? ProtocolSystem.isRunDiscovered(orb.protocolName)
+      : Array.isArray(ProtocolSystem.runDiscoveredProtocols) && ProtocolSystem.runDiscoveredProtocols.includes(orb.protocolName);
     const protocolInfluence = Math.max(0, Math.floor((PROTOCOLS[orb.protocolName]?.influence) || 0));
-    if (protocolInfluence > 0) {
+    if (!useRunOnlyDiscovery && protocolInfluence > 0) {
       collectRunBytes(protocolInfluence);
     }
-    if (ProtocolSystem.discover(orb.protocolName)) {
+    const discovered = useRunOnlyDiscovery && typeof ProtocolSystem.discoverRunOnly === "function"
+      ? ProtocolSystem.discoverRunOnly(orb.protocolName)
+      : ProtocolSystem.discover(orb.protocolName);
+    if (discovered) {
       for (let i = 0; i < 18; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 2 + Math.random() * 2;
@@ -1428,9 +1782,72 @@ window.onload = function () {
           type: "enemyDeath"
         });
       }
-      console.log(`✓ Protocol discovered from orb: ${orb.protocolName}`);
-      console.log(`+${protocolInfluence} Bytes (Influence)`);
+      if (useRunOnlyDiscovery) {
+        console.log(`✓ Protocol discovered from orb (run-only editor): ${orb.protocolName}`);
+      } else {
+        console.log(`✓ Protocol discovered from orb: ${orb.protocolName}`);
+      }
+      if (!wasRunDiscovered) {
+        protocolWarnings.push({
+          text: `NEW PROTOCOL ACQUIRED: ${orb.protocolName}`,
+          color: "#7bf4ff",
+          timer: 210
+        });
+      }
+      if (!useRunOnlyDiscovery && !wasPermanentlyDiscovered) {
+        protocolWarnings.push({
+          text: `NEW PROTOCOL UNLOCKED (DISCOVERED): ${orb.protocolName}`,
+          color: "#00ff88",
+          timer: 230
+        });
+      }
+      while (protocolWarnings.length > 4) {
+        protocolWarnings.shift();
+      }
+      if (!useRunOnlyDiscovery) {
+        console.log(`+${protocolInfluence} Bytes (Influence)`);
+      }
     }
+  }
+
+  function drawProtocolWarnings() {
+    if (!protocolWarnings.length) return;
+
+    for (let i = protocolWarnings.length - 1; i >= 0; i--) {
+      const warning = protocolWarnings[i];
+      if (!paused) warning.timer -= 1;
+      if (warning.timer <= 0) {
+        protocolWarnings.splice(i, 1);
+      }
+    }
+
+    if (!protocolWarnings.length) return;
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < protocolWarnings.length; i++) {
+      const warning = protocolWarnings[i];
+      const alpha = Math.max(0, Math.min(1, warning.timer / 40));
+      const y = 128 + (i * 30);
+
+      ctx.globalAlpha = 0.62 * alpha;
+      ctx.fillStyle = "#00161d";
+      ctx.fillRect(canvas.width / 2 - 305, y - 12, 610, 24);
+
+      ctx.globalAlpha = 0.95 * alpha;
+      ctx.strokeStyle = warning.color;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(canvas.width / 2 - 305, y - 12, 610, 24);
+
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillStyle = warning.color;
+      ctx.shadowColor = warning.color;
+      ctx.shadowBlur = 10;
+      ctx.fillText(warning.text, canvas.width / 2, y);
+      ctx.shadowBlur = 0;
+    }
+    ctx.restore();
   }
 
 
@@ -1965,323 +2382,56 @@ const droplifelenght = 280;
 //-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=     WAVE     =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
 
-    // GRUNT BOSS
-    // Spawns a grunt boss at a random edge
-    function spawnGruntBoss() {
-      // Add properties for spawning grunts
-      let gruntSpawnTimer = 0;
-      let gruntSpawnInterval = 420; // 7 sec at 60 FPS (slower)
-      let gruntSpawnCount = 1 + Math.floor(Math.random() * 2); // 1-2 grunts per spawn (fewer)
-      const side = Math.floor(Math.random() * 4);
-      let x, y;
-      if (side === 0) { x = -30; y = Math.random() * 600; }
-      else if (side === 1) { x = 1054; y = Math.random() * 768; }
-      else if (side === 2) { x = Math.random() * 1024; y = -30; }
-      else { x = Math.random() * 1024; y = 798; }
-      // Match grunt appearance and stats, but keep boss health and magenta color
-      let radius = 26, collisionRadius = 30, speed = 0.4, health = 300, damage = 1, attackRange = 20, color = "magenta";
-      const spinAngle = Math.random() * Math.PI * 2;
-      const spinSpeed = (Math.random() - 0.5) * 0.02;
-      enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "gruntBoss", spinAngle, spinSpeed, sprite: gruntImg,
-        projectileCooldown: 0,
-        projectileInterval: 120, // 2 sec at 60 FPS (slower than slinger)
-        projectileRadius: 22, // bigger projectile
-        burstMode: false, // false = single shot, true = 3-round burst
-        burstShotsLeft: 0,
-        burstTimer: 0
-      });
-      enemies[enemies.length - 1].gruntSpawnTimer = gruntSpawnTimer;
-      enemies[enemies.length - 1].gruntSpawnInterval = gruntSpawnInterval;
-      enemies[enemies.length - 1].gruntSpawnCount = gruntSpawnCount;
-    }
-    // GRUNT BOSS MINOR
-    // Spawns a grunt boss minor at a random edge (weaker, more common)
-    function spawnGruntBossMinor() {
-      let gruntSpawnTimer = 0;
-      let gruntSpawnInterval = 420; // 7 sec at 60 FPS (slower)
-      let gruntSpawnCount = 1 + Math.floor(Math.random() * 2); // 1-2 grunts per spawn (fewer)
-      const side = Math.floor(Math.random() * 4);
-      let x, y;
-      if (side === 0) { x = -30; y = Math.random() * 600; }
-      else if (side === 1) { x = 1054; y = Math.random() * 768; }
-      else if (side === 2) { x = Math.random() * 1024; y = -30; }
-      else { x = Math.random() * 1024; y = 798; }
-      // Weaker stats: less health, smaller radius, slower, but still magenta
-      let radius = 22, collisionRadius = 24, speed = 0.32, health = 150 + (wave*1.5), damage = 1, attackRange = 20, color = "magenta";
-      const spinAngle = Math.random() * Math.PI * 2;
-      const spinSpeed = (Math.random() - 0.5) * 0.02;
-      enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "gruntBossMinor", spinAngle, spinSpeed, sprite: gruntImg });
-      enemies[enemies.length - 1].gruntSpawnTimer = gruntSpawnTimer;
-      enemies[enemies.length - 1].gruntSpawnInterval = gruntSpawnInterval;
-      enemies[enemies.length - 1].gruntSpawnCount = gruntSpawnCount;
-    }
-
-  // GRUNTS
-  // Spawns the requested number of grunts at random edges
-  function spawnBurst(count) {
-    for (let i = 0; i < count; i++) {
-      const side = Math.floor(Math.random() * 4);
-      let x, y;
-      if (side === 0) { x = -30; y = Math.random() * 600; }
-      else if (side === 1) { x = 1054; y = Math.random() * 768; }
-      else if (side === 2) { x = Math.random() * 1024; y = -30; }
-      else { x = Math.random() * 1024; y = 798; }
-      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave*1.3), damage = 1, attackRange = 20, color = "magenta";
-      const spinAngle = Math.random() * Math.PI * 2;
-      const spinSpeed = (Math.random() - 0.5) * 0.02;
-      enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "grunt", spinAngle, spinSpeed });
-    }
-    }
-
-    // Spawns the requested number of kamikaze mobs at random edges
-    function spawnKamikazeBurst(count) {
-      for (let i = 0; i < count; i++) {
-        const side = Math.floor(Math.random() * 4);
-        let x, y;
-        if (side === 0) { x = -30; y = Math.random() * 600; }
-        else if (side === 1) { x = 1054; y = Math.random() * 768; }
-        else if (side === 2) { x = Math.random() * 1024; y = -30; }
-        else { x = Math.random() * 1024; y = 798; }
-        let radius = 16, collisionRadius = 18, speed = 2, color = "#ff4444", damage = 3, health = 12 + (wave * 1.2);
-        enemies.push({
-          x, y, radius, collisionRadius, speed, color, damage, health,
-          type: "kamikaze",
-          timer: 60, // 1 second per mine
-          exploded: false,
-          minesPlaced: 0,
-          mineInterval: 60, // 1 second
-          nextMineTime: 60 // countdown to next mine
-        });
+  function getWaveControlContext() {
+    return {
+      getWave: () => wave,
+      getBurstCount: () => burstCount,
+      setBurstCount: (value) => {
+        burstCount = value;
+      },
+      getBurstInterval: () => burstInterval,
+      setBurstInterval: (value) => {
+        burstInterval = value;
+      },
+      getBurstIndex: () => burstIndex,
+      setBurstIndex: (value) => {
+        burstIndex = value;
+      },
+      getBurstTimer: () => burstTimer,
+      setBurstTimer: (value) => {
+        burstTimer = value;
+      },
+      getEnemies: () => enemies,
+      getSpeedMultiplier: () => SPEED_MULTIPLIER,
+      setWaveAnnouncementTimer: () => {
+        waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
+      },
+      getGruntSprite: () => gruntImg,
+      getSlingerSprite: () => slingerImg,
+      resetBurstProgress: () => {
+        burstIndex = 0;
+        burstTimer = 0;
       }
-  }
-
-  // SLINGERS
-  // Spawns the requested number of slingers at random edges
-  function spawnSlingerBurst(count) {
-    for (let i = 0; i < count; i++) {
-      const side = Math.floor(Math.random() * 4);
-      let x, y;
-      if (side === 0) { x = -30; y = Math.random() * 600; }
-      else if (side === 1) { x = 1054; y = Math.random() * 768; }
-      else if (side === 2) { x = Math.random() * 1024; y = -30; }
-      else { x = Math.random() * 1024; y = 798; }
-      let radius = 18, collisionRadius = 20, speed = 0.8, health = 18 + (wave*1.5), damage = 1, attackRange = 240, color = "orange";
-      const spinAngle = Math.random() * Math.PI * 2;
-      const spinSpeed = (Math.random() - 0.5) * 0.02;
-      enemies.push({ x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "slinger", spinAngle, spinSpeed, sprite: slingerImg });
-    }
-  }
-
-  // Spawns the requested number of grunt boss minors at random edges
-  function spawnBossMinorBurst(count) {
-    for (let i = 0; i < count; i++) {
-      spawnGruntBossMinor();
-    }
+    };
   }
 
   // Main function to spawn waves based on the current wave number, with custom logic for each wave
   function spawnWave() {
-    waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
-
-    if (wave === 1) {
-      burstCount = 5;
-      burstInterval = 330;
-      window._customBursts = [1, 2, 3, 4, 5];
-    } else if (wave === 2) {
-      burstCount = 5;
-      burstInterval = 240;
-      window._customBursts = Array.from({length: 5}, () => 2 + Math.floor(Math.random() * 3));
-    } else if (wave === 3) {
-      burstCount = 5;
-      burstInterval = 240;
-      window._customBursts = Array.from({length: 5}, () => 3 + Math.floor(Math.random() * 3));
-    } else if (wave === 4) {
-      burstCount = 5;
-      burstInterval = 240;
-      window._customBursts = [3, 3, 4, 4, 5, 7].slice(0, 5);
-    } else if (wave === 5) {
-      burstCount = Infinity;
-      burstInterval = 400;
-      window._customBursts = null;
-      spawnGruntBoss();
-
-    } else if (wave === 6) {
-      burstCount = 6;
-      burstInterval = 150;
-      window._customBursts = null;
-      window._customSlingers = [1, 0, 0, 1, 0, 1];
-    } else if (wave === 7) {
-      burstCount = 7;
-      burstInterval = 300;
-      window._customBursts = null;
-      window._customSlingers = [2, 0, 0, 2, 0, 3, 0];
-    } else if (wave === 8) {
-      burstCount = 7;
-      burstInterval = 300; // 5 sec
-      window._customBursts = null;
-      window._customSlingers = [3, 0, 0, 2, 0, 3, 0];
-      spawnGruntBossMinor();
-    } else if (wave === 9) {
-      burstCount = 8;
-      burstInterval = 300; // 5 sec
-      window._customBursts = null;
-      window._customSlingers = [2, 1, 1, 1, 2, 1, 1, 2];
-      spawnGruntBossMinor();
-      setTimeout(() => spawnGruntBossMinor(), 10000);
-    } else if (wave === 10) {
-      burstCount = Infinity;
-      burstInterval = 300; // 5 sec
-      window._customBursts = null;
-      window._customSlingers = null;
-      window._bossMinorBursts = null;
-      // Spawn exactly 3 gruntBossMinors at the start of wave 10
-      if (!window._wave10MinorsSpawned) {
-        spawnBossMinorBurst(3);
-        window._wave10MinorsSpawned = true;
-      }
-    } else if (wave === 11) {
-      burstCount = 15;
-      burstInterval = 250; // 5 sec
-      window._customBursts = null;
-      window._customSlingers = null;
-      window._customKamikazes = [1, 1, 2, 2, 3, 3, 1, 2, 3, 4, 4, 2, 3, 4, 5];
-
-    } else if (wave === 12) {
-      burstCount = 15;
-      burstInterval = 300; // 5 sec
-      window._customSlingers =   [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
-      window._customKamikazes =  [0, 0, 0, 1, 0, 2, 0, 0, 0, 1, 0, 2, 0, 1, 2];
-      window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0];
-
-    } else if (wave === 13) {
-      burstCount = 15;
-      burstInterval = 300; // 5 sec
-      window._customSlingers =   [0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0];
-      window._customKamikazes =  [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1];
-      window._customBossMinors = [2, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0];
-
-    } else if (wave === 14) {
-      burstCount = 15;
-      burstInterval = 300; // 5.33 sec
-      window._customBursts =     [1, 1, 2, 1, 4, 1, 1, 6, 1, 1, 8, 0, 0, 0, 0];
-      window._customSlingers =   [0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0];
-      window._customKamikazes =  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-      window._customBossMinors = [0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0];
-
-    } else if (wave === 15) {
-      burstCount = 15;
-      burstInterval = 300; // 5 sec
-      window._customBursts =     [1, 1, 2, 1, 1, 4, 1, 1, 6, 1, 1, 8, 2, 2, 2];
-      window._customSlingers =   [0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0];
-      window._customKamikazes =  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3];
-      window._customBossMinors = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0];
-
-    } else if (wave === 16) {
-      burstCount = 15;
-      burstInterval = 300; // 4.67 sec
-      window._customBursts =     [1, 1, 2, 1, 1, 4, 1, 1, 6, 1, 1, 8, 2, 2, 2];
-      window._customSlingers =   [0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0];
-      window._customKamikazes =  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3];
-      window._customBossMinors = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0];
-
-    } else {
-      // For now, do nothing for later waves (old system removed)
-      burstCount = 0;
-      burstInterval = 300;
+    if (!window.SentinelWaveControl || typeof window.SentinelWaveControl.spawnWave !== "function") {
+      console.warn("SentinelWaveControl.spawnWave is unavailable.");
+      return;
     }
-    // Ensure _customBursts is always an array for waves 1-4
-    if ((wave === 1 || wave === 2 || wave === 3 || wave === 4) && !Array.isArray(window._customBursts)) {
-      window._customBursts = [2, 3, 4, 5]; // Default values, adjust as needed
-    }
-    burstIndex = 0;
-    burstTimer = 0;
-    window._bossMinorCount = 0;
+    window.SentinelWaveControl.spawnWave(getWaveControlContext());
 
   }
   
 
 
   function handleWaveSpawning(delta) {
-    // Custom burst logic for waves 1-4, infinite for wave 5, and controlled bursts for waves 6-10
-    // (Removed block that prevented spawning after wave 10)
-    // For wave 10, set burstCount to number of alive gruntBossMinors
-    if (wave === 10) {
-      burstCount = enemies.filter(en => en.type === "gruntBossMinor").length;
+    if (!window.SentinelWaveControl || typeof window.SentinelWaveControl.handleWaveSpawning !== "function") {
+      return;
     }
-    // For waves 11-16, keep spawning kamikazes at interval until all mobs are cleared
-    const isKamikazeWave = (wave >= 12 && wave <= 16);
-    const shouldContinueKamikaze = isKamikazeWave && enemies.length > 0;
-    if ((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5) || (wave >= 6 && wave <= 10 && burstIndex < burstCount) || (wave >= 11 && wave <= 16 && (burstIndex < burstCount || shouldContinueKamikaze))) {
-          burstTimer += delta * SPEED_MULTIPLIER;
-          if (burstTimer >= burstInterval) {
-            burstTimer = 0;
-            let grunts = 0;
-            let slingers = 0;
-            // Only assign grunts for specific waves
-            if (wave === 1 || wave === 2 || wave === 3 || wave === 4) {
-              grunts = (window._customBursts && window._customBursts[burstIndex]) || 0;
-
-            } else if (wave === 5) {
-              grunts = 1 + Math.floor(Math.random() * 2); // 2-4 grunts
-
-            } else if (wave >= 6 && wave <= 9) {
-              grunts = 2 + Math.floor(Math.random() * 3); // 2-4 grunts
-              if (window._customSlingers) {
-                slingers = window._customSlingers[burstIndex] || 0;
-              }
-            }
-
-            // Apocalypse mode: 1 kamikaze every burst, every wave
-            if (window.sentinelDifficulty === "Apocalypse") {
-              spawnKamikazeBurst(1);
-            }
-
-            // For wave 10, spawn slingers and grunts per burst
-            if (wave === 10) {
-              const slingerCount = 2 + Math.floor(Math.random() * 3);
-              spawnSlingerBurst(slingerCount);
-              // Add grunt spawns (2-4 per burst, as in waves 6-9)
-              const gruntCount = 2 + Math.floor(Math.random() * 3);
-              spawnBurst(gruntCount);
-            } else {
-              // Only call spawnBurst(grunts) once per burst
-              if (slingers > 0) spawnSlingerBurst(slingers);
-            }
-            
-            if (wave === 11) {
-              // Only kamikazes, handled here
-              if (window._customKamikazes && window._customKamikazes[burstIndex]) {
-                spawnKamikazeBurst(window._customKamikazes[burstIndex]);
-              }
-            }
-
-
-            if (wave === 12 || wave === 13 || wave === 14 || wave === 15 || wave === 16) {
-              grunts = 0 + Math.floor(Math.random() * 1); 
-              if (window._customSlingers && window._customSlingers[burstIndex]) {
-                spawnSlingerBurst(window._customSlingers[burstIndex]);
-              }
-              let count = 0;
-              if (window._customKamikazes && window._customKamikazes[burstIndex]) {
-                count = window._customKamikazes[burstIndex];
-              } else if (shouldContinueKamikaze) {
-                count = wave - 10; // Default to 1 kamikaze per interval after bursts
-              }
-              if (count > 0) spawnKamikazeBurst(count);
-            }
-              if (window._customBossMinors && window._customBossMinors[burstIndex]) {
-                for (let i = 0; i < window._customBossMinors[burstIndex]; i++) {
-                  spawnGruntBossMinor();
-                }
-              }
-              if (grunts > 0) spawnBurst(grunts);
-            
-
-
-        burstIndex++;
-      }
-    }
-    // No fallback/default system for later waves
+    window.SentinelWaveControl.handleWaveSpawning(getWaveControlContext(), delta);
 
     
   }
@@ -2967,11 +3117,14 @@ const droplifelenght = 280;
     burstIndex = 0;
     burstTimer = 0;
     window._customBursts = null;
+    window._customBrutes = null;
     window._customSlingers = null;
     window._customKamikazes = null;
     window._customBossMinors = null;
+    window._customBosses = null;
     window._bossMinorBursts = null;
     window._wave10MinorsSpawned = false;
+    window._editorSessionActive = false;
     gameOver = false;
     showStats = false;
     paused = false;
@@ -3190,7 +3343,7 @@ const droplifelenght = 280;
                 if (dist < e.novaRadius + player.radius) {
                     if (!e.novaPlayerInside || e.novaPlayerTick <= 0) {
                       player.health -= 1; // Nova damage per tick
-                      playerHurtTimer = 44;
+                      playerHurtTimer = 24;
                       e.novaPlayerTick = 60; // 1 second cooldown
                     }
                   e.novaPlayerInside = true;
@@ -3305,9 +3458,12 @@ const droplifelenght = 280;
               } else {
                 palette = [e.color];
               }
-              for (let j = 0; j < 18; j++) {
+              const particleCount = e.type === "kamikaze" ? KAMIKAZE_DEATH_PARTICLE_COUNT : 18;
+              const lifeBase = e.type === "kamikaze" ? 24 : 60;
+              const lifeRange = e.type === "kamikaze" ? 70 : 240;
+              for (let j = 0; j < particleCount; j++) {
                 const angle = Math.random() * Math.PI * 2;
-                const speed = 2.5 + Math.random() * 1.8;
+                const speed = e.type === "kamikaze" ? (1.7 + Math.random() * 1.1) : (2.5 + Math.random() * 1.8);
                 let size = 2;
                 if (j < 4) size = 4;
                 if (j < 2) size = 7;
@@ -3317,7 +3473,7 @@ const droplifelenght = 280;
                   y: e.y,
                   dx: Math.cos(angle) * speed,
                   dy: Math.sin(angle) * speed,
-                  life: 60 + Math.floor(Math.random() * 240),
+                  life: lifeBase + Math.floor(Math.random() * lifeRange),
                   color: color,
                   decay: 0.88 + Math.random() * 0.04,
                   size: size,
@@ -3529,6 +3685,9 @@ const droplifelenght = 280;
     }
     for (let i = particles.length - 1; i >= 0; i--) {
       if (particles[i].life <= 0) particles.splice(i, 1);
+    }
+    if (particles.length > MAX_PARTICLES) {
+      particles.splice(0, particles.length - MAX_PARTICLES);
     }
   }
 
@@ -4224,6 +4383,7 @@ const droplifelenght = 280;
         ctx.globalAlpha = 1;
       }
       drawHUD();
+      drawProtocolWarnings();
       
       // Update hovered protocol based on mouse position
       hoveredProtocol = -1;
