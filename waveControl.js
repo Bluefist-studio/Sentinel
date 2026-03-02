@@ -219,7 +219,7 @@ window.SentinelWaveControl = (function () {
 
     for (let i = 0; i < count; i++) {
       const { x, y } = randomEdgeSpawn();
-      let radius = 24, collisionRadius = 26, speed = 0.62, health = 160 + (wave * 1.5), damage = 2, attackRange = 28, color = "#ff7a00";
+      let radius = 24, collisionRadius = 26, speed = 0.62, health = 200 + (wave * 1.8), damage = 2, attackRange = 28, color = "#ff7a00";
       enemies.push({
         x,
         y,
@@ -541,3 +541,4 @@ window.SentinelWaveControl = (function () {
     getWaveEditorCodes: () => ({ ...window.SentinelWaveEditorCodes })
   };
 })();
+
