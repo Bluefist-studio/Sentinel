@@ -4,6 +4,7 @@
 	const waveEditorOverrides = {};
 	let waveEditorOverlay = null;
 	let waveEditorWasPaused = false;
+	let autoScalePlayerToLoadedWave = false;
 
 	function clampPositiveNumber(value, fallback) {
 		return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -19,6 +20,17 @@
 		return Math.max(1, Math.round(safeSeconds * INTERVAL_UNITS_PER_SECOND));
 	}
 
+	function normalizeMobIntervals(intervals) {
+		if (!intervals || typeof intervals !== "object") return undefined;
+		const keys = ["grunts", "slingers", "brutes", "kamikazes", "bossMinors", "bosses"];
+		const out = {};
+		keys.forEach((key) => {
+			const raw = Number(intervals[key]);
+			if (Number.isFinite(raw) && raw > 0) out[key] = Math.round(raw);
+		});
+		return Object.keys(out).length ? out : undefined;
+	}
+
 	function cloneOverrides(overrides) {
 		const out = {};
 		Object.keys(overrides || {}).forEach((waveKey) => {
@@ -32,7 +44,8 @@
 				customSlingers: Array.isArray(entry.customSlingers) ? entry.customSlingers.slice() : undefined,
 				customKamikazes: Array.isArray(entry.customKamikazes) ? entry.customKamikazes.slice() : undefined,
 				customBossMinors: Array.isArray(entry.customBossMinors) ? entry.customBossMinors.slice() : undefined,
-				customBosses: Array.isArray(entry.customBosses) ? entry.customBosses.slice() : undefined
+				customBosses: Array.isArray(entry.customBosses) ? entry.customBosses.slice() : undefined,
+				mobIntervals: normalizeMobIntervals(entry.mobIntervals)
 			};
 		});
 		return out;
@@ -51,7 +64,17 @@
 				customSlingers: Array.isArray(src.customSlingers) ? src.customSlingers.slice() : undefined,
 				customKamikazes: Array.isArray(src.customKamikazes) ? src.customKamikazes.slice() : undefined,
 				customBossMinors: Array.isArray(src.customBossMinors) ? src.customBossMinors.slice() : undefined,
-				customBosses: Array.isArray(src.customBosses) ? src.customBosses.slice() : undefined
+				customBosses: Array.isArray(src.customBosses) ? src.customBosses.slice() : undefined,
+				mobIntervalsSeconds: src.mobIntervals
+					? {
+						grunts: src.mobIntervals.grunts ? Number(intervalUnitsToSeconds(src.mobIntervals.grunts).toFixed(3)) : undefined,
+						slingers: src.mobIntervals.slingers ? Number(intervalUnitsToSeconds(src.mobIntervals.slingers).toFixed(3)) : undefined,
+						brutes: src.mobIntervals.brutes ? Number(intervalUnitsToSeconds(src.mobIntervals.brutes).toFixed(3)) : undefined,
+						kamikazes: src.mobIntervals.kamikazes ? Number(intervalUnitsToSeconds(src.mobIntervals.kamikazes).toFixed(3)) : undefined,
+						bossMinors: src.mobIntervals.bossMinors ? Number(intervalUnitsToSeconds(src.mobIntervals.bossMinors).toFixed(3)) : undefined,
+						bosses: src.mobIntervals.bosses ? Number(intervalUnitsToSeconds(src.mobIntervals.bosses).toFixed(3)) : undefined
+					}
+					: undefined
 			};
 		});
 		return normalized;
@@ -83,7 +106,19 @@
 				customSlingers: Array.isArray(src.customSlingers) ? src.customSlingers.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customKamikazes: Array.isArray(src.customKamikazes) ? src.customKamikazes.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customBossMinors: Array.isArray(src.customBossMinors) ? src.customBossMinors.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
-				customBosses: Array.isArray(src.customBosses) ? src.customBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined
+				customBosses: Array.isArray(src.customBosses) ? src.customBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
+				mobIntervals: normalizeMobIntervals(
+					src.mobIntervalsSeconds
+						? {
+							grunts: src.mobIntervalsSeconds.grunts ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.grunts)) : undefined,
+							slingers: src.mobIntervalsSeconds.slingers ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.slingers)) : undefined,
+							brutes: src.mobIntervalsSeconds.brutes ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.brutes)) : undefined,
+							kamikazes: src.mobIntervalsSeconds.kamikazes ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.kamikazes)) : undefined,
+							bossMinors: src.mobIntervalsSeconds.bossMinors ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bossMinors)) : undefined,
+							bosses: src.mobIntervalsSeconds.bosses ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bosses)) : undefined
+						}
+						: undefined
+				)
 			};
 		});
 		return restored;
@@ -152,6 +187,13 @@
 		return Array.isArray(list) ? list.join(",") : "";
 	}
 
+	function expandSingleValueList(list, burstCount) {
+		if (!Array.isArray(list) || list.length !== 1) return list;
+		if (!Number.isFinite(burstCount) || burstCount <= 0) return list;
+		const value = list[0] || 0;
+		return Array.from({ length: burstCount }, () => value);
+	}
+
 	function getWaveEditorBurstValue(list, index) {
 		if (!Array.isArray(list) || list.length === 0) return 0;
 		if (index < list.length) return list[index] || 0;
@@ -174,7 +216,8 @@
 				customSlingers: override.customSlingers,
 				customKamikazes: override.customKamikazes,
 				customBossMinors: override.customBossMinors,
-				customBosses: override.customBosses
+				customBosses: override.customBosses,
+				mobIntervals: normalizeMobIntervals(override.mobIntervals)
 			};
 		}
 		if (currentState && targetWave === currentState.wave) {
@@ -186,7 +229,8 @@
 				customSlingers: currentState.customSlingers,
 				customKamikazes: currentState.customKamikazes,
 				customBossMinors: currentState.customBossMinors,
-				customBosses: currentState.customBosses
+				customBosses: currentState.customBosses,
+				mobIntervals: undefined
 			};
 		}
 		if (bridge && typeof bridge.getWavePresetConfig === "function") {
@@ -200,7 +244,8 @@
 					customSlingers: preset.customSlingers,
 					customKamikazes: preset.customKamikazes,
 					customBossMinors: preset.customBossMinors,
-					customBosses: preset.customBosses
+					customBosses: preset.customBosses,
+					mobIntervals: normalizeMobIntervals(preset.mobIntervals)
 				};
 			}
 		}
@@ -212,7 +257,8 @@
 			customSlingers: undefined,
 			customKamikazes: undefined,
 			customBossMinors: undefined,
-			customBosses: undefined
+			customBosses: undefined,
+			mobIntervals: undefined
 		};
 	}
 
@@ -415,6 +461,22 @@
 		bossWrap.appendChild(bossInput);
 		rowC.appendChild(bossWrap);
 
+		const addPairedIntervalInput = (wrap, labelText) => {
+			const label = makeLabel(labelText);
+			label.style.marginTop = "8px";
+			wrap.appendChild(label);
+			const input = makeInput();
+			wrap.appendChild(input);
+			return input;
+		};
+
+		const gruntIntervalInput = addPairedIntervalInput(gruntWrap, "Grunt interval (seconds)");
+		const slingerIntervalInput = addPairedIntervalInput(slingerWrap, "Slinger interval (seconds)");
+		const bruteIntervalInput = addPairedIntervalInput(bruteWrap, "Brute interval (seconds)");
+		const kamikazeIntervalInput = addPairedIntervalInput(kamikazeWrap, "Kamikaze interval (seconds)");
+		const bossMinorIntervalInput = addPairedIntervalInput(bossMinorWrap, "Boss Minor interval (seconds)");
+		const bossIntervalInput = addPairedIntervalInput(bossWrap, "Boss interval (seconds)");
+
 		const waveStatus = document.createElement("div");
 		waveStatus.style.marginTop = "10px";
 		waveStatus.style.fontSize = "0.85rem";
@@ -455,6 +517,21 @@
 		playerStatus.style.fontSize = "0.85rem";
 		playerStatus.style.color = "#9de8ff";
 		playerSection.appendChild(playerStatus);
+
+		const autoScaleWrap = document.createElement("label");
+		autoScaleWrap.style.display = "flex";
+		autoScaleWrap.style.alignItems = "center";
+		autoScaleWrap.style.gap = "8px";
+		autoScaleWrap.style.marginTop = "8px";
+		autoScaleWrap.style.color = "#d8ffff";
+		const autoScaleToggle = document.createElement("input");
+		autoScaleToggle.type = "checkbox";
+		autoScaleToggle.checked = !!autoScalePlayerToLoadedWave;
+		autoScaleWrap.appendChild(autoScaleToggle);
+		const autoScaleText = document.createElement("span");
+		autoScaleText.textContent = "Auto-scale player to loaded wave";
+		autoScaleWrap.appendChild(autoScaleText);
+		playerSection.appendChild(autoScaleWrap);
 
 		const actionRow = document.createElement("div");
 		actionRow.style.display = "flex";
@@ -508,7 +585,9 @@
 		const loadBtn = makeActionBtn("Load Wave", "#00ffdd");
 		const applyWaveBtn = makeActionBtn("Apply Wave Override", "#a8ff6c");
 		const spawnNowBtn = makeActionBtn("Apply + Spawn Now", "#ffe26c");
+		const clearInputsBtn = makeActionBtn("Clear Inputs", "#ffd27f");
 		const clearWaveBtn = makeActionBtn("Clear Wave Override", "#ff9a9a");
+		const clearLootsBtn = makeActionBtn("Clear Loots", "#ffb3de");
 		const applyPlayerBtn = makeActionBtn("Apply Player Stats", "#9fd2ff");
 		const clearAllBtn = makeActionBtn("Clear All Overrides", "#ff7b7b");
 		const backToMenuBtn = makeActionBtn("Back to Menu", "#ffffff");
@@ -520,7 +599,9 @@
 		actionRow.appendChild(loadBtn);
 		actionRow.appendChild(applyWaveBtn);
 		actionRow.appendChild(spawnNowBtn);
+		actionRow.appendChild(clearInputsBtn);
 		actionRow.appendChild(clearWaveBtn);
+		actionRow.appendChild(clearLootsBtn);
 		actionRow.appendChild(backToMenuBtn);
 		actionRow.appendChild(applyPlayerBtn);
 		actionRow.appendChild(clearAllBtn);
@@ -542,6 +623,13 @@
 			kamikazeInput.value = formatWaveEditorList(source.customKamikazes);
 			bossMinorInput.value = formatWaveEditorList(source.customBossMinors);
 			bossInput.value = formatWaveEditorList(source.customBosses);
+			const mobIntervals = source.mobIntervals || {};
+			gruntIntervalInput.value = mobIntervals.grunts ? String(Number(intervalUnitsToSeconds(mobIntervals.grunts).toFixed(2))) : "";
+			slingerIntervalInput.value = mobIntervals.slingers ? String(Number(intervalUnitsToSeconds(mobIntervals.slingers).toFixed(2))) : "";
+			bruteIntervalInput.value = mobIntervals.brutes ? String(Number(intervalUnitsToSeconds(mobIntervals.brutes).toFixed(2))) : "";
+			kamikazeIntervalInput.value = mobIntervals.kamikazes ? String(Number(intervalUnitsToSeconds(mobIntervals.kamikazes).toFixed(2))) : "";
+			bossMinorIntervalInput.value = mobIntervals.bossMinors ? String(Number(intervalUnitsToSeconds(mobIntervals.bossMinors).toFixed(2))) : "";
+			bossIntervalInput.value = mobIntervals.bosses ? String(Number(intervalUnitsToSeconds(mobIntervals.bosses).toFixed(2))) : "";
 			waveStatus.textContent = `Editing wave ${selectedWaveState.value}.`;
 		};
 
@@ -571,23 +659,135 @@
 				return;
 			}
 
+			const parseMobIntervalField = (rawValue) => {
+				const trimmed = (rawValue || "").trim();
+				if (!trimmed) return undefined;
+				const parsed = parseFloat(trimmed);
+				if (!Number.isFinite(parsed) || parsed <= 0) return null;
+				return secondsToIntervalUnits(parsed);
+			};
+
+			const parsedMobIntervalsRaw = {
+				grunts: parseMobIntervalField(gruntIntervalInput.value),
+				slingers: parseMobIntervalField(slingerIntervalInput.value),
+				brutes: parseMobIntervalField(bruteIntervalInput.value),
+				kamikazes: parseMobIntervalField(kamikazeIntervalInput.value),
+				bossMinors: parseMobIntervalField(bossMinorIntervalInput.value),
+				bosses: parseMobIntervalField(bossIntervalInput.value)
+			};
+
+			if (Object.values(parsedMobIntervalsRaw).some(v => v === null)) {
+				waveStatus.textContent = "Mob intervals must be positive seconds (or blank).";
+				return;
+			}
+			const parsedMobIntervals = normalizeMobIntervals(parsedMobIntervalsRaw);
+			const parsedCustomBursts = parseWaveEditorList(gruntInput.value);
+			const parsedCustomBrutes = parseWaveEditorList(bruteInput.value);
+			const parsedCustomSlingers = parseWaveEditorList(slingerInput.value);
+			const parsedCustomKamikazes = parseWaveEditorList(kamikazeInput.value);
+			const parsedCustomBossMinors = parseWaveEditorList(bossMinorInput.value);
+			const parsedCustomBosses = parseWaveEditorList(bossInput.value);
+
 			waveEditorOverrides[targetWave] = {
 				burstCount: parsedBurstCount,
 				burstInterval: secondsToIntervalUnits(parsedBurstIntervalSeconds),
-				customBursts: parseWaveEditorList(gruntInput.value),
-				customBrutes: parseWaveEditorList(bruteInput.value),
-				customSlingers: parseWaveEditorList(slingerInput.value),
-				customKamikazes: parseWaveEditorList(kamikazeInput.value),
-				customBossMinors: parseWaveEditorList(bossMinorInput.value),
-				customBosses: parseWaveEditorList(bossInput.value)
+				customBursts: expandSingleValueList(parsedCustomBursts, parsedBurstCount),
+				customBrutes: expandSingleValueList(parsedCustomBrutes, parsedBurstCount),
+				customSlingers: expandSingleValueList(parsedCustomSlingers, parsedBurstCount),
+				customKamikazes: expandSingleValueList(parsedCustomKamikazes, parsedBurstCount),
+				customBossMinors: expandSingleValueList(parsedCustomBossMinors, parsedBurstCount),
+				customBosses: expandSingleValueList(parsedCustomBosses, parsedBurstCount),
+				mobIntervals: parsedMobIntervals
 			};
 
 			waveStatus.textContent = `Wave ${targetWave} override applied.`;
 
+			const applyAutoScalePlayerForWave = (waveNumber) => {
+				if (!autoScalePlayerToLoadedWave) return;
+				if (typeof bridge.getPlayer !== "function" || typeof bridge.setLevel !== "function" || typeof bridge.setStatPoints !== "function") {
+					playerStatus.textContent = "Auto-scale unavailable (bridge missing methods).";
+					return;
+				}
+
+				const targetLevel = Math.max(1, parseInt(waveNumber, 10) || 1);
+				bridge.setLevel(targetLevel);
+				const player = bridge.getPlayer();
+
+				const stats = ["Power", "AttackSpeed", "Range", "Movement", "Vitality", "Pickup"];
+				const influenceWeight = {
+					Power: 5,
+					AttackSpeed: 4,
+					Range: 3,
+					Movement: 3,
+					Vitality: 2,
+					Pickup: 1
+				};
+
+				const statCap = targetLevel + 1;
+				const totalPointsEarned = 5 + Math.max(0, (targetLevel - 1) * 2);
+				const totalWeight = stats.reduce((sum, key) => sum + (influenceWeight[key] || 0), 0);
+				let spent = 0;
+				for (const key of stats) {
+					const weighted = Math.floor((totalPointsEarned * (influenceWeight[key] || 0)) / totalWeight);
+					const value = Math.min(statCap, weighted);
+					player.stats[key] = value;
+					spent += value;
+				}
+
+				const priorityOrder = [...stats];
+
+				let distributeRemaining = Math.max(0, totalPointsEarned - spent);
+				while (distributeRemaining > 0) {
+					let allocated = false;
+					for (const key of priorityOrder) {
+						if (distributeRemaining <= 0) break;
+						if (player.stats[key] < statCap) {
+							player.stats[key] += 1;
+							distributeRemaining--;
+							allocated = true;
+						}
+					}
+					if (!allocated) break;
+				}
+
+				const remaining = distributeRemaining;
+				bridge.setStatPoints(remaining);
+				if (typeof bridge.applyStats === "function") bridge.applyStats();
+				player.health = player.maxHealth;
+				playerStatus.textContent = `Auto-scaled player to wave ${waveNumber} (level ${targetLevel}) using stat influence priority.`;
+				loadPlayerForm();
+			};
+
 			if (spawnImmediately && typeof bridge.spawnWaveNow === "function") {
 				bridge.spawnWaveNow(targetWave, waveEditorOverrides[targetWave]);
+				if (window.SentinelWaveControl && typeof window.SentinelWaveControl.setMobBurstIntervals === "function") {
+					if (waveEditorOverrides[targetWave].mobIntervals) {
+						window.SentinelWaveControl.setMobBurstIntervals(waveEditorOverrides[targetWave].mobIntervals);
+					} else if (typeof window.SentinelWaveControl.clearMobBurstIntervals === "function") {
+						window.SentinelWaveControl.clearMobBurstIntervals();
+					}
+				}
+				applyAutoScalePlayerForWave(targetWave);
 				waveStatus.textContent = `Wave ${targetWave} override applied and spawned.`;
 			}
+		};
+
+		const clearWaveInputs = () => {
+			burstCountInput.value = "";
+			burstIntervalInput.value = "";
+			gruntInput.value = "";
+			bruteInput.value = "";
+			slingerInput.value = "";
+			kamikazeInput.value = "";
+			bossMinorInput.value = "";
+			bossInput.value = "";
+			gruntIntervalInput.value = "";
+			slingerIntervalInput.value = "";
+			bruteIntervalInput.value = "";
+			kamikazeIntervalInput.value = "";
+			bossMinorIntervalInput.value = "";
+			bossIntervalInput.value = "";
+			waveStatus.textContent = `Wave ${selectedWaveState.value} inputs cleared.`;
 		};
 
 		const loadPlayerForm = () => {
@@ -645,8 +845,15 @@
 		};
 
 		loadBtn.addEventListener("click", loadWaveIntoForm);
+		autoScaleToggle.addEventListener("change", () => {
+			autoScalePlayerToLoadedWave = !!autoScaleToggle.checked;
+			playerStatus.textContent = autoScalePlayerToLoadedWave
+				? "Auto-scale is ON for Apply + Spawn Now."
+				: "Auto-scale is OFF.";
+		});
 		applyWaveBtn.addEventListener("click", () => applyWaveOverride(false));
 		spawnNowBtn.addEventListener("click", () => applyWaveOverride(true));
+		clearInputsBtn.addEventListener("click", clearWaveInputs);
 		clearWaveBtn.addEventListener("click", () => {
 			const targetWave = parseInt(waveInput.value, 10);
 			if (!Number.isFinite(targetWave) || targetWave < 1) {
@@ -656,6 +863,14 @@
 			delete waveEditorOverrides[targetWave];
 			waveStatus.textContent = `Wave ${targetWave} override cleared.`;
 			loadWaveIntoForm();
+		});
+		clearLootsBtn.addEventListener("click", () => {
+			if (typeof bridge.clearLoots === "function") {
+				bridge.clearLoots();
+				playerStatus.textContent = "Active loot drops cleared.";
+			} else {
+				playerStatus.textContent = "Clear loot function unavailable.";
+			}
 		});
 		clearAllBtn.addEventListener("click", () => {
 			Object.keys(waveEditorOverrides).forEach(key => delete waveEditorOverrides[key]);
