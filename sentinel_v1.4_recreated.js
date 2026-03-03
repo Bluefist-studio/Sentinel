@@ -460,6 +460,7 @@ window.onload = function () {
               : proto.statMods;
             const card = document.createElement("button");
             card.type = "button";
+            card.style.position = "relative";
             card.style.textAlign = "left";
             card.style.padding = "10px";
             card.style.borderRadius = "8px";
@@ -479,11 +480,73 @@ window.onload = function () {
                               <div style="font-size:0.85rem; color:#aaf6ff; margin-top:3px;">${proto.rarity} • ${proto.tier}</div>
                               <div style="font-size:0.8rem; color:#aaf6ff; margin-top:4px;">${mods || "No mods"}</div>`;
 
+            const favoriteBadge = document.createElement("div");
+            favoriteBadge.textContent = "✶";
+            favoriteBadge.title = "Toggle favorite";
+            favoriteBadge.style.position = "absolute";
+            favoriteBadge.style.top = "8px";
+            favoriteBadge.style.right = "8px";
+            favoriteBadge.style.width = "20px";
+            favoriteBadge.style.height = "20px";
+            favoriteBadge.style.boxSizing = "border-box";
+            favoriteBadge.style.borderRadius = "50%";
+            favoriteBadge.style.border = "1px solid #00ffdd";
+            favoriteBadge.style.background = "rgba(0, 35, 40, 0.92)";
+            favoriteBadge.style.fontWeight = "bold";
+            favoriteBadge.style.fontSize = "1.1rem";
+            favoriteBadge.style.lineHeight = "1";
+            favoriteBadge.style.display = "flex";
+            favoriteBadge.style.alignItems = "center";
+            favoriteBadge.style.justifyContent = "center";
+            favoriteBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+            favoriteBadge.style.cursor = "pointer";
+            card.appendChild(favoriteBadge);
+
+            const selectedBadge = document.createElement("div");
+            selectedBadge.textContent = "✓";
+            selectedBadge.title = "Starter protocol selected";
+            selectedBadge.style.position = "absolute";
+            selectedBadge.style.top = "8px";
+            selectedBadge.style.right = "32px";
+            selectedBadge.style.width = "18px";
+            selectedBadge.style.height = "18px";
+            selectedBadge.style.borderRadius = "50%";
+            selectedBadge.style.border = "1px solid #00ffdd";
+            selectedBadge.style.background = "rgba(0, 35, 40, 0.92)";
+            selectedBadge.style.color = "#00ffdd";
+            selectedBadge.style.fontWeight = "bold";
+            selectedBadge.style.fontSize = "0.85rem";
+            selectedBadge.style.lineHeight = "1";
+            selectedBadge.style.display = "none";
+            selectedBadge.style.alignItems = "center";
+            selectedBadge.style.justifyContent = "center";
+            selectedBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+            selectedBadge.style.pointerEvents = "none";
+            card.appendChild(selectedBadge);
+
+            const applyFavoriteBadgeState = () => {
+              const isFavorite = typeof ProtocolSystem.isFavorite === "function"
+                ? ProtocolSystem.isFavorite(protocolName)
+                : false;
+              favoriteBadge.style.color = isFavorite ? "#ffd84d" : "#4e696f";
+              favoriteBadge.style.textShadow = isFavorite ? "0 0 8px rgba(255,216,77,0.85)" : "none";
+            };
+            applyFavoriteBadgeState();
+
+            favoriteBadge.addEventListener("click", (evt) => {
+              evt.stopPropagation();
+              if (typeof ProtocolSystem.toggleFavorite === "function") {
+                ProtocolSystem.toggleFavorite(protocolName);
+                applyFavoriteBadgeState();
+              }
+            });
+
             const renderCardState = () => {
               const isSelected = selected.includes(protocolName);
               card.style.background = isSelected ? "rgba(0, 255, 221, 0.22)" : "rgba(0, 77, 92, 0.7)";
               card.style.borderColor = isSelected ? "#ffffff" : "#00ffdd";
               card.style.boxShadow = isSelected ? "0 0 14px rgba(255,255,255,0.35)" : "none";
+              selectedBadge.style.display = isSelected ? "flex" : "none";
             };
             renderCardState();
 
@@ -570,7 +633,7 @@ window.onload = function () {
   }
 
   // Protocol menu
-  function showProtocolMenu() {
+  function showProtocolMenu(initialScrollTop = null) {
     const menuOverlay = document.createElement("div");
     const canvasRect = canvas.getBoundingClientRect();
     menuOverlay.id = "protocolMenuOverlay";
@@ -841,6 +904,16 @@ window.onload = function () {
 
     // Group protocols by family
     const allProtocols = Object.keys(PROTOCOLS);
+    const starterProtocolSet = new Set(
+      Array.isArray(ProtocolSystem.starterProtocols)
+        ? ProtocolSystem.starterProtocols.slice(0, 2)
+        : []
+    );
+    const favoriteProtocolSet = new Set(
+      typeof ProtocolSystem.getFavorites === "function"
+        ? ProtocolSystem.getFavorites()
+        : []
+    );
     const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
     
     allProtocols.forEach(protocolName => {
@@ -886,6 +959,7 @@ window.onload = function () {
         card.style.display = "flex";
         card.style.flexDirection = "column";
         card.style.justifyContent = "center";
+        card.style.position = "relative";
         card.style.cursor = "pointer";
         card.style.transition = "all 0.2s";
 
@@ -917,6 +991,43 @@ window.onload = function () {
           card.style.transform = "scale(1)";
         });
 
+        const favoriteBtn = document.createElement("div");
+        favoriteBtn.textContent = "✶";
+        favoriteBtn.title = "Toggle favorite";
+        favoriteBtn.style.position = "absolute";
+        favoriteBtn.style.top = "8px";
+        favoriteBtn.style.right = "8px";
+        favoriteBtn.style.width = "20px";
+        favoriteBtn.style.height = "20px";
+        favoriteBtn.style.boxSizing = "border-box";
+        favoriteBtn.style.borderRadius = "50%";
+        favoriteBtn.style.border = "1px solid #00ffdd";
+        favoriteBtn.style.background = "rgba(0, 35, 40, 0.92)";
+        favoriteBtn.style.fontWeight = "bold";
+        favoriteBtn.style.fontSize = "1.1rem";
+        favoriteBtn.style.lineHeight = "1";
+        favoriteBtn.style.display = "flex";
+        favoriteBtn.style.alignItems = "center";
+        favoriteBtn.style.justifyContent = "center";
+        favoriteBtn.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+        favoriteBtn.style.cursor = "pointer";
+        const applyFavoriteBtnState = () => {
+          const isFavorite = typeof ProtocolSystem.isFavorite === "function"
+            ? ProtocolSystem.isFavorite(protocolName)
+            : favoriteProtocolSet.has(protocolName);
+          favoriteBtn.style.color = isFavorite ? "#ffd84d" : "#4e696f";
+          favoriteBtn.style.textShadow = isFavorite ? "0 0 8px rgba(255,216,77,0.85)" : "none";
+        };
+        applyFavoriteBtnState();
+        favoriteBtn.addEventListener("click", (evt) => {
+          evt.stopPropagation();
+          if (typeof ProtocolSystem.toggleFavorite === "function") {
+            ProtocolSystem.toggleFavorite(protocolName);
+            applyFavoriteBtnState();
+          }
+        });
+        card.appendChild(favoriteBtn);
+
         // Protocol name
         const nameEl = document.createElement("div");
         nameEl.textContent = protocolName;
@@ -935,6 +1046,65 @@ window.onload = function () {
           newEl.style.fontSize = "0.75rem";
           newEl.style.marginBottom = "4px";
           card.appendChild(newEl);
+        }
+
+        const isStarterSelected = discovered && starterProtocolSet.has(protocolName);
+        if (isStarterSelected) {
+          const starterBadge = document.createElement("div");
+          starterBadge.textContent = "✓";
+          starterBadge.title = "Starter protocol selected";
+          starterBadge.style.position = "absolute";
+          starterBadge.style.top = "8px";
+          starterBadge.style.right = "32px";
+          starterBadge.style.width = "18px";
+          starterBadge.style.height = "18px";
+          starterBadge.style.borderRadius = "50%";
+          starterBadge.style.border = "1px solid #00ffdd";
+          starterBadge.style.background = "rgba(0, 35, 40, 0.92)";
+          starterBadge.style.color = "#00ffdd";
+          starterBadge.style.fontWeight = "bold";
+          starterBadge.style.fontSize = "0.85rem";
+          starterBadge.style.lineHeight = "1";
+          starterBadge.style.display = "flex";
+          starterBadge.style.alignItems = "center";
+          starterBadge.style.justifyContent = "center";
+          starterBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+          starterBadge.style.pointerEvents = "none";
+          card.appendChild(starterBadge);
+        }
+
+        if (discovered) {
+          card.addEventListener("click", () => {
+            const currentStarters = Array.isArray(ProtocolSystem.starterProtocols)
+              ? ProtocolSystem.starterProtocols
+                  .filter(name => ProtocolSystem.protocolBoard[name]?.discovered)
+                  .slice(0, 2)
+              : [];
+            const existingIndex = currentStarters.indexOf(protocolName);
+            let nextStarters;
+
+            if (existingIndex >= 0) {
+              nextStarters = currentStarters.filter(name => name !== protocolName);
+            } else {
+              if (currentStarters.length >= 2) {
+                showUpgradeInfoModal(
+                  "STARTER LIMIT",
+                  "You can select up to 2 starter protocols."
+                );
+                return;
+              }
+              nextStarters = [...currentStarters, protocolName];
+            }
+
+            const applied = (typeof ProtocolSystem.setStarters === "function")
+              ? ProtocolSystem.setStarters(nextStarters)
+              : false;
+            if (!applied) return;
+
+            const restoreScrollTop = scrollContent.scrollTop;
+            menuOverlay.remove();
+            showProtocolMenu(restoreScrollTop);
+          });
         }
 
         // Rarity
@@ -1063,8 +1233,9 @@ window.onload = function () {
 
                 totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
                 saveCollectedBytes();
+                const restoreScrollTop = scrollContent.scrollTop;
                 menuOverlay.remove();
-                showProtocolMenu();
+                showProtocolMenu(restoreScrollTop);
               }
             );
           });
@@ -1090,6 +1261,12 @@ window.onload = function () {
     });
     menuOverlay.appendChild(scrollContent);
     document.body.appendChild(menuOverlay);
+
+    if (Number.isFinite(initialScrollTop) && initialScrollTop > 0) {
+      requestAnimationFrame(() => {
+        scrollContent.scrollTop = initialScrollTop;
+      });
+    }
 
     // Back button functionality
     backBtn.addEventListener("click", () => {
@@ -1223,7 +1400,6 @@ window.onload = function () {
   }
 
   totalCollectedBytes = loadCollectedBytes();
-  let playerHurtTimer = 0;
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
   window._editorSessionActive = false;
@@ -1241,11 +1417,37 @@ window.onload = function () {
   let burstCount = 3, burstIndex = 0, burstTimer = 0;
   // Burst interval in frames (higher = longer pause between bursts)
   let burstInterval = 120; // Increased for bigger cooldown
+  const INTER_WAVE_DELAY_SECONDS = 8;
+  let interWaveDelayTimer = 0;
+  let interWavePending = false;
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
   const KAMIKAZE_DEATH_PARTICLE_COUNT = 8;
   const MAX_PARTICLES = 1400;
+
+  if (typeof window.SentinelWaveEnemyHealthModifier !== "number") {
+    window.SentinelWaveEnemyHealthModifier = 1.2;
+  }
+  if (typeof window.SentinelWaveEnemyDamageModifier !== "number") {
+    window.SentinelWaveEnemyDamageModifier = 4;
+  }
+
+  function applyWaveEnemyModifiers(enemy) {
+    if (!enemy) return enemy;
+    const healthMod = Number(window.SentinelWaveEnemyHealthModifier);
+    const damageMod = Number(window.SentinelWaveEnemyDamageModifier);
+    const resolvedHealthMod = Number.isFinite(healthMod) ? healthMod : 1;
+    const resolvedDamageMod = Number.isFinite(damageMod) ? damageMod : 1;
+
+    if (typeof enemy.health === "number") {
+      enemy.health = Math.max(0, enemy.health * resolvedHealthMod);
+    }
+    if (typeof enemy.damage === "number") {
+      enemy.damage = Math.max(0, enemy.damage * resolvedDamageMod);
+    }
+    return enemy;
+  }
 
   const player = {
     x: 512, y: 425, radius: 20,
@@ -1259,6 +1461,74 @@ window.onload = function () {
   };
 
   const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], slingerDrops = [], bruteDrops = [], protocolOrbs = [], particles = [], mines = [];
+  const enemyPool = [], projectilePool = [], particlePool = [];
+
+  function clearPooledObject(obj) {
+    for (const key in obj) delete obj[key];
+    return obj;
+  }
+
+  function removeAtSwap(array, index) {
+    const lastIndex = array.length - 1;
+    const item = array[index];
+    if (index !== lastIndex) array[index] = array[lastIndex];
+    array.pop();
+    return item;
+  }
+
+  function spawnEnemy() {
+    const enemy = enemyPool.length ? clearPooledObject(enemyPool.pop()) : {};
+    enemies.push(enemy);
+    return enemy;
+  }
+
+  function releaseEnemyAt(index) {
+    const enemy = removeAtSwap(enemies, index);
+    enemyPool.push(clearPooledObject(enemy));
+  }
+
+  function spawnProjectile(x, y, dx, dy, damage, radius, color, type) {
+    const projectile = projectilePool.length ? projectilePool.pop() : { trail: [] };
+    clearPooledObject(projectile);
+    projectile.x = x;
+    projectile.y = y;
+    projectile.dx = dx;
+    projectile.dy = dy;
+    projectile.damage = damage;
+    projectile.radius = typeof radius === "number" ? radius : 4;
+    projectile.color = color || "#ff8844";
+    projectile.type = type || "enemyProjectile";
+    if (!projectile.trail) projectile.trail = [];
+    projectile.trail.length = 0;
+    projectiles.push(projectile);
+    return projectile;
+  }
+
+  function releaseProjectileAt(index) {
+    const projectile = removeAtSwap(projectiles, index);
+    if (projectile.trail) projectile.trail.length = 0;
+    projectilePool.push(clearPooledObject(projectile));
+  }
+
+  function spawnParticle(x, y, dx, dy, life, color, decay, size, type) {
+    const particle = particlePool.length ? particlePool.pop() : {};
+    particle.x = x;
+    particle.y = y;
+    particle.dx = dx;
+    particle.dy = dy;
+    particle.life = life;
+    particle.color = color;
+    particle.decay = typeof decay === "number" ? decay : 1;
+    particle.size = typeof size === "number" ? size : 2;
+    particle.type = type || "generic";
+    particles.push(particle);
+    return particle;
+  }
+
+  function releaseParticleAt(index) {
+    const particle = removeAtSwap(particles, index);
+    particlePool.push(particle);
+  }
   // Update mines: explode when player enters zone, remove after explosion
   function updateMines(delta) {
     for (let i = mines.length - 1; i >= 0; i--) {
@@ -1269,7 +1539,6 @@ window.onload = function () {
         m.exploded = true;
         // Damage player
         player.health -= 2;
-        playerHurtTimer = 44;
         // Draw explosion ring
         ctx.save();
         ctx.beginPath();
@@ -1289,17 +1558,17 @@ window.onload = function () {
           const size = 2 + Math.random() * 2.5;
           const life = 20 + Math.random() * 14;
           const decay = 0.89 + Math.random() * 0.04;
-          particles.push({
-            x: m.x,
-            y: m.y,
-            dx: Math.cos(angle) * speed,
-            dy: Math.sin(angle) * speed,
+          spawnParticle(
+            m.x,
+            m.y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
             life,
             color,
             decay,
             size,
-            type: "enemyDeath"
-          });
+            "enemyDeath"
+          );
         }
         mines.splice(i, 1);
         continue;
@@ -1311,7 +1580,6 @@ window.onload = function () {
         const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
         if (distToPlayer < 52 + player.radius) {
           player.health -= 2;
-          playerHurtTimer = 44;
         }
         // Draw explosion ring
         ctx.save();
@@ -1332,17 +1600,17 @@ window.onload = function () {
           const size = 2 + Math.random() * 2.5;
           const life = 20 + Math.random() * 14;
           const decay = 0.89 + Math.random() * 0.04;
-          particles.push({
-            x: m.x,
-            y: m.y,
-            dx: Math.cos(angle) * speed,
-            dy: Math.sin(angle) * speed,
+          spawnParticle(
+            m.x,
+            m.y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
             life,
             color,
             decay,
             size,
-            type: "enemyDeath"
-          });
+            "enemyDeath"
+          );
         }
         mines.splice(i, 1);
       }
@@ -1642,6 +1910,13 @@ window.onload = function () {
     setStatPoints: (value) => {
       statPoints = value;
     },
+    clearLoots: () => {
+      xpDrops.length = 0;
+      slingerDrops.length = 0;
+      bruteDrops.length = 0;
+      healthDrops.length = 0;
+      protocolOrbs.length = 0;
+    },
     applyStats,
     spawnWaveNow: (targetWave, previewOverride) => {
       if (!gameStarted || showMenuScreen || showLoadingScreen) {
@@ -1770,17 +2045,17 @@ window.onload = function () {
       for (let i = 0; i < 18; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = 2 + Math.random() * 2;
-        particles.push({
-          x: orb.x,
-          y: orb.y,
-          dx: Math.cos(angle) * speed,
-          dy: Math.sin(angle) * speed,
-          life: 35 + Math.floor(Math.random() * 35),
-          color: orb.rarity === "Rare" ? "#d896ff" : "#7bf4ff",
-          decay: 0.9 + Math.random() * 0.05,
-          size: 2 + Math.random() * 2,
-          type: "enemyDeath"
-        });
+        spawnParticle(
+          orb.x,
+          orb.y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          35 + Math.floor(Math.random() * 35),
+          orb.rarity === "Rare" ? "#d896ff" : "#7bf4ff",
+          0.9 + Math.random() * 0.05,
+          2 + Math.random() * 2,
+          "enemyDeath"
+        );
       }
       if (useRunOnlyDiscovery) {
         console.log(`✓ Protocol discovered from orb (run-only editor): ${orb.protocolName}`);
@@ -1861,14 +2136,17 @@ window.onload = function () {
   function createParticles(x, y, color) {
     // Create generic particles at (x, y)
     for (let i = 0; i < 10; i++) {
-      particles.push({
-        x, y,
-        dx: (Math.random() - 0.5) * 3,
-        dy: (Math.random() - 0.5) * 3,
-        life: 18 + Math.floor(Math.random() * 72),
+      spawnParticle(
+        x,
+        y,
+        (Math.random() - 0.5) * 3,
+        (Math.random() - 0.5) * 3,
+        18 + Math.floor(Math.random() * 72),
         color,
-        type: "generic"
-      });
+        1,
+        2,
+        "generic"
+      );
     }
   }
 
@@ -1905,31 +2183,69 @@ window.onload = function () {
   }
 
   function updatePlayer(delta) {
-    // Update player position and cooldowns
-    if (followMouse) {
-    }
-    // Track previous position for dust
     if (typeof player._prevX === 'undefined') player._prevX = player.x;
     if (typeof player._prevY === 'undefined') player._prevY = player.y;
-    let moved = false;
+    if (typeof player._followVX !== 'number') player._followVX = 0;
+    if (typeof player._followVY !== 'number') player._followVY = 0;
+    if (typeof player._hoverPhase !== 'number') player._hoverPhase = Math.random() * Math.PI * 2;
+    if (typeof player._cursorStillTime !== 'number') player._cursorStillTime = 0;
+    if (typeof player._lastMouseX !== 'number') player._lastMouseX = mouseX;
+    if (typeof player._lastMouseY !== 'number') player._lastMouseY = mouseY;
+
+    const frameScale = delta * SPEED_MULTIPLIER;
+    const mouseDeltaX = mouseX - player._lastMouseX;
+    const mouseDeltaY = mouseY - player._lastMouseY;
+    const mouseDelta = Math.hypot(mouseDeltaX, mouseDeltaY);
+    if (mouseDelta < 0.25) player._cursorStillTime += frameScale;
+    else player._cursorStillTime = 0;
+    player._lastMouseX = mouseX;
+    player._lastMouseY = mouseY;
+
     if (followMouse) {
-      const dx = mouseX - player.x;
-      const dy = mouseY - player.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > 1) {
-        const dirX = dx / dist;
-        const dirY = dy / dist;
-        player.x += dirX * player.speed * delta * SPEED_MULTIPLIER;
-        player.y += dirY * player.speed * delta * SPEED_MULTIPLIER;
-        moved = true;
+      let targetX = mouseX;
+      let targetY = mouseY;
+      if (player._cursorStillTime > 4) {
+        player._hoverPhase += 0.07 * frameScale;
+        const hoverRadius = Math.min(6, Math.max(2.2, player.speed * 0.95));
+        targetX += Math.cos(player._hoverPhase) * hoverRadius;
+        targetY += Math.sin(player._hoverPhase * 0.93) * (hoverRadius * 0.58);
       }
+
+      const dx = targetX - player.x;
+      const dy = targetY - player.y;
+      const dist = Math.hypot(dx, dy);
+
+      let desiredVX = 0;
+      let desiredVY = 0;
+      if (dist > 0.001) {
+        const arriveRadius = 26;
+        const speedScale = dist < arriveRadius ? (dist / arriveRadius) : 1;
+        const desiredSpeed = player.speed * speedScale;
+        desiredVX = (dx / dist) * desiredSpeed;
+        desiredVY = (dy / dist) * desiredSpeed;
+      }
+
+      const smoothing = Math.min(0.28, 0.12 + frameScale * 0.018);
+      player._followVX += (desiredVX - player._followVX) * smoothing;
+      player._followVY += (desiredVY - player._followVY) * smoothing;
+
+      if (dist < 0.85 && player._cursorStillTime > 4) {
+        player._followVX *= 0.78;
+        player._followVY *= 0.78;
+      }
+
+      player.x += player._followVX * frameScale;
+      player.y += player._followVY * frameScale;
+    } else {
+      player._followVX *= 0.78;
+      player._followVY *= 0.78;
+      player._cursorStillTime = 0;
     }
-    // Dust particles disabled for performance
+
     player._prevX = player.x;
     player._prevY = player.y;
     constrainPlayer();
     if (player.attackCooldown > 0) player.attackCooldown -= delta * SPEED_MULTIPLIER;
-    if (playerHurtTimer > 0) playerHurtTimer -= delta * SPEED_MULTIPLIER;
     if (playerLevelUpTimer > 0) playerLevelUpTimer -= delta * SPEED_MULTIPLIER;
   }
 
@@ -1958,12 +2274,23 @@ window.onload = function () {
     }
 
     window._nearestEnemy = nearest;
-    let targetAngle = 0;
+    let targetAngle = playerVisualAngle;
     if (nearest) {
       targetAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+      player._scanSnapCooldown = 0;
+      player._scanTargetAngle = targetAngle;
+    } else {
+      if (typeof player._scanTargetAngle !== "number") player._scanTargetAngle = playerVisualAngle;
+      if (typeof player._scanSnapCooldown !== "number") player._scanSnapCooldown = 0;
+      player._scanSnapCooldown--;
+      if (player._scanSnapCooldown <= 0) {
+        player._scanTargetAngle = Math.random() * Math.PI * 2;
+        player._scanSnapCooldown = 28 + Math.floor(Math.random() * 53);
+      }
+      targetAngle = player._scanTargetAngle;
     }
     const angleDiff = ((targetAngle - playerVisualAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-    playerVisualAngle += angleDiff * 0.15;
+    playerVisualAngle += angleDiff * (nearest ? 0.15 : 0.32);
     window._playerToEnemyAngle = playerVisualAngle;
 
     let isAttacking = nearest && minDist < player.range + nearest.radius && player.attackCooldown > 0 && followMouse;
@@ -2063,17 +2390,17 @@ window.onload = function () {
         ];
         const color = palette[Math.floor(Math.random() * palette.length)];
         const speed = 1.2 + Math.random() * .5;
-        particles.push({
-          x: px,
-          y: py,
-          dx: dirX * speed + (Math.random() - 0.2) * 1,
-          dy: dirY * speed + (Math.random() - 0.2) * 1,
-          life: 4 + Math.floor(Math.random() * 8),
-          color: color,
-          decay: 0.92 + Math.random() * 0.04,
-          size: 2.2 + Math.random() * 2,
-          type: "laser"
-        });
+        spawnParticle(
+          px,
+          py,
+          dirX * speed + (Math.random() - 0.2) * 1,
+          dirY * speed + (Math.random() - 0.2) * 1,
+          4 + Math.floor(Math.random() * 8),
+          color,
+          0.92 + Math.random() * 0.04,
+          2.2 + Math.random() * 2,
+          "laser"
+        );
       }
     }
 
@@ -2095,17 +2422,17 @@ window.onload = function () {
           "rgba(255,220,0,0.6)",
           "rgb(248, 144, 144)"
         ][Math.floor(Math.random() * 4)];
-        particles.push({
-          x: nearest.x,
-          y: nearest.y,
-          dx: Math.cos(angle) * speed,
-          dy: Math.sin(angle) * speed,
-          life: 18 + Math.floor(Math.random() * 32),
-          color: color,
-          decay: 0.92 + Math.random() * 0.04,
-          size: 2.2 + Math.random() * 2.2,
-          type: "enemyHit"
-        });
+        spawnParticle(
+          nearest.x,
+          nearest.y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          18 + Math.floor(Math.random() * 32),
+          color,
+          0.92 + Math.random() * 0.04,
+          2.2 + Math.random() * 2.2,
+          "enemyHit"
+        );
       }
 
       player.attackCooldown = player.cooldownBase;
@@ -2156,16 +2483,17 @@ window.onload = function () {
         // Use squared random for radius: more close, fewer far
         const t = Math.random();
         const speed = 1.5 + 8.5 * Math.pow(t, 2); // 1.5 to ~7.0, denser close, further spread
-        particles.push({
-          x: player.x,
-          y: player.y,
-          dx: Math.cos(angle) * speed,
-          dy: Math.sin(angle) * speed,
-          life: 60 + Math.floor(Math.random() * 240),
-          color: ["#FFA500", "#ffb84d", "#ff9900", "#ffcc80", "#8b5b00"][Math.floor(Math.random() * 5)],
-          decay: 0.88 + Math.random() * 0.04,
-          type: "levelUp"
-        });
+        spawnParticle(
+          player.x,
+          player.y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          60 + Math.floor(Math.random() * 240),
+          ["#FFA500", "#ffb84d", "#ff9900", "#ffcc80", "#8b5b00"][Math.floor(Math.random() * 5)],
+          0.88 + Math.random() * 0.04,
+          2,
+          "levelUp"
+        );
       }
     }
     // Cap at max level
@@ -2203,17 +2531,17 @@ const droplifelenght = 280;
           if (j < 4) size = 4;
           if (j < 2) size = 7;
           const color = palette[Math.floor(Math.random() * palette.length)];
-          particles.push({
-            x: d.x,
-            y: d.y,
-            dx: Math.cos(angle) * speed,
-            dy: Math.sin(angle) * speed,
-            life: 60 + Math.floor(Math.random() * 240),
-            color: color,
-            decay: 0.88 + Math.random() * 0.04,
-            size: size,
-            type: "xpDrop"
-          });
+          spawnParticle(
+            d.x,
+            d.y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            60 + Math.floor(Math.random() * 240),
+            color,
+            0.88 + Math.random() * 0.04,
+            size,
+            "xpDrop"
+          );
         }
         xpDrops.splice(i, 1);
       }
@@ -2247,17 +2575,17 @@ const droplifelenght = 280;
           if (j < 4) size = 4;
           if (j < 2) size = 7;
           const color = palette[Math.floor(Math.random() * palette.length)];
-          particles.push({
-            x: d.x,
-            y: d.y,
-            dx: Math.cos(angle) * speed,
-            dy: Math.sin(angle) * speed,
-            life: 60 + Math.floor(Math.random() * 240),
-            color: color,
-            decay: 0.88 + Math.random() * 0.04,
-            size: size,
-            type: "slingerDrop"
-          });
+          spawnParticle(
+            d.x,
+            d.y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            60 + Math.floor(Math.random() * 240),
+            color,
+            0.88 + Math.random() * 0.04,
+            size,
+            "slingerDrop"
+          );
         }
         slingerDrops.splice(i, 1);
       }
@@ -2292,17 +2620,17 @@ const droplifelenght = 280;
           if (j < 4) size = 4;
           if (j < 2) size = 7;
           const color = palette[Math.floor(Math.random() * palette.length)];
-          particles.push({
-            x: d.x,
-            y: d.y,
-            dx: Math.cos(angle) * speed,
-            dy: Math.sin(angle) * speed,
-            life: 60 + Math.floor(Math.random() * 240),
-            color: color,
-            decay: 0.88 + Math.random() * 0.04,
-            size: size,
-            type: "bruteDrop"
-          });
+          spawnParticle(
+            d.x,
+            d.y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            60 + Math.floor(Math.random() * 240),
+            color,
+            0.88 + Math.random() * 0.04,
+            size,
+            "bruteDrop"
+          );
         }
         bruteDrops.splice(i, 1);
       }
@@ -2330,16 +2658,17 @@ const droplifelenght = 280;
         for (let j = 0; j < 18; j++) {
           const angle = Math.random() * Math.PI * 2;
           const speed = 2.5 + Math.random() * 1.8; // fast start
-          particles.push({
-            x: d.x,
-            y: d.y,
-            dx: Math.cos(angle) * speed,
-            dy: Math.sin(angle) * speed,
-            life: 60 + Math.floor(Math.random() * 240),
-            color: Math.random() < 0.5 ? "#b11717" : "#d43636",
-            decay: 0.88 + Math.random() * 0.04, // quick deceleration
-            type: "healthDrop"
-          });
+          spawnParticle(
+            d.x,
+            d.y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            60 + Math.floor(Math.random() * 240),
+            Math.random() < 0.5 ? "#b11717" : "#d43636",
+            0.88 + Math.random() * 0.04,
+            2,
+            "healthDrop"
+          );
         }
         healthDrops.splice(i, 1);
       }
@@ -2402,6 +2731,8 @@ const droplifelenght = 280;
         burstTimer = value;
       },
       getEnemies: () => enemies,
+      spawnEnemy: () => spawnEnemy(),
+      applyWaveEnemyModifiers,
       getSpeedMultiplier: () => SPEED_MULTIPLIER,
       setWaveAnnouncementTimer: () => {
         waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
@@ -2675,6 +3006,9 @@ const droplifelenght = 280;
           const cardX = panelX + (panelWidth - cardWidth) / 2;
           const isDiscovered = discoveredSet.has(protocolName);
           const isActive = ProtocolSystem.activeProtocols.includes(protocolName);
+          const isFavorite = typeof ProtocolSystem.isFavorite === "function"
+            ? ProtocolSystem.isFavorite(protocolName)
+            : false;
           ctx.save();
           ctx.globalAlpha = 0.92;
           ctx.fillStyle = isActive ? "#00ffdd" : (isDiscovered ? "#222" : "#1a1a1a");
@@ -2687,6 +3021,14 @@ const droplifelenght = 280;
           ctx.fillStyle = isActive ? "#152c16" : (isDiscovered ? "#00ffdd" : "#7f8f8b");
           ctx.textAlign = "center";
           ctx.fillText(protocolName.substr(0, 28), cardX + cardWidth / 2, y + 16);
+
+          const starCenterX = cardX + cardWidth - 11;
+          const starCenterY = y + 8;
+          ctx.font = "bold 11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = isFavorite ? "#ffd84d" : "#4a5a56";
+          ctx.fillText("✶", starCenterX, starCenterY);
           ctx.restore();
           
           window._protocolSelectorBoxes.push({
@@ -2696,7 +3038,11 @@ const droplifelenght = 280;
             h: 26,
             index: globalIndex[protocolName],
             name: protocolName,
-            discovered: isDiscovered
+            discovered: isDiscovered,
+            favoriteX: cardX + cardWidth - 20,
+            favoriteY: y,
+            favoriteW: 20,
+            favoriteH: 14
           });
           y += 27;
         });
@@ -3012,6 +3358,16 @@ const droplifelenght = 280;
             my >= box.y &&
             my <= box.y + box.h
           ) {
+            if (
+              typeof ProtocolSystem.toggleFavorite === "function" &&
+              mx >= box.favoriteX &&
+              mx <= box.favoriteX + box.favoriteW &&
+              my >= box.favoriteY &&
+              my <= box.favoriteY + box.favoriteH
+            ) {
+              ProtocolSystem.toggleFavorite(box.name);
+              return;
+            }
             if (box.discovered) {
               if (ProtocolSystem.activeProtocols.includes(box.name)) {
                 ProtocolSystem.deactivate(box.name);
@@ -3093,6 +3449,12 @@ const droplifelenght = 280;
       x: 500, y: 430, health: 10, attackCooldown: 0,
       stats: { Range: 0, Power: 0, AttackSpeed: 0, Movement: 0, Vitality: 0, Pickup: 0 }
     });
+    player._followVX = 0;
+    player._followVY = 0;
+    player._hoverPhase = 0;
+    player._cursorStillTime = 0;
+    player._lastMouseX = mouseX;
+    player._lastMouseY = mouseY;
     ProtocolSystem.initializeRun();
     playerVisualAngle = Math.PI / 2; // Start facing down on wave 1
     applyStats();
@@ -3116,6 +3478,8 @@ const droplifelenght = 280;
     burstCount = 3;
     burstIndex = 0;
     burstTimer = 0;
+    interWaveDelayTimer = 0;
+    interWavePending = false;
     window._customBursts = null;
     window._customBrutes = null;
     window._customSlingers = null;
@@ -3159,17 +3523,17 @@ const droplifelenght = 280;
                                 const size = flare ? 7 + Math.random() * 3 : 4 + Math.random() * 2;
                                 const life = flare ? 22 + Math.random() * 12 : 16 + Math.random() * 8;
                                 const decay = flare ? 0.91 : 0.95;
-                                particles.push({
-                                  x: e.x + Math.cos(partAngle) * partRadius,
-                                  y: e.y + Math.sin(partAngle) * partRadius,
-                                  dx: Math.cos(partAngle) * partSpeed * (flare ? 1.8 : 1),
-                                  dy: Math.sin(partAngle) * partSpeed * (flare ? 1.8 : 1),
+                                spawnParticle(
+                                  e.x + Math.cos(partAngle) * partRadius,
+                                  e.y + Math.sin(partAngle) * partRadius,
+                                  Math.cos(partAngle) * partSpeed * (flare ? 1.8 : 1),
+                                  Math.sin(partAngle) * partSpeed * (flare ? 1.8 : 1),
                                   life,
                                   color,
                                   decay,
                                   size,
-                                  type: "novaFlare"
-                                });
+                                  "novaFlare"
+                                );
                               }
                               for (let i = 0; i < count; i++) {
                                 const angle = baseAngle + (Math.PI * 2 / count) * i;
@@ -3181,14 +3545,27 @@ const droplifelenght = 280;
                                 const spinSpeed = (Math.random() - 0.5) * 0.02;
                                 // Give each grunt an outward velocity for the nova effect
                                 const novaSpeed = 2.2 + Math.random() * 0.8;
-                                enemies.push({
-                                  x, y, radius, collisionRadius, speed, health, damage, attackCooldown: 0, attackRange, color, type: "grunt", spinAngle, spinSpeed, noBossCollision: 120,
-                                  vx: Math.cos(angle) * novaSpeed,
-                                  vy: Math.sin(angle) * novaSpeed,
-                                  novaTimer: 18, // frames to move outward before normal AI
-                                  noXP: true, // Legacy marker
-                                  noLoot: true // Boss-spawned mobs should not drop loot
-                                });
+                                const spawnedEnemy = spawnEnemy();
+                                spawnedEnemy.x = x;
+                                spawnedEnemy.y = y;
+                                spawnedEnemy.radius = radius;
+                                spawnedEnemy.collisionRadius = collisionRadius;
+                                spawnedEnemy.speed = speed;
+                                spawnedEnemy.health = health;
+                                spawnedEnemy.damage = damage;
+                                spawnedEnemy.attackCooldown = 0;
+                                spawnedEnemy.attackRange = attackRange;
+                                spawnedEnemy.color = color;
+                                spawnedEnemy.type = "grunt";
+                                spawnedEnemy.spinAngle = spinAngle;
+                                spawnedEnemy.spinSpeed = spinSpeed;
+                                spawnedEnemy.noBossCollision = 120;
+                                spawnedEnemy.vx = Math.cos(angle) * novaSpeed;
+                                spawnedEnemy.vy = Math.sin(angle) * novaSpeed;
+                                spawnedEnemy.novaTimer = 18;
+                                spawnedEnemy.noXP = true;
+                                spawnedEnemy.noLoot = true;
+                                applyWaveEnemyModifiers(spawnedEnemy);
                               }
                               // Optionally randomize next spawn count
                               if (e.type === "gruntBoss") {
@@ -3215,16 +3592,16 @@ const droplifelenght = 280;
                                   if (dist > 0) {
                                     const angle = Math.atan2(dy, dx);
                                     const speed = 2.2;
-                                    projectiles.push({
-                                      x: e.x,
-                                      y: e.y,
-                                      dx: Math.cos(angle) * speed,
-                                      dy: Math.sin(angle) * speed,
-                                      damage: 2,
-                                      radius: e.projectileRadius,
-                                      color: "#ff33ff",
-                                      type: "gruntBossProjectile"
-                                    });
+                                    spawnProjectile(
+                                      e.x,
+                                      e.y,
+                                      Math.cos(angle) * speed,
+                                      Math.sin(angle) * speed,
+                                      2,
+                                      e.projectileRadius,
+                                      "#ff33ff",
+                                      "gruntBossProjectile"
+                                    );
                                     // Play laser sound for enemy projectile
                                     try {
                                       let enemyLaserSound = new Audio('laser.wav');
@@ -3252,10 +3629,15 @@ const droplifelenght = 280;
                 // Brute nova visual particles
                 for (let e of enemies) {
                   if (e.type === "brute") {
-                    let particleCount = 6;
-                    if (e.novaState !== "growing" && e.novaState !== "shrinking") {
-                      particleCount = 1; // Reduce only in 'else' (idle) state
+                    if (typeof e.fxCooldown !== "number") e.fxCooldown = Math.floor(Math.random() * 2);
+                    if (e.fxCooldown > 0) {
+                      e.fxCooldown--;
+                      continue;
                     }
+                    const isActiveNova = e.novaState === "growing" || e.novaState === "shrinking";
+                    if (!isActiveNova) continue;
+                    e.fxCooldown = 1;
+                    let particleCount = 2;
                     for (let p = 0; p < particleCount; p++) {
                       const angle = Math.random() * Math.PI * 2;
                       const radius = Math.random() * (e.novaRadius - e.radius - 8) + (e.radius + 8);
@@ -3266,32 +3648,28 @@ const droplifelenght = 280;
                         speed = 2.2 + Math.random() * 1.2;
                         color = flare ? "#ffae00" : ["#ff6600","#ffaa00","#ff3300"][Math.floor(Math.random()*3)];
                         size = flare ? 7 + Math.random() * 3 : 4 + Math.random() * 2;
-                        life = flare ? 22 + Math.random() * 12 : 16 + Math.random() * 8;
+                        life = flare ? 15 + Math.random() * 8 : 10 + Math.random() * 6;
                         decay = flare ? 0.91 : 0.95;
                       } else if (e.novaState === "shrinking") {
                         speed = 0.8 + Math.random() * 0.8;
                         color = flare ? "#ff3300" : ["#ff6600","#ffaa00","#ffbb33"][Math.floor(Math.random()*3)];
                         size = flare ? 5 + Math.random() * 2 : 2 + Math.random() * 2;
-                        life = flare ? 14 + Math.random() * 8 : 8 + Math.random() * 6;
+                        life = flare ? 10 + Math.random() * 6 : 6 + Math.random() * 4;
                         decay = flare ? 0.97 : 0.98;
                       } else {
-                        speed = 0.2 + Math.random() * 0.2;
-                        color = flare ? "#ffbb33" : ["#ff6600","#ffaa00","#ff3300"][Math.floor(Math.random()*3)];
-                        size = flare ? 6 + Math.random() * 3 : 3 + Math.random() * 2;
-                        life = flare ? 18 + Math.random() * 12 : 12 + Math.random() * 8;
-                        decay = flare ? 0.92 : 0.96;
+                        continue;
                       }
-                      particles.push({
-                        x: e.x + Math.cos(angle) * radius,
-                        y: e.y + Math.sin(angle) * radius,
-                        dx: Math.cos(angle) * speed * (flare ? 1.8 : 1),
-                        dy: Math.sin(angle) * speed * (flare ? 1.8 : 1),
+                      spawnParticle(
+                        e.x + Math.cos(angle) * radius,
+                        e.y + Math.sin(angle) * radius,
+                        Math.cos(angle) * speed * (flare ? 1.8 : 1),
+                        Math.sin(angle) * speed * (flare ? 1.8 : 1),
                         life,
                         color,
                         decay,
                         size,
-                        type: "novaFlare"
-                      });
+                        "novaFlare"
+                      );
                     }
                   }
                 }
@@ -3343,7 +3721,6 @@ const droplifelenght = 280;
                 if (dist < e.novaRadius + player.radius) {
                     if (!e.novaPlayerInside || e.novaPlayerTick <= 0) {
                       player.health -= 1; // Nova damage per tick
-                      playerHurtTimer = 24;
                       e.novaPlayerTick = 60; // 1 second cooldown
                     }
                   e.novaPlayerInside = true;
@@ -3373,17 +3750,17 @@ const droplifelenght = 280;
                 const size = 7 + Math.random() * 3;
                 const life = 32 + Math.random() * 24;
                 const decay = 0.92 + Math.random() * 0.04;
-                particles.push({
-                  x: e.x + Math.cos(angle) * novaRadius,
-                  y: e.y + Math.sin(angle) * novaRadius,
-                  dx: Math.cos(angle) * speed,
-                  dy: Math.sin(angle) * speed,
+                spawnParticle(
+                  e.x + Math.cos(angle) * novaRadius,
+                  e.y + Math.sin(angle) * novaRadius,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
                   life,
                   color,
                   decay,
                   size,
-                  type: "enemyDeath"
-                });
+                  "enemyDeath"
+                );
               }
               // Scatter 5 xpDrops around gruntBossMinor's location
               if (e.type === "gruntBossMinor") {
@@ -3396,8 +3773,8 @@ const droplifelenght = 280;
                   });
                 }
               }
-              // End wave if gruntBoss dies
-              if (e.type === "gruntBoss") {
+              // Wave 5 boss uses direct completion; other waves use standard burst progression
+              if (e.type === "gruntBoss" && wave === 5) {
                 wave++;
                 try {
                   let warnAudio = new Audio('warning.wav');
@@ -3407,29 +3784,9 @@ const droplifelenght = 280;
                 } catch (e) {}
                 spawnWave();
               }
-              // End wave 10 only if all three gruntBossMinors are dead
-              if (e.type === "gruntBossMinor" && wave === 10) {
-                // Check if all gruntBossMinors are gone
-                const remainingMinors = enemies.filter(en => en.type === "gruntBossMinor").length;
-                if (remainingMinors === 0) {
-                  // Only end wave 10 if ALL enemies are gone
-                  if (enemies.length === 0) {
-                    wave++;
-                    try {
-                      let warnAudio = new Audio('warning.wav');
-                      warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                      warnAudio.playbackRate = 0.7;
-                      warnAudio.play();
-                    } catch (e) {}
-                    burstCount = 0;
-                    burstIndex = 0;
-                    spawnWave();
-                  }
-                }
-              }
             } else if (e.type === "brute") {
               // Brute death burst: mimic nova 'growing' burst
-              for (let j = 0; j < 24; j++) {
+              for (let j = 0; j < 12; j++) {
                 const angle = Math.random() * Math.PI * 2;
                 const speed = 2.2 + Math.random() * 1.2;
                 const flare = j < 4;
@@ -3437,17 +3794,17 @@ const droplifelenght = 280;
                 const size = flare ? 7 + Math.random() * 3 : 4 + Math.random() * 2;
                 const life = flare ? 22 + Math.random() * 12 : 16 + Math.random() * 8;
                 const decay = flare ? 0.91 : 0.95;
-                particles.push({
-                  x: e.x,
-                  y: e.y,
-                  dx: Math.cos(angle) * speed * (flare ? 1.8 : 1),
-                  dy: Math.sin(angle) * speed * (flare ? 1.8 : 1),
+                spawnParticle(
+                  e.x,
+                  e.y,
+                  Math.cos(angle) * speed * (flare ? 1.8 : 1),
+                  Math.sin(angle) * speed * (flare ? 1.8 : 1),
                   life,
                   color,
                   decay,
                   size,
-                  type: "enemyDeath"
-                });
+                  "enemyDeath"
+                );
               }
             } else {
               let palette;
@@ -3468,23 +3825,23 @@ const droplifelenght = 280;
                 if (j < 4) size = 4;
                 if (j < 2) size = 7;
                 const color = palette[Math.floor(Math.random() * palette.length)];
-                particles.push({
-                  x: e.x,
-                  y: e.y,
-                  dx: Math.cos(angle) * speed,
-                  dy: Math.sin(angle) * speed,
-                  life: lifeBase + Math.floor(Math.random() * lifeRange),
-                  color: color,
-                  decay: 0.88 + Math.random() * 0.04,
-                  size: size,
-                  type: "enemyDeath"
-                });
+                spawnParticle(
+                  e.x,
+                  e.y,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
+                  lifeBase + Math.floor(Math.random() * lifeRange),
+                  color,
+                  0.88 + Math.random() * 0.04,
+                  size,
+                  "enemyDeath"
+                );
               }
             }
             if (!(e.noLoot || e.noXP)) {
               tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
             }
-            enemies.splice(i, 1);
+            releaseEnemyAt(i);
             continue;
           }
 
@@ -3499,12 +3856,16 @@ const droplifelenght = 280;
       } else {
         const dx = player.x - e.x, dy = player.y - e.y;
         const dist = Math.hypot(dx, dy);
-        if (dist < (e.attackRange || (e.radius > 20 ? 40 : 20)) + player.radius) {
+        const isSlinger = e.type === "slinger";
+        const isTouchingPlayer = dist < (e.radius + player.radius);
+        const isSlingerInRange = dist < (e.attackRange || 20) + player.radius;
+        const canAttackNow = isSlinger ? isSlingerInRange : isTouchingPlayer;
+        if (canAttackNow) {
           if (e.attackCooldown <= 0) {
-            if (e.type === "slinger") {
+            if (isSlinger) {
               const angle = Math.atan2(player.y - e.y, player.x - e.x);
               const speed = 1.5;
-              projectiles.push({ x: e.x, y: e.y, dx: Math.cos(angle) * speed, dy: Math.sin(angle) * speed, damage: e.damage });
+              spawnProjectile(e.x, e.y, Math.cos(angle) * speed, Math.sin(angle) * speed, e.damage);
               // Play laser sound for enemy projectile
               try {
                 let enemyLaserSound = new Audio('laser.wav');
@@ -3513,12 +3874,40 @@ const droplifelenght = 280;
               } catch (e) {}
             } else {
               player.health -= e.damage;
-              playerHurtTimer = 44; // 14 frames of red flash
             }
             e.attackCooldown = 60;
           }
-            if (e.type !== "slinger") drawLine(e.x, e.y, player.x, player.y, "gray");
+            if (!isSlinger) drawLine(e.x, e.y, player.x, player.y, "gray");
         } else {
+            if (e.type === "brute") {
+              if (typeof e.zoneTargetX !== "number" || typeof e.zoneTargetY !== "number") {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const maxDistance = Math.max(80, Math.min(canvas.width, canvas.height) * 0.35);
+                const minDistance = Math.max(40, maxDistance * 0.38);
+                const targetDistance = minDistance + Math.random() * (maxDistance - minDistance);
+                const targetAngle = Math.random() * Math.PI * 2;
+                const targetX = centerX + Math.cos(targetAngle) * targetDistance;
+                const targetY = centerY + Math.sin(targetAngle) * targetDistance;
+                e.zoneTargetX = Math.max(e.radius, Math.min(canvas.width - e.radius, targetX));
+                e.zoneTargetY = Math.max(e.radius, Math.min(canvas.height - e.radius, targetY));
+                e.zoneLocked = false;
+              }
+
+              if (!e.zoneLocked) {
+                const zoneDx = e.zoneTargetX - e.x;
+                const zoneDy = e.zoneTargetY - e.y;
+                const zoneDist = Math.hypot(zoneDx, zoneDy);
+                if (zoneDist <= 4) {
+                  e.x = e.zoneTargetX;
+                  e.y = e.zoneTargetY;
+                  e.zoneLocked = true;
+                } else {
+                  e.x += (zoneDx / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
+                  e.y += (zoneDy / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
+                }
+              }
+            } else
             if (e.type === "kamikaze" && !e.exploded) {
               // Draw visible explosion zone
               ctx.save();
@@ -3561,7 +3950,6 @@ const droplifelenght = 280;
                 const distToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
                 if (distToPlayer < e.radius + player.radius + 52) {
                   player.health -= e.damage;
-                  playerHurtTimer = 44;
                 }
                 // Explosion effect
                 for (let j = 0; j < 24; j++) {
@@ -3571,20 +3959,20 @@ const droplifelenght = 280;
                   const size = 3 + Math.random() * 4;
                   const life = 42 + Math.random() * 2;
                   const decay = 0.91 + Math.random() * 0.02;
-                  particles.push({
-                    x: e.x,
-                    y: e.y,
-                    dx: Math.cos(angle) * speed,
-                    dy: Math.sin(angle) * speed,
+                  spawnParticle(
+                    e.x,
+                    e.y,
+                    Math.cos(angle) * speed,
+                    Math.sin(angle) * speed,
                     life,
                     color,
                     decay,
                     size,
-                    type: "enemyDeath"
-                  });
+                    "enemyDeath"
+                  );
                 }
                 // Do NOT drop slingerDrop here (self-explode)
-                enemies.splice(i, 1);
+                releaseEnemyAt(i);
                 continue;
               }
             } else {
@@ -3593,7 +3981,7 @@ const droplifelenght = 280;
             }
         }
       }
-      // Only decrement attackCooldown for mobs, not playerHurtTimer
+      // Only decrement attackCooldown for mobs
       if (typeof e.attackCooldown === "number") e.attackCooldown--;
 
       // Prevent enemy overlap and update spin
@@ -3648,27 +4036,27 @@ const droplifelenght = 280;
   }
 
   function updateProjectiles(delta) {
+    const frameScale = delta * SPEED_MULTIPLIER;
     for (let i = projectiles.length - 1; i >= 0; i--) {
       const p = projectiles[i];
-      let moved = false;
-      // Store previous positions for trail
-      if (!p.trail) p.trail = [];
-      p.trail.push({ x: p.x, y: p.y });
-      if (p.trail.length > 12) p.trail.shift();
-      // Apply delta and SPEED_MULTIPLIER for frame-rate independence
-      p.x += p.dx * delta * SPEED_MULTIPLIER;
-      p.y += p.dy * delta * SPEED_MULTIPLIER;
+      p.x += p.dx * frameScale;
+      p.y += p.dy * frameScale;
 
+      if (p.trail) {
+        p.trail.push({ x: p.x, y: p.y });
+        if (p.trail.length > 8) p.trail.shift();
+      }
+
+      const projectileRadius = typeof p.radius === "number" ? p.radius : 4;
       const dist = Math.hypot(player.x - p.x, player.y - p.y);
-      if (dist < player.radius + 4) {
+      if (dist < player.radius + projectileRadius) {
         player.health -= p.damage;
-        playerHurtTimer = 44; // 14 frames of red flash
-        projectiles.splice(i, 1);
+        releaseProjectileAt(i);
         continue;
       }
 
       if (p.x < -20 || p.x > canvas.width + 20 || p.y < -20 || p.y > canvas.height + 20) {
-        projectiles.splice(i, 1);
+        releaseProjectileAt(i);
       }
     }
   }
@@ -3684,10 +4072,12 @@ const droplifelenght = 280;
       p.life--;
     }
     for (let i = particles.length - 1; i >= 0; i--) {
-      if (particles[i].life <= 0) particles.splice(i, 1);
+      if (particles[i].life <= 0) releaseParticleAt(i);
     }
     if (particles.length > MAX_PARTICLES) {
-      particles.splice(0, particles.length - MAX_PARTICLES);
+      while (particles.length > MAX_PARTICLES) {
+        releaseParticleAt(0);
+      }
     }
   }
 
@@ -3861,7 +4251,13 @@ const droplifelenght = 280;
         updateProjectiles(delta);
         autoAttack();
         handleWaveSpawning(delta);
-        if (enemies.length === 0 && burstIndex >= burstCount) {
+        const waveUsesBossGate = wave === 5;
+        const finalBurstReached = burstCount !== Infinity && burstIndex >= burstCount;
+        const allEnemiesCleared = enemies.length === 0;
+        const shouldAdvanceWave = !waveUsesBossGate && finalBurstReached && allEnemiesCleared;
+        if (shouldAdvanceWave) {
+          interWavePending = false;
+          interWaveDelayTimer = 0;
           wave++;
           try {
             let warnAudio = new Audio('warning.wav');
@@ -3870,6 +4266,10 @@ const droplifelenght = 280;
             warnAudio.play();
           } catch (e) {}
           spawnWave();
+          burstTimer = burstInterval;
+        } else {
+          interWavePending = false;
+          interWaveDelayTimer = 0;
         }
       }
 
@@ -4034,13 +4434,10 @@ const droplifelenght = 280;
         ctx.restore();
       }
 
-      // Player feedback: red flash when hurt, green flash when level up
+      // Player feedback: green flash when level up
       let feedbackColor = null;
       let feedbackAlpha = 0;
-      if (playerHurtTimer > 0) {
-        feedbackColor = "#b6bee9"; // blue shield effect
-        feedbackAlpha = 0.38 * (playerHurtTimer / 14);
-      } else if (playerLevelUpTimer > 0) {
+      if (playerLevelUpTimer > 0) {
         feedbackColor = "#00ffdd";
         feedbackAlpha = 0.35 * (playerLevelUpTimer / 24);
       }
@@ -4197,6 +4594,10 @@ const droplifelenght = 280;
                   const barHeight = 8;
                   const barX = e.x - barWidth / 2;
                   const barY = e.y - e.radius - 24;
+                  if (typeof e.maxHealth !== "number" || e.maxHealth < e.health) {
+                    e.maxHealth = Math.max(1, e.health);
+                  }
+                  const bossHealthRatio = Math.max(0, Math.min(1, e.health / Math.max(1, e.maxHealth)));
                   ctx.save();
                   ctx.globalAlpha = 0.92;
                   ctx.lineWidth = 3;
@@ -4205,7 +4606,7 @@ const droplifelenght = 280;
                   ctx.beginPath();
                   ctx.rect(barX, barY, barWidth, barHeight);
                   ctx.stroke();
-                  ctx.fillRect(barX, barY, barWidth * (e.health / 300), barHeight);
+                  ctx.fillRect(barX, barY, barWidth * bossHealthRatio, barHeight);
                   // Draw boss label
                   ctx.font = "bold 13px sans-serif";
                   ctx.fillStyle = "#fff";
