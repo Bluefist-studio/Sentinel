@@ -1,10 +1,37 @@
 (function () {
-	const WAVE_CODE_PREFIX = "SWC1:";
+	const WAVE_CODE_PREFIX_V1 = "SWC1:";
+	const WAVE_CODE_PREFIX_V2 = "SWC2:";
 	const INTERVAL_UNITS_PER_SECOND = 120;
 	const waveEditorOverrides = {};
 	let waveEditorOverlay = null;
 	let waveEditorWasPaused = false;
-	let autoScalePlayerToLoadedWave = false;
+	let autoScalePlayerToLoadedWave = true;
+	const SWC2_ARRAY_FIELD_MAP = {
+		customBursts: "g",
+		customBrutes: "br",
+		customSlingers: "sl",
+		customShielders: "sh",
+		customBeamers: "be",
+		customKamikazes: "k",
+		customStalkers: "st",
+		customBossMinors: "bm",
+		customBosses: "bo"
+	};
+	const SWC2_INTERVAL_FIELD_MAP = {
+		grunts: "g",
+		slingers: "sl",
+		shielders: "sh",
+		beamers: "be",
+		stalkers: "st",
+		brutes: "br",
+		kamikazes: "k",
+		bossMinors: "bm",
+		bosses: "bo"
+	};
+
+	function hasSupportedWaveCodePrefix(raw) {
+		return raw.startsWith(WAVE_CODE_PREFIX_V1) || raw.startsWith(WAVE_CODE_PREFIX_V2);
+	}
 
 	function clampPositiveNumber(value, fallback) {
 		return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -22,7 +49,7 @@
 
 	function normalizeMobIntervals(intervals) {
 		if (!intervals || typeof intervals !== "object") return undefined;
-		const keys = ["grunts", "slingers", "brutes", "kamikazes", "bossMinors", "bosses"];
+		const keys = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "bossMinors", "bosses"];
 		const out = {};
 		keys.forEach((key) => {
 			const raw = Number(intervals[key]);
@@ -42,7 +69,10 @@
 				customBursts: Array.isArray(entry.customBursts) ? entry.customBursts.slice() : undefined,
 				customBrutes: Array.isArray(entry.customBrutes) ? entry.customBrutes.slice() : undefined,
 				customSlingers: Array.isArray(entry.customSlingers) ? entry.customSlingers.slice() : undefined,
+				customShielders: Array.isArray(entry.customShielders) ? entry.customShielders.slice() : undefined,
+				customBeamers: Array.isArray(entry.customBeamers) ? entry.customBeamers.slice() : undefined,
 				customKamikazes: Array.isArray(entry.customKamikazes) ? entry.customKamikazes.slice() : undefined,
+				customStalkers: Array.isArray(entry.customStalkers) ? entry.customStalkers.slice() : undefined,
 				customBossMinors: Array.isArray(entry.customBossMinors) ? entry.customBossMinors.slice() : undefined,
 				customBosses: Array.isArray(entry.customBosses) ? entry.customBosses.slice() : undefined,
 				mobIntervals: normalizeMobIntervals(entry.mobIntervals)
@@ -62,13 +92,19 @@
 				customBursts: Array.isArray(src.customBursts) ? src.customBursts.slice() : undefined,
 				customBrutes: Array.isArray(src.customBrutes) ? src.customBrutes.slice() : undefined,
 				customSlingers: Array.isArray(src.customSlingers) ? src.customSlingers.slice() : undefined,
+				customShielders: Array.isArray(src.customShielders) ? src.customShielders.slice() : undefined,
+				customBeamers: Array.isArray(src.customBeamers) ? src.customBeamers.slice() : undefined,
 				customKamikazes: Array.isArray(src.customKamikazes) ? src.customKamikazes.slice() : undefined,
+				customStalkers: Array.isArray(src.customStalkers) ? src.customStalkers.slice() : undefined,
 				customBossMinors: Array.isArray(src.customBossMinors) ? src.customBossMinors.slice() : undefined,
 				customBosses: Array.isArray(src.customBosses) ? src.customBosses.slice() : undefined,
 				mobIntervalsSeconds: src.mobIntervals
 					? {
 						grunts: src.mobIntervals.grunts ? Number(intervalUnitsToSeconds(src.mobIntervals.grunts).toFixed(3)) : undefined,
 						slingers: src.mobIntervals.slingers ? Number(intervalUnitsToSeconds(src.mobIntervals.slingers).toFixed(3)) : undefined,
+						shielders: src.mobIntervals.shielders ? Number(intervalUnitsToSeconds(src.mobIntervals.shielders).toFixed(3)) : undefined,
+						beamers: src.mobIntervals.beamers ? Number(intervalUnitsToSeconds(src.mobIntervals.beamers).toFixed(3)) : undefined,
+						stalkers: src.mobIntervals.stalkers ? Number(intervalUnitsToSeconds(src.mobIntervals.stalkers).toFixed(3)) : undefined,
 						brutes: src.mobIntervals.brutes ? Number(intervalUnitsToSeconds(src.mobIntervals.brutes).toFixed(3)) : undefined,
 						kamikazes: src.mobIntervals.kamikazes ? Number(intervalUnitsToSeconds(src.mobIntervals.kamikazes).toFixed(3)) : undefined,
 						bossMinors: src.mobIntervals.bossMinors ? Number(intervalUnitsToSeconds(src.mobIntervals.bossMinors).toFixed(3)) : undefined,
@@ -104,7 +140,10 @@
 				customBursts: Array.isArray(src.customBursts) ? src.customBursts.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customBrutes: Array.isArray(src.customBrutes) ? src.customBrutes.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customSlingers: Array.isArray(src.customSlingers) ? src.customSlingers.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
+				customShielders: Array.isArray(src.customShielders) ? src.customShielders.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
+				customBeamers: Array.isArray(src.customBeamers) ? src.customBeamers.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customKamikazes: Array.isArray(src.customKamikazes) ? src.customKamikazes.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
+				customStalkers: Array.isArray(src.customStalkers) ? src.customStalkers.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customBossMinors: Array.isArray(src.customBossMinors) ? src.customBossMinors.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customBosses: Array.isArray(src.customBosses) ? src.customBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				mobIntervals: normalizeMobIntervals(
@@ -112,6 +151,9 @@
 						? {
 							grunts: src.mobIntervalsSeconds.grunts ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.grunts)) : undefined,
 							slingers: src.mobIntervalsSeconds.slingers ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.slingers)) : undefined,
+							shielders: src.mobIntervalsSeconds.shielders ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.shielders)) : undefined,
+							beamers: src.mobIntervalsSeconds.beamers ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.beamers)) : undefined,
+							stalkers: src.mobIntervalsSeconds.stalkers ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.stalkers)) : undefined,
 							brutes: src.mobIntervalsSeconds.brutes ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.brutes)) : undefined,
 							kamikazes: src.mobIntervalsSeconds.kamikazes ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.kamikazes)) : undefined,
 							bossMinors: src.mobIntervalsSeconds.bossMinors ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bossMinors)) : undefined,
@@ -124,26 +166,203 @@
 		return restored;
 	}
 
-	function encodeWaveCode(overrides) {
-		const payload = { version: 2, overrides: serializeOverrides(overrides) };
+	function encodeJsonPayload(payload) {
 		const json = JSON.stringify(payload);
-		const encoded = btoa(unescape(encodeURIComponent(json)));
-		return `${WAVE_CODE_PREFIX}${encoded}`;
+		return btoa(unescape(encodeURIComponent(json)));
+	}
+
+	function decodeJsonPayload(encoded) {
+		const json = decodeURIComponent(escape(atob(encoded)));
+		return JSON.parse(json);
+	}
+
+	function toNonNegativeIntList(list) {
+		if (!Array.isArray(list)) return undefined;
+		const values = list.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0);
+		return values.length ? values : undefined;
+	}
+
+	function compressArrayForSWC2(list) {
+		const values = toNonNegativeIntList(list);
+		if (!values) return undefined;
+		let lastNonZero = -1;
+		for (let i = values.length - 1; i >= 0; i--) {
+			if (values[i] > 0) {
+				lastNonZero = i;
+				break;
+			}
+		}
+		if (lastNonZero < 0) return undefined;
+		const trimmed = values.slice(0, lastNonZero + 1);
+		const pairs = [];
+		for (let i = 0; i < trimmed.length; i++) {
+			if (trimmed[i] > 0) pairs.push([i, trimmed[i]]);
+		}
+		if (pairs.length <= Math.floor(trimmed.length * 0.6)) {
+			return { n: trimmed.length, p: pairs };
+		}
+		return { f: trimmed };
+	}
+
+	function expandArrayFromSWC2(value) {
+		if (Array.isArray(value)) return toNonNegativeIntList(value);
+		if (!value || typeof value !== "object") return undefined;
+		if (Array.isArray(value.f)) return toNonNegativeIntList(value.f);
+		if (!Array.isArray(value.p)) return undefined;
+
+		const pairs = value.p;
+		let length = parseInt(value.n, 10);
+		if (!Number.isFinite(length) || length <= 0) {
+			length = 0;
+			pairs.forEach((pair) => {
+				if (!Array.isArray(pair) || pair.length < 2) return;
+				const index = parseInt(pair[0], 10);
+				if (Number.isFinite(index) && index >= 0) {
+					length = Math.max(length, index + 1);
+				}
+			});
+		}
+		if (length <= 0) return undefined;
+
+		const out = Array.from({ length }, () => 0);
+		pairs.forEach((pair) => {
+			if (!Array.isArray(pair) || pair.length < 2) return;
+			const index = parseInt(pair[0], 10);
+			const amount = parseInt(pair[1], 10);
+			if (!Number.isFinite(index) || index < 0 || index >= out.length) return;
+			if (!Number.isFinite(amount) || amount < 0) return;
+			out[index] = amount;
+		});
+		return out;
+	}
+
+	function serializeOverridesForSWC2(overrides) {
+		const serialized = serializeOverrides(overrides);
+		const compact = {};
+
+		Object.keys(serialized || {}).forEach((waveKey) => {
+			const src = serialized[waveKey];
+			if (!src || typeof src !== "object") return;
+			const entry = {};
+
+			if (src.burstCount !== undefined) {
+				entry.bc = src.burstCount === "INF" ? "I" : src.burstCount;
+			}
+			if (src.burstIntervalSeconds !== undefined) {
+				entry.bi = Number(src.burstIntervalSeconds);
+			}
+
+			Object.keys(SWC2_ARRAY_FIELD_MAP).forEach((longKey) => {
+				const shortKey = SWC2_ARRAY_FIELD_MAP[longKey];
+				const packed = compressArrayForSWC2(src[longKey]);
+				if (packed !== undefined) entry[shortKey] = packed;
+			});
+
+			if (src.mobIntervalsSeconds && typeof src.mobIntervalsSeconds === "object") {
+				const compactIntervals = {};
+				Object.keys(SWC2_INTERVAL_FIELD_MAP).forEach((longKey) => {
+					const shortKey = SWC2_INTERVAL_FIELD_MAP[longKey];
+					const raw = Number(src.mobIntervalsSeconds[longKey]);
+					if (Number.isFinite(raw) && raw > 0) {
+						compactIntervals[shortKey] = Number(raw.toFixed(3));
+					}
+				});
+				if (Object.keys(compactIntervals).length) {
+					entry.mi = compactIntervals;
+				}
+			}
+
+			if (Object.keys(entry).length) {
+				compact[waveKey] = entry;
+			}
+		});
+
+		return compact;
+	}
+
+	function deserializeOverridesFromSWC2(compactOverrides) {
+		const serialized = {};
+		Object.keys(compactOverrides || {}).forEach((waveKey) => {
+			const src = compactOverrides[waveKey];
+			if (!src || typeof src !== "object") return;
+			const waveNumber = parseInt(waveKey, 10);
+			if (!Number.isFinite(waveNumber) || waveNumber < 1) return;
+
+			const entry = {};
+			if (src.bc === "I" || src.bc === "INF") {
+				entry.burstCount = "INF";
+			} else {
+				const burstCount = parseInt(src.bc, 10);
+				if (Number.isFinite(burstCount) && burstCount >= 0) {
+					entry.burstCount = burstCount;
+				}
+			}
+
+			const burstIntervalSeconds = Number(src.bi);
+			if (Number.isFinite(burstIntervalSeconds) && burstIntervalSeconds > 0) {
+				entry.burstIntervalSeconds = Number(burstIntervalSeconds.toFixed(3));
+			}
+
+			Object.keys(SWC2_ARRAY_FIELD_MAP).forEach((longKey) => {
+				const shortKey = SWC2_ARRAY_FIELD_MAP[longKey];
+				const unpacked = expandArrayFromSWC2(src[shortKey]);
+				if (Array.isArray(unpacked) && unpacked.length) {
+					entry[longKey] = unpacked;
+				}
+			});
+
+			if (src.mi && typeof src.mi === "object") {
+				const intervalByLongKey = {};
+				Object.keys(SWC2_INTERVAL_FIELD_MAP).forEach((longKey) => {
+					const shortKey = SWC2_INTERVAL_FIELD_MAP[longKey];
+					const raw = Number(src.mi[shortKey]);
+					if (Number.isFinite(raw) && raw > 0) {
+						intervalByLongKey[longKey] = Number(raw.toFixed(3));
+					}
+				});
+				if (Object.keys(intervalByLongKey).length) {
+					entry.mobIntervalsSeconds = intervalByLongKey;
+				}
+			}
+
+			if (entry.burstCount === undefined) return;
+			if (entry.burstIntervalSeconds === undefined) return;
+			serialized[waveNumber] = entry;
+		});
+
+		return deserializeOverrides(serialized);
+	}
+
+	function encodeWaveCode(overrides) {
+		const payload = { v: 1, o: serializeOverridesForSWC2(overrides) };
+		return `${WAVE_CODE_PREFIX_V2}${encodeJsonPayload(payload)}`;
 	}
 
 	function decodeWaveCode(code) {
 		const raw = (code || "").trim();
-		if (!raw.startsWith(WAVE_CODE_PREFIX)) {
-			throw new Error("Invalid wave code prefix.");
+		if (!hasSupportedWaveCodePrefix(raw)) {
+			throw new Error("Invalid wave code prefix. Use SWC1 or SWC2.");
 		}
-		const encoded = raw.slice(WAVE_CODE_PREFIX.length);
-		const json = decodeURIComponent(escape(atob(encoded)));
-		const payload = JSON.parse(json);
+
+		if (raw.startsWith(WAVE_CODE_PREFIX_V2)) {
+			const encoded = raw.slice(WAVE_CODE_PREFIX_V2.length);
+			const payload = decodeJsonPayload(encoded);
+			if (!payload || typeof payload.o !== "object") {
+				throw new Error("Invalid SWC2 wave code payload.");
+			}
+			if (payload.v !== 1) {
+				throw new Error("Unsupported SWC2 wave code version.");
+			}
+			return deserializeOverridesFromSWC2(payload.o);
+		}
+
+		const encoded = raw.slice(WAVE_CODE_PREFIX_V1.length);
+		const payload = decodeJsonPayload(encoded);
 		if (!payload || typeof payload.overrides !== "object") {
-			throw new Error("Invalid wave code payload.");
+			throw new Error("Invalid SWC1 wave code payload.");
 		}
 		if (payload.version !== 1 && payload.version !== 2) {
-			throw new Error("Unsupported wave code version.");
+			throw new Error("Unsupported SWC1 wave code version.");
 		}
 		return deserializeOverrides(payload.overrides);
 	}
@@ -214,7 +433,10 @@
 				customBursts: override.customBursts,
 				customBrutes: override.customBrutes,
 				customSlingers: override.customSlingers,
+				customShielders: override.customShielders,
+				customBeamers: override.customBeamers,
 				customKamikazes: override.customKamikazes,
+				customStalkers: override.customStalkers,
 				customBossMinors: override.customBossMinors,
 				customBosses: override.customBosses,
 				mobIntervals: normalizeMobIntervals(override.mobIntervals)
@@ -227,7 +449,10 @@
 				customBursts: currentState.customBursts,
 				customBrutes: currentState.customBrutes,
 				customSlingers: currentState.customSlingers,
+				customShielders: currentState.customShielders,
+				customBeamers: currentState.customBeamers,
 				customKamikazes: currentState.customKamikazes,
+				customStalkers: currentState.customStalkers,
 				customBossMinors: currentState.customBossMinors,
 				customBosses: currentState.customBosses,
 				mobIntervals: undefined
@@ -242,7 +467,10 @@
 					customBursts: preset.customBursts,
 					customBrutes: preset.customBrutes,
 					customSlingers: preset.customSlingers,
+					customShielders: preset.customShielders,
+					customBeamers: preset.customBeamers,
 					customKamikazes: preset.customKamikazes,
+					customStalkers: preset.customStalkers,
 					customBossMinors: preset.customBossMinors,
 					customBosses: preset.customBosses,
 					mobIntervals: normalizeMobIntervals(preset.mobIntervals)
@@ -255,20 +483,24 @@
 			customBursts: undefined,
 			customBrutes: undefined,
 			customSlingers: undefined,
+			customShielders: undefined,
+			customBeamers: undefined,
 			customKamikazes: undefined,
+			customStalkers: undefined,
 			customBossMinors: undefined,
 			customBosses: undefined,
 			mobIntervals: undefined
 		};
 	}
 
-	function closeWaveEditor() {
+	function closeWaveEditor(options) {
 		const bridge = window.SentinelEditorBridge;
+		const keepEditorSession = !!(options && options.keepEditorSession);
 		if (!waveEditorOverlay) return;
 		waveEditorOverlay.remove();
 		waveEditorOverlay = null;
 		if (bridge && typeof bridge.setEditorSessionActive === "function") {
-			bridge.setEditorSessionActive(false);
+			bridge.setEditorSessionActive(keepEditorSession);
 		}
 		if (bridge && typeof bridge.setPaused === "function") {
 			bridge.setPaused(waveEditorWasPaused);
@@ -388,11 +620,15 @@
 		const waveSection = makeSection("Wave Controls");
 		const rowA = document.createElement("div");
 		rowA.style.display = "grid";
-		rowA.style.gridTemplateColumns = "repeat(auto-fit, minmax(210px, 1fr))";
-		rowA.style.gap = "10px";
+		rowA.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
+		rowA.style.gap = "0";
+		rowA.style.border = "1px solid rgba(0,255,221,0.28)";
+		rowA.style.borderRadius = "8px";
+		rowA.style.overflow = "hidden";
 		waveSection.appendChild(rowA);
 
 		const waveInputWrap = document.createElement("div");
+		waveInputWrap.style.padding = "8px";
 		waveInputWrap.appendChild(makeLabel("Target Wave"));
 		const waveInput = makeInput();
 		waveInput.value = String(selectedWaveState.value);
@@ -400,12 +636,16 @@
 		rowA.appendChild(waveInputWrap);
 
 		const burstCountWrap = document.createElement("div");
+		burstCountWrap.style.padding = "8px";
+		burstCountWrap.style.borderLeft = "1px solid rgba(0,255,221,0.28)";
 		burstCountWrap.appendChild(makeLabel("Burst Count (use Infinity)"));
 		const burstCountInput = makeInput();
 		burstCountWrap.appendChild(burstCountInput);
 		rowA.appendChild(burstCountWrap);
 
 		const burstIntervalWrap = document.createElement("div");
+		burstIntervalWrap.style.padding = "8px";
+		burstIntervalWrap.style.borderLeft = "1px solid rgba(0,255,221,0.28)";
 		burstIntervalWrap.appendChild(makeLabel("Burst Interval (seconds)"));
 		const burstIntervalInput = makeInput();
 		burstIntervalWrap.appendChild(burstIntervalInput);
@@ -430,11 +670,29 @@
 		slingerWrap.appendChild(slingerInput);
 		rowB.appendChild(slingerWrap);
 
+		const shielderWrap = document.createElement("div");
+		shielderWrap.appendChild(makeLabel("Shielders per burst (comma list)"));
+		const shielderInput = makeInput();
+		shielderWrap.appendChild(shielderInput);
+		rowB.appendChild(shielderWrap);
+
+		const beamerWrap = document.createElement("div");
+		beamerWrap.appendChild(makeLabel("Beamers per burst (comma list)"));
+		const beamerInput = makeInput();
+		beamerWrap.appendChild(beamerInput);
+		rowB.appendChild(beamerWrap);
+
 		const bruteWrap = document.createElement("div");
 		bruteWrap.appendChild(makeLabel("Brutes per burst (comma list)"));
 		const bruteInput = makeInput();
 		bruteWrap.appendChild(bruteInput);
 		rowB.appendChild(bruteWrap);
+
+		const rowDivider = document.createElement("div");
+		rowDivider.style.height = "1px";
+		rowDivider.style.margin = "10px 0";
+		rowDivider.style.background = "rgba(0, 255, 221, 0.28)";
+		waveSection.appendChild(rowDivider);
 
 		const rowC = document.createElement("div");
 		rowC.style.display = "grid";
@@ -448,6 +706,12 @@
 		const kamikazeInput = makeInput();
 		kamikazeWrap.appendChild(kamikazeInput);
 		rowC.appendChild(kamikazeWrap);
+
+		const stalkerWrap = document.createElement("div");
+		stalkerWrap.appendChild(makeLabel("Stalkers per burst (comma list)"));
+		const stalkerInput = makeInput();
+		stalkerWrap.appendChild(stalkerInput);
+		rowC.appendChild(stalkerWrap);
 
 		const bossMinorWrap = document.createElement("div");
 		bossMinorWrap.appendChild(makeLabel("Boss Minors per burst (comma list)"));
@@ -472,6 +736,9 @@
 
 		const gruntIntervalInput = addPairedIntervalInput(gruntWrap, "Grunt interval (seconds)");
 		const slingerIntervalInput = addPairedIntervalInput(slingerWrap, "Slinger interval (seconds)");
+		const shielderIntervalInput = addPairedIntervalInput(shielderWrap, "Shielder interval (seconds)");
+		const beamerIntervalInput = addPairedIntervalInput(beamerWrap, "Beamer interval (seconds)");
+		const stalkerIntervalInput = addPairedIntervalInput(stalkerWrap, "Stalker interval (seconds)");
 		const bruteIntervalInput = addPairedIntervalInput(bruteWrap, "Brute interval (seconds)");
 		const kamikazeIntervalInput = addPairedIntervalInput(kamikazeWrap, "Kamikaze interval (seconds)");
 		const bossMinorIntervalInput = addPairedIntervalInput(bossMinorWrap, "Boss Minor interval (seconds)");
@@ -538,11 +805,11 @@
 		actionRow.style.flexWrap = "wrap";
 		actionRow.style.gap = "8px";
 		actionRow.style.marginTop = "8px";
+		actionRow.style.marginBottom = "12px";
 		panel.appendChild(actionRow);
 
 		const codeSection = makeSection("Wave Code");
 		const waveCodeWrap = document.createElement("div");
-		waveCodeWrap.appendChild(makeLabel("Wave Code"));
 		const waveCodeInput = document.createElement("textarea");
 		waveCodeInput.style.width = "100%";
 		waveCodeInput.style.maxWidth = "100%";
@@ -557,6 +824,13 @@
 		waveCodeInput.style.resize = "vertical";
 		waveCodeWrap.appendChild(waveCodeInput);
 		codeSection.appendChild(waveCodeWrap);
+
+		const codeActionRow = document.createElement("div");
+		codeActionRow.style.display = "flex";
+		codeActionRow.style.flexWrap = "wrap";
+		codeActionRow.style.gap = "8px";
+		codeActionRow.style.marginTop = "8px";
+		codeSection.appendChild(codeActionRow);
 
 		const codeStatus = document.createElement("div");
 		codeStatus.style.marginTop = "8px";
@@ -591,7 +865,7 @@
 		const applyPlayerBtn = makeActionBtn("Apply Player Stats", "#9fd2ff");
 		const clearAllBtn = makeActionBtn("Clear All Overrides", "#ff7b7b");
 		const backToMenuBtn = makeActionBtn("Back to Menu", "#ffffff");
-		const closeBtn = makeActionBtn("Close", "#ffffff");
+		const closeBtn = makeActionBtn("Test", "#ffffff");
 		const generateCodeBtn = makeActionBtn("Generate Code", "#9de8ff");
 		const loadCodeBtn = makeActionBtn("Load Code", "#9de8ff");
 		const copyCodeBtn = makeActionBtn("Copy Code", "#ffffff");
@@ -606,9 +880,10 @@
 		actionRow.appendChild(applyPlayerBtn);
 		actionRow.appendChild(clearAllBtn);
 		actionRow.appendChild(closeBtn);
-		actionRow.appendChild(generateCodeBtn);
-		actionRow.appendChild(loadCodeBtn);
-		actionRow.appendChild(copyCodeBtn);
+
+		codeActionRow.appendChild(generateCodeBtn);
+		codeActionRow.appendChild(loadCodeBtn);
+		codeActionRow.appendChild(copyCodeBtn);
 
 		const loadWaveIntoForm = () => {
 			const parsedWave = parseInt(waveInput.value, 10);
@@ -620,12 +895,18 @@
 			gruntInput.value = formatWaveEditorList(source.customBursts);
 			bruteInput.value = formatWaveEditorList(source.customBrutes);
 			slingerInput.value = formatWaveEditorList(source.customSlingers);
+			shielderInput.value = formatWaveEditorList(source.customShielders);
+			beamerInput.value = formatWaveEditorList(source.customBeamers);
 			kamikazeInput.value = formatWaveEditorList(source.customKamikazes);
+			stalkerInput.value = formatWaveEditorList(source.customStalkers);
 			bossMinorInput.value = formatWaveEditorList(source.customBossMinors);
 			bossInput.value = formatWaveEditorList(source.customBosses);
 			const mobIntervals = source.mobIntervals || {};
 			gruntIntervalInput.value = mobIntervals.grunts ? String(Number(intervalUnitsToSeconds(mobIntervals.grunts).toFixed(2))) : "";
 			slingerIntervalInput.value = mobIntervals.slingers ? String(Number(intervalUnitsToSeconds(mobIntervals.slingers).toFixed(2))) : "";
+			shielderIntervalInput.value = mobIntervals.shielders ? String(Number(intervalUnitsToSeconds(mobIntervals.shielders).toFixed(2))) : "";
+			beamerIntervalInput.value = mobIntervals.beamers ? String(Number(intervalUnitsToSeconds(mobIntervals.beamers).toFixed(2))) : "";
+			stalkerIntervalInput.value = mobIntervals.stalkers ? String(Number(intervalUnitsToSeconds(mobIntervals.stalkers).toFixed(2))) : "";
 			bruteIntervalInput.value = mobIntervals.brutes ? String(Number(intervalUnitsToSeconds(mobIntervals.brutes).toFixed(2))) : "";
 			kamikazeIntervalInput.value = mobIntervals.kamikazes ? String(Number(intervalUnitsToSeconds(mobIntervals.kamikazes).toFixed(2))) : "";
 			bossMinorIntervalInput.value = mobIntervals.bossMinors ? String(Number(intervalUnitsToSeconds(mobIntervals.bossMinors).toFixed(2))) : "";
@@ -670,6 +951,9 @@
 			const parsedMobIntervalsRaw = {
 				grunts: parseMobIntervalField(gruntIntervalInput.value),
 				slingers: parseMobIntervalField(slingerIntervalInput.value),
+				shielders: parseMobIntervalField(shielderIntervalInput.value),
+				beamers: parseMobIntervalField(beamerIntervalInput.value),
+				stalkers: parseMobIntervalField(stalkerIntervalInput.value),
 				brutes: parseMobIntervalField(bruteIntervalInput.value),
 				kamikazes: parseMobIntervalField(kamikazeIntervalInput.value),
 				bossMinors: parseMobIntervalField(bossMinorIntervalInput.value),
@@ -684,7 +968,10 @@
 			const parsedCustomBursts = parseWaveEditorList(gruntInput.value);
 			const parsedCustomBrutes = parseWaveEditorList(bruteInput.value);
 			const parsedCustomSlingers = parseWaveEditorList(slingerInput.value);
+			const parsedCustomShielders = parseWaveEditorList(shielderInput.value);
+			const parsedCustomBeamers = parseWaveEditorList(beamerInput.value);
 			const parsedCustomKamikazes = parseWaveEditorList(kamikazeInput.value);
+			const parsedCustomStalkers = parseWaveEditorList(stalkerInput.value);
 			const parsedCustomBossMinors = parseWaveEditorList(bossMinorInput.value);
 			const parsedCustomBosses = parseWaveEditorList(bossInput.value);
 
@@ -694,7 +981,10 @@
 				customBursts: expandSingleValueList(parsedCustomBursts, parsedBurstCount),
 				customBrutes: expandSingleValueList(parsedCustomBrutes, parsedBurstCount),
 				customSlingers: expandSingleValueList(parsedCustomSlingers, parsedBurstCount),
+				customShielders: expandSingleValueList(parsedCustomShielders, parsedBurstCount),
+				customBeamers: expandSingleValueList(parsedCustomBeamers, parsedBurstCount),
 				customKamikazes: expandSingleValueList(parsedCustomKamikazes, parsedBurstCount),
+				customStalkers: expandSingleValueList(parsedCustomStalkers, parsedBurstCount),
 				customBossMinors: expandSingleValueList(parsedCustomBossMinors, parsedBurstCount),
 				customBosses: expandSingleValueList(parsedCustomBosses, parsedBurstCount),
 				mobIntervals: parsedMobIntervals
@@ -778,11 +1068,17 @@
 			gruntInput.value = "";
 			bruteInput.value = "";
 			slingerInput.value = "";
+			shielderInput.value = "";
+			beamerInput.value = "";
 			kamikazeInput.value = "";
+			stalkerInput.value = "";
 			bossMinorInput.value = "";
 			bossInput.value = "";
 			gruntIntervalInput.value = "";
 			slingerIntervalInput.value = "";
+			shielderIntervalInput.value = "";
+			beamerIntervalInput.value = "";
+			stalkerIntervalInput.value = "";
 			bruteIntervalInput.value = "";
 			kamikazeIntervalInput.value = "";
 			bossMinorIntervalInput.value = "";
@@ -920,11 +1216,16 @@
 				codeStatus.textContent = "Could not copy code.";
 			}
 		});
-		closeBtn.addEventListener("click", closeWaveEditor);
+		closeBtn.addEventListener("click", () => {
+			applyWaveOverride(true);
+			applyPlayerValues();
+			closeWaveEditor({ keepEditorSession: true });
+		});
 
 		waveEditorOverlay.addEventListener("click", (event) => {
 			if (event.target === waveEditorOverlay) {
-				closeWaveEditor();
+				event.preventDefault();
+				event.stopPropagation();
 			}
 		});
 
@@ -933,7 +1234,7 @@
 		loadPlayerForm();
 	}
 
-	if (typeof window.sentinelWaveCode === "string" && window.sentinelWaveCode.trim().startsWith(WAVE_CODE_PREFIX)) {
+	if (typeof window.sentinelWaveCode === "string" && hasSupportedWaveCodePrefix(window.sentinelWaveCode.trim())) {
 		try { activateWaveCode(window.sentinelWaveCode); } catch (_) {}
 	}
 
