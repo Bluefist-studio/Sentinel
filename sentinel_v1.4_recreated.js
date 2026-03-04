@@ -1355,6 +1355,12 @@ window.onload = function () {
   slingerImg.src = "slinger.png";
   const kamikazeImg = new window.Image();
   kamikazeImg.src = "kamikaze.png";
+  const stalkerImg = new window.Image();
+  stalkerImg.src = "stalker.png";
+  const beamerImg = new window.Image();
+  beamerImg.src = "beamer.png";
+  const shielderImg = new window.Image();
+  shielderImg.src = "shielder.png";
 
 
 
@@ -1510,6 +1516,50 @@ window.onload = function () {
     projectilePool.push(clearPooledObject(projectile));
   }
 
+  function spawnBurningArea(x, y, options = {}) {
+    const radius = typeof options.radius === "number" ? options.radius : 72;
+    const duration = typeof options.duration === "number" ? options.duration : 360;
+    const tickInterval = typeof options.tickInterval === "number" ? options.tickInterval : 36;
+    const damagePerTick = typeof options.damage === "number" ? options.damage : 1;
+    const overlapDistance = radius * 0.8;
+    const nearbyBurnZones = [];
+
+    for (let mineIndex = 0; mineIndex < mines.length; mineIndex++) {
+      const mine = mines[mineIndex];
+      if (!mine || mine.type !== "burn") continue;
+      const dist = Math.hypot(x - mine.x, y - mine.y);
+      if (dist <= overlapDistance) {
+        nearbyBurnZones.push(mine);
+      }
+    }
+
+    if (nearbyBurnZones.length >= 2) {
+      let strongestZone = nearbyBurnZones[0];
+      for (let zoneIndex = 1; zoneIndex < nearbyBurnZones.length; zoneIndex++) {
+        if ((nearbyBurnZones[zoneIndex].timer || 0) > (strongestZone.timer || 0)) {
+          strongestZone = nearbyBurnZones[zoneIndex];
+        }
+      }
+      strongestZone.timer = Math.max(strongestZone.timer || 0, duration);
+      strongestZone.radius = Math.max(strongestZone.radius || 0, radius);
+      strongestZone.tickInterval = Math.min(strongestZone.tickInterval || tickInterval, tickInterval);
+      strongestZone.damagePerTick = Math.max(strongestZone.damagePerTick || 0, damagePerTick);
+      return;
+    }
+
+    mines.push({
+      type: "burn",
+      x,
+      y,
+      radius,
+      timer: duration,
+      tickInterval,
+      tickTimer: 0,
+      damagePerTick,
+      active: true
+    });
+  }
+
   function spawnParticle(x, y, dx, dy, life, color, decay, size, type) {
     const particle = particlePool.length ? particlePool.pop() : {};
     particle.x = x;
@@ -1533,6 +1583,46 @@ window.onload = function () {
   function updateMines(delta) {
     for (let i = mines.length - 1; i >= 0; i--) {
       const m = mines[i];
+      if (m.type === "burn") {
+        m.timer -= delta * SPEED_MULTIPLIER;
+        m.tickTimer = (m.tickTimer || 0) - delta * SPEED_MULTIPLIER;
+        m.particleTimer = (m.particleTimer || 0) - delta * SPEED_MULTIPLIER;
+        const burnRadius = typeof m.radius === "number" ? m.radius : 72;
+        const tickInterval = typeof m.tickInterval === "number" ? m.tickInterval : 36;
+        const burnDamage = typeof m.damagePerTick === "number" ? m.damagePerTick : 1;
+        const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
+        if (distToPlayer < burnRadius + player.radius && m.tickTimer <= 0) {
+          player.health -= burnDamage;
+          m.tickTimer = tickInterval;
+        }
+        if (m.particleTimer <= 0) {
+          m.particleTimer = 10;
+          const particleCount = 4;
+          for (let particleIndex = 0; particleIndex < particleCount; particleIndex++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * burnRadius * 0.9;
+            const px = m.x + Math.cos(angle) * radius;
+            const py = m.y + Math.sin(angle) * radius;
+            const driftAngle = Math.random() * Math.PI * 2;
+            const driftSpeed = 0.25 + Math.random() * 0.45;
+            spawnParticle(
+              px,
+              py,
+              Math.cos(driftAngle) * driftSpeed,
+              Math.sin(driftAngle) * driftSpeed,
+              10 + Math.floor(Math.random() * 12),
+              ["#ff5a00", "#ff9a2f", "#ffd26a", "#ff3f00"][Math.floor(Math.random() * 4)],
+              0.93 + Math.random() * 0.03,
+              1.8 + Math.random() * 1.8,
+              "burnZone"
+            );
+          }
+        }
+        if (m.timer <= 0) {
+          mines.splice(i, 1);
+        }
+        continue;
+      }
       // Check if player is in explosion zone
       const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
       if (!m.exploded && distToPlayer < 52 + player.radius) {
@@ -1620,6 +1710,31 @@ window.onload = function () {
   // Draw mines with visible trigger zone
   function drawMines() {
     for (let m of mines) {
+      if (m.type === "burn") {
+        const burnRadius = typeof m.radius === "number" ? m.radius : 72;
+        const burnLifeRatio = Math.max(0, Math.min(1, (m.timer || 0) / 360));
+        ctx.save();
+        const scorchGradient = ctx.createRadialGradient(m.x, m.y, burnRadius * 0.2, m.x, m.y, burnRadius);
+        scorchGradient.addColorStop(0, "rgba(35, 20, 15, 0.45)");
+        scorchGradient.addColorStop(0.7, "rgba(22, 14, 12, 0.28)");
+        scorchGradient.addColorStop(1, "rgba(8, 6, 6, 0.08)");
+        ctx.globalAlpha = 0.65 * burnLifeRatio;
+        ctx.fillStyle = scorchGradient;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, burnRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = 0.58 * burnLifeRatio;
+        ctx.strokeStyle = "#ff8a00";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, burnRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        continue;
+      }
       ctx.save();
       // Draw trigger zone ring
       ctx.beginPath();
@@ -1667,7 +1782,7 @@ window.onload = function () {
     }
     if (k === "e") { showStats = !showStats; paused = showStats; }
     if (k === "o") {
-      if (window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
+      if (window._editorSessionActive && window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
         window.SentinelEditor.showWaveEditor();
       }
     }
@@ -1725,6 +1840,9 @@ window.onload = function () {
       
       // Second death - always return to menu on click
       if (window._playerUsedContinue) {
+        if (window._editorSessionActive) {
+          return;
+        }
         finalizeRunBytes();
         showMenuScreen = true;
         window._playMenuAmbienceOnShowMenu = true;
@@ -1819,9 +1937,13 @@ window.onload = function () {
       customBursts: window._customBursts,
       customBrutes: window._customBrutes,
       customSlingers: window._customSlingers,
+      customShielders: window._customShielders,
+      customBeamers: window._customBeamers,
       customKamikazes: window._customKamikazes,
+      customStalkers: window._customStalkers,
       customBossMinors: window._customBossMinors,
-      customBosses: window._customBosses
+      customBosses: window._customBosses,
+      mobIntervals: window._customMobBurstIntervals
     }),
     getWavePresetConfig: (targetWave) => {
       const waveNumber = parseInt(targetWave, 10);
@@ -1837,9 +1959,13 @@ window.onload = function () {
         customBursts: Array.isArray(window._customBursts) ? window._customBursts.slice() : window._customBursts,
         customBrutes: Array.isArray(window._customBrutes) ? window._customBrutes.slice() : window._customBrutes,
         customSlingers: Array.isArray(window._customSlingers) ? window._customSlingers.slice() : window._customSlingers,
+        customShielders: Array.isArray(window._customShielders) ? window._customShielders.slice() : window._customShielders,
+        customBeamers: Array.isArray(window._customBeamers) ? window._customBeamers.slice() : window._customBeamers,
         customKamikazes: Array.isArray(window._customKamikazes) ? window._customKamikazes.slice() : window._customKamikazes,
+        customStalkers: Array.isArray(window._customStalkers) ? window._customStalkers.slice() : window._customStalkers,
         customBossMinors: Array.isArray(window._customBossMinors) ? window._customBossMinors.slice() : window._customBossMinors,
         customBosses: Array.isArray(window._customBosses) ? window._customBosses.slice() : window._customBosses,
+        customMobBurstIntervals: window._customMobBurstIntervals ? { ...window._customMobBurstIntervals } : null,
         bossMinorBursts: Array.isArray(window._bossMinorBursts) ? window._bossMinorBursts.slice() : window._bossMinorBursts,
         bossMinorCount: window._bossMinorCount,
         wave10MinorsSpawned: window._wave10MinorsSpawned,
@@ -1864,9 +1990,13 @@ window.onload = function () {
           customBursts: Array.isArray(window._customBursts) ? window._customBursts.slice() : window._customBursts,
           customBrutes: Array.isArray(window._customBrutes) ? window._customBrutes.slice() : window._customBrutes,
           customSlingers: Array.isArray(window._customSlingers) ? window._customSlingers.slice() : window._customSlingers,
+          customShielders: Array.isArray(window._customShielders) ? window._customShielders.slice() : window._customShielders,
+          customBeamers: Array.isArray(window._customBeamers) ? window._customBeamers.slice() : window._customBeamers,
           customKamikazes: Array.isArray(window._customKamikazes) ? window._customKamikazes.slice() : window._customKamikazes,
+          customStalkers: Array.isArray(window._customStalkers) ? window._customStalkers.slice() : window._customStalkers,
           customBossMinors: Array.isArray(window._customBossMinors) ? window._customBossMinors.slice() : window._customBossMinors,
-          customBosses: Array.isArray(window._customBosses) ? window._customBosses.slice() : window._customBosses
+          customBosses: Array.isArray(window._customBosses) ? window._customBosses.slice() : window._customBosses,
+          mobIntervals: window._customMobBurstIntervals ? { ...window._customMobBurstIntervals } : undefined
         };
       } catch (_) {
         return null;
@@ -1882,9 +2012,13 @@ window.onload = function () {
         window._customBursts = savedState.customBursts;
         window._customBrutes = savedState.customBrutes;
         window._customSlingers = savedState.customSlingers;
+        window._customShielders = savedState.customShielders;
+        window._customBeamers = savedState.customBeamers;
         window._customKamikazes = savedState.customKamikazes;
+        window._customStalkers = savedState.customStalkers;
         window._customBossMinors = savedState.customBossMinors;
         window._customBosses = savedState.customBosses;
+        window._customMobBurstIntervals = savedState.customMobBurstIntervals;
         window._bossMinorBursts = savedState.bossMinorBursts;
         window._bossMinorCount = savedState.bossMinorCount;
         window._wave10MinorsSpawned = savedState.wave10MinorsSpawned;
@@ -1928,12 +2062,22 @@ window.onload = function () {
         restartGame();
         gameStarted = true;
       }
+
+      gameOver = false;
+      window._gameOverTime = undefined;
+      window._playerUsedContinue = false;
+      followMouse = false;
+      paused = false;
+      showStats = false;
+      player.health = player.maxHealth;
+
       wave = targetWave;
       enemies.length = 0;
       mines.length = 0;
       spawnWave();
 
       if (previewOverride && typeof previewOverride === "object") {
+        window._editorSessionActive = true;
         window._editorPreviewWave = targetWave;
         window._editorPreviewOverride = {
           burstCount: previewOverride.burstCount,
@@ -1941,7 +2085,10 @@ window.onload = function () {
           customBursts: Array.isArray(previewOverride.customBursts) ? previewOverride.customBursts.slice() : undefined,
           customBrutes: Array.isArray(previewOverride.customBrutes) ? previewOverride.customBrutes.slice() : undefined,
           customSlingers: Array.isArray(previewOverride.customSlingers) ? previewOverride.customSlingers.slice() : undefined,
+          customShielders: Array.isArray(previewOverride.customShielders) ? previewOverride.customShielders.slice() : undefined,
+          customBeamers: Array.isArray(previewOverride.customBeamers) ? previewOverride.customBeamers.slice() : undefined,
           customKamikazes: Array.isArray(previewOverride.customKamikazes) ? previewOverride.customKamikazes.slice() : undefined,
+          customStalkers: Array.isArray(previewOverride.customStalkers) ? previewOverride.customStalkers.slice() : undefined,
           customBossMinors: Array.isArray(previewOverride.customBossMinors) ? previewOverride.customBossMinors.slice() : undefined,
           customBosses: Array.isArray(previewOverride.customBosses) ? previewOverride.customBosses.slice() : undefined
         };
@@ -1951,18 +2098,24 @@ window.onload = function () {
     }
   };
 
-  function tryDiscoverProtocolFromEnemy(enemyType, x, y) {
+  function tryDiscoverProtocolFromEnemy(enemyType, x, y, options = {}) {
+    const forceDrop = !!(options && options.forceDrop);
+    const forcedRarity = options && typeof options.rarity === "string" ? options.rarity : null;
     const dropRules = {
       grunt: { chance: 0.08 },
       kamikaze: { chance: 0.1 },
+      stalker: { chance: 0.2 },
+      shielder: { chance: 0.18 },
+      beamer: { chance: 0.22 },
       slinger: { chance: 0.18 },
       brute: { chance: 0.22 },
+      bruteBoss: { chance: 1.0 },
       gruntBossMinor: { chance: 0.35 },
       gruntBoss: { chance: 1.0 }
     };
 
     const rule = dropRules[enemyType] || { chance: 0.1 };
-    if (Math.random() > rule.chance) return;
+    if (!forceDrop && Math.random() > rule.chance) return;
 
     const activeOrbProtocols = new Set(protocolOrbs.map(orb => orb.protocolName));
     const droppableProtocols = Object.keys(PROTOCOLS)
@@ -1981,7 +2134,9 @@ window.onload = function () {
     const chooseRandom = (pool) => pool[Math.floor(Math.random() * pool.length)];
 
     let pool = [];
-    if (enemyType === "grunt") {
+    if (forcedRarity === "Rare" || forcedRarity === "Common") {
+      pool = getPool(forcedRarity);
+    } else if (enemyType === "grunt") {
       // Common lower only
       pool = getPool("Common", ["Lower"]);
       if (pool.length === 0) pool = getPool("Common");
@@ -1992,9 +2147,27 @@ window.onload = function () {
     } else if (enemyType === "slinger") {
       // Any common
       pool = getPool("Common");
+    } else if (enemyType === "stalker") {
+      // Common standard/higher, fallback to any common
+      pool = getPool("Common", ["Standard", "Higher"]);
+      if (pool.length === 0) pool = getPool("Common");
+    } else if (enemyType === "beamer") {
+      // Common higher, small chance for rare lower
+      if (Math.random() < 0.15) {
+        pool = getPool("Rare", ["Lower"]);
+      }
+      if (pool.length === 0) pool = getPool("Common", ["Higher"]);
+      if (pool.length === 0) pool = getPool("Common", ["Standard", "Higher"]);
+      if (pool.length === 0) pool = getPool("Common");
+    } else if (enemyType === "shielder") {
+      pool = getPool("Common", ["Standard", "Higher"]);
+      if (pool.length === 0) pool = getPool("Common");
     } else if (enemyType === "brute") {
       // Any common
       pool = getPool("Common");
+    } else if (enemyType === "bruteBoss") {
+      // Guaranteed rare from any tier
+      pool = getPool("Rare");
     } else if (enemyType === "gruntBossMinor") {
       // Common standard / higher, low chance rare lower
       if (Math.random() < 0.2) {
@@ -2407,7 +2580,8 @@ window.onload = function () {
     let isAttackFrame = nearest && minDist < player.range + nearest.radius && player.attackCooldown <= 0 && followMouse;
     if (isAttackFrame) {
       drawLine(player.x, player.y, nearest.x, nearest.y, "LightBlue");
-      nearest.health -= player.damage;
+      const shieldReduction = Math.max(0, Math.min(0.8, Number(nearest.shieldReduction) || 0));
+      nearest.health -= player.damage * (1 - shieldReduction);
       if (!isAttacking && laserAudio && !laserAudio.paused) {
         laserAudio.pause();
         laserAudio.currentTime = 0;
@@ -2449,10 +2623,19 @@ window.onload = function () {
         if (!noLootDrop && nearest.type === "slinger") {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
+        if (!noLootDrop && nearest.type === "stalker") {
+          slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
+        }
+        if (!noLootDrop && nearest.type === "beamer") {
+          slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
+        }
+        if (!noLootDrop && nearest.type === "shielder") {
+          slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
+        }
         if (!noLootDrop && nearest.type === "kamikaze") {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
-        if (!noLootDrop && nearest.type === "brute") {
+        if (!noLootDrop && (nearest.type === "brute" || nearest.type === "bruteBoss")) {
           bruteDrops.push({ x: nearest.x + 3, y: nearest.y + 5 });
         }
         if (!noLootDrop && Math.random() < 0.15) {
@@ -2733,6 +2916,8 @@ const droplifelenght = 280;
       getEnemies: () => enemies,
       spawnEnemy: () => spawnEnemy(),
       applyWaveEnemyModifiers,
+      getCanvasWidth: () => canvas.width,
+      getCanvasHeight: () => canvas.height,
       getSpeedMultiplier: () => SPEED_MULTIPLIER,
       setWaveAnnouncementTimer: () => {
         waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
@@ -2785,6 +2970,17 @@ const droplifelenght = 280;
 
   function drawHUD() {
     // ...existing code...
+    if (window._editorSessionActive && gameStarted && !gameOver) {
+      ctx.save();
+      ctx.font = "bold 16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#ffe26c";
+      ctx.shadowColor = "rgba(0,0,0,0.8)";
+      ctx.shadowBlur = 10;
+      ctx.fillText("Press O to open editor", canvas.width / 2, 65);
+      ctx.restore();
+    }
     if (showStats) {
       // ...existing code for stats panel...
       const statsPanelWidth = 320;
@@ -3483,7 +3679,10 @@ const droplifelenght = 280;
     window._customBursts = null;
     window._customBrutes = null;
     window._customSlingers = null;
+    window._customShielders = null;
+    window._customBeamers = null;
     window._customKamikazes = null;
+    window._customStalkers = null;
     window._customBossMinors = null;
     window._customBosses = null;
     window._bossMinorBursts = null;
@@ -3498,6 +3697,24 @@ const droplifelenght = 280;
   }
 
   function updateEnemies(delta) {
+                        for (let e of enemies) {
+                          if (typeof e.shieldPersistTimer !== "number") e.shieldPersistTimer = 0;
+                          if (e.shieldPersistTimer > 0) {
+                            e.shieldPersistTimer -= delta * SPEED_MULTIPLIER;
+                            if (e.shieldPersistTimer <= 0) {
+                              e.shieldPersistTimer = 0;
+                              e.shielded = false;
+                              e.shieldReduction = 0;
+                            } else {
+                              e.shielded = true;
+                            }
+                          } else {
+                            e.shielded = false;
+                            e.shieldReduction = 0;
+                          }
+                          e.shieldedBy = null;
+                          if (Array.isArray(e.activeShieldTargets)) e.activeShieldTargets.length = 0;
+                        }
                         // Decrease noBossCollision timer for grunts
                         for (let e of enemies) {
                           if (e.type === "grunt" && e.noBossCollision > 0) {
@@ -3625,22 +3842,76 @@ const droplifelenght = 280;
                               }
                             }
                           }
+
+                          if (e.type === "bruteBoss" && e.health > 0) {
+                            if (typeof e.fireballCooldown !== "number") e.fireballCooldown = 80;
+                            if (typeof e.fireballInterval !== "number") e.fireballInterval = 280;
+                            if (typeof e.fireballRadius !== "number") e.fireballRadius = 15;
+                            if (typeof e.fireballLifetime !== "number") e.fireballLifetime = 220;
+                            if (typeof e.fireballBurnRadius !== "number") e.fireballBurnRadius = 88;
+                            if (typeof e.fireballBurnDuration !== "number") e.fireballBurnDuration = 420;
+                            if (typeof e.fireballBurnTickInterval !== "number") e.fireballBurnTickInterval = 32;
+                            if (typeof e.fireballBurnDamage !== "number") e.fireballBurnDamage = 1;
+
+                            const maxHealth = Math.max(1, typeof e.maxHealth === "number" ? e.maxHealth : e.health);
+                            const missingHealthRatio = Math.max(0, Math.min(1, 1 - (e.health / maxHealth)));
+                            const phaseProgress = Math.max(0, Math.min(1, missingHealthRatio / 0.68));
+                            e.bruteBossPhaseProgress = phaseProgress;
+                            const volleyShots = 1 + Math.floor(phaseProgress * 4);
+
+                            if (e.fireballCooldown <= 0) {
+                              for (let shotIndex = 0; shotIndex < volleyShots; shotIndex++) {
+                                const shotAngle = Math.random() * Math.PI * 2;
+                                const projectileSpeed = 1.12;
+                                const fireball = spawnProjectile(
+                                  e.x,
+                                  e.y,
+                                  Math.cos(shotAngle) * projectileSpeed,
+                                  Math.sin(shotAngle) * projectileSpeed,
+                                  e.damage,
+                                  e.fireballRadius,
+                                  "#ff6a00",
+                                  "bruteBossFireball"
+                                );
+                                fireball.lifeTimer = e.fireballLifetime;
+                                fireball.burnRadius = e.fireballBurnRadius;
+                                fireball.burnDuration = e.fireballBurnDuration;
+                                fireball.burnTickInterval = e.fireballBurnTickInterval;
+                                fireball.burnDamage = e.fireballBurnDamage;
+                                fireball.particleCooldown = Math.floor(Math.random() * 3);
+                              }
+                              const acceleratedInterval = Math.max(170, e.fireballInterval - Math.floor(phaseProgress * 90));
+                              e.fireballCooldown = acceleratedInterval;
+                            } else {
+                              e.fireballCooldown -= delta * SPEED_MULTIPLIER;
+                            }
+                          }
                         }
                 // Brute nova visual particles
                 for (let e of enemies) {
-                  if (e.type === "brute") {
+                  if (e.type === "brute" || e.type === "bruteBoss") {
                     if (typeof e.fxCooldown !== "number") e.fxCooldown = Math.floor(Math.random() * 2);
                     if (e.fxCooldown > 0) {
                       e.fxCooldown--;
                       continue;
                     }
                     const isActiveNova = e.novaState === "growing" || e.novaState === "shrinking";
-                    if (!isActiveNova) continue;
+                    if (!isActiveNova && e.type !== "bruteBoss") continue;
                     e.fxCooldown = 1;
-                    let particleCount = 2;
+                    let particleCount = isActiveNova ? 2 : 0;
+                    if (e.type === "bruteBoss") {
+                      particleCount = isActiveNova ? 10 : 4;
+                    }
                     for (let p = 0; p < particleCount; p++) {
                       const angle = Math.random() * Math.PI * 2;
-                      const radius = Math.random() * (e.novaRadius - e.radius - 8) + (e.radius + 8);
+                      const minRingRadius = e.radius + 8;
+                      const maxRingRadius = Math.max(minRingRadius + 1, (e.novaRadius || (e.radius + 24)) - 6);
+                      const isBossInteriorFire = e.type === "bruteBoss";
+                      const radius = isBossInteriorFire
+                        ? (Math.random() * (maxRingRadius - minRingRadius) + minRingRadius)
+                        : (isActiveNova
+                          ? (Math.random() * (maxRingRadius - minRingRadius) + minRingRadius)
+                          : (maxRingRadius - Math.random() * 10));
                       const flare = radius > e.novaRadius - 12;
                       // Different behavior for growing vs shrinking
                       let speed, color, size, life, decay;
@@ -3656,6 +3927,12 @@ const droplifelenght = 280;
                         size = flare ? 5 + Math.random() * 2 : 2 + Math.random() * 2;
                         life = flare ? 10 + Math.random() * 6 : 6 + Math.random() * 4;
                         decay = flare ? 0.97 : 0.98;
+                      } else if (e.type === "bruteBoss") {
+                        speed = 0.35 + Math.random() * 0.65;
+                        color = ["#ff6a00", "#ff9c33", "#ff4000", "#ffd07a"][Math.floor(Math.random() * 4)];
+                        size = 2.6 + Math.random() * 2.6;
+                        life = 12 + Math.random() * 11;
+                        decay = 0.95 + Math.random() * 0.02;
                       } else {
                         continue;
                       }
@@ -3675,17 +3952,24 @@ const droplifelenght = 280;
                 }
             // Brute nova visual and collision
             for (let e of enemies) {
-              if (e.type === "brute") {
+              if (e.type === "brute" || e.type === "bruteBoss") {
                 // Nova animation states
-                const minRadius = e.radius + 20; // slightly bigger than brute
-                const maxRadius = e.radius * 3.2;
+                const minRadius = typeof e.novaMinRadius === "number" ? e.novaMinRadius : (e.radius + 20); // slightly bigger than brute
+                let maxRadius = e.radius * (typeof e.novaMaxMultiplier === "number" ? e.novaMaxMultiplier : 3.2);
+                let novaGrowthSpeed = typeof e.novaGrowthSpeed === "number" ? e.novaGrowthSpeed : 2.2;
+                const novaShrinkSpeed = typeof e.novaShrinkSpeed === "number" ? e.novaShrinkSpeed : 2.2;
+                if (e.type === "bruteBoss") {
+                  const phaseProgress = Math.max(0, Math.min(1, typeof e.bruteBossPhaseProgress === "number" ? e.bruteBossPhaseProgress : 0));
+                  maxRadius *= (1 + (phaseProgress * 0.18));
+                  novaGrowthSpeed *= (1 + (phaseProgress * 0.25));
+                }
                 if (typeof e.novaRadius === "undefined") e.novaRadius = minRadius;
                 if (typeof e.novaState === "undefined") e.novaState = "growing";
                 if (typeof e.novaCooldown === "undefined") e.novaCooldown = 0;
 
                 // Animate nova
                     if (e.novaState === "growing") {
-                      e.novaRadius += 2.2;
+                      e.novaRadius += novaGrowthSpeed;
                       if (e.novaRadius >= maxRadius) {
                         e.novaRadius = maxRadius;
                         e.novaState = "maxPause";
@@ -3698,7 +3982,7 @@ const droplifelenght = 280;
                         e.novaState = "shrinking";
                       }
                     } else if (e.novaState === "shrinking") {
-                      e.novaRadius -= 2.2;
+                      e.novaRadius -= novaShrinkSpeed;
                       if (e.novaRadius <= minRadius) {
                         e.novaRadius = minRadius;
                         e.novaState = "minPause";
@@ -3719,8 +4003,9 @@ const droplifelenght = 280;
                 if (typeof e.novaPlayerInside === 'undefined') e.novaPlayerInside = false;
                 if (typeof e.novaPlayerTick === 'undefined') e.novaPlayerTick = 0;
                 if (dist < e.novaRadius + player.radius) {
+                    const novaDamage = typeof e.novaDamage === "number" ? e.novaDamage : 1;
                     if (!e.novaPlayerInside || e.novaPlayerTick <= 0) {
-                      player.health -= 1; // Nova damage per tick
+                      player.health -= novaDamage; // Nova damage per tick
                       e.novaPlayerTick = 60; // 1 second cooldown
                     }
                   e.novaPlayerInside = true;
@@ -3773,7 +4058,7 @@ const droplifelenght = 280;
                   });
                 }
               }
-              // Wave 5 boss uses direct completion; other waves use standard burst progression
+              // Boss-gated waves use direct completion; other waves use standard burst progression
               if (e.type === "gruntBoss" && wave === 5) {
                 wave++;
                 try {
@@ -3783,13 +4068,23 @@ const droplifelenght = 280;
                   warnAudio.play();
                 } catch (e) {}
                 spawnWave();
+              } else if (e.type === "slingerBoss" && wave === 10) {
+                wave++;
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
               }
-            } else if (e.type === "brute") {
+            } else if (e.type === "brute" || e.type === "bruteBoss" || e.type === "slingerBoss") {
               // Brute death burst: mimic nova 'growing' burst
-              for (let j = 0; j < 12; j++) {
+              const burstCount = e.type === "bruteBoss" ? 24 : 12;
+              for (let j = 0; j < burstCount; j++) {
                 const angle = Math.random() * Math.PI * 2;
                 const speed = 2.2 + Math.random() * 1.2;
-                const flare = j < 4;
+                const flare = j < (e.type === "bruteBoss" ? 8 : 4);
                 const color = flare ? "#fff200" : ["#ff6600","#ffaa00","#ff3300"][Math.floor(Math.random()*3)];
                 const size = flare ? 7 + Math.random() * 3 : 4 + Math.random() * 2;
                 const life = flare ? 22 + Math.random() * 12 : 16 + Math.random() * 8;
@@ -3806,11 +4101,48 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
+              if (e.type === "bruteBoss" && wave === 20) {
+                wave++;
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
+              } else if (e.type === "slingerBoss" && wave === 10) {
+                wave++;
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
+              }
+            } else if (e.type === "stalker") {
+              const stalkerPalette = ["#57e7ff", "#7fdfff", "#a7f3ff", "#3ec6ff"];
+              for (let j = 0; j < 16; j++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 1.4;
+                const color = stalkerPalette[Math.floor(Math.random() * stalkerPalette.length)];
+                spawnParticle(
+                  e.x,
+                  e.y,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
+                  45 + Math.floor(Math.random() * 90),
+                  color,
+                  0.9 + Math.random() * 0.06,
+                  2 + Math.random() * 2,
+                  "enemyDeath"
+                );
+              }
             } else {
               let palette;
               if (e.type === "grunt") {
                 palette = ["#FF00FF", "#910091", "#d900ff", "#c800b0", "#b800e0"];
-              } else if (e.type === "slinger") {
+              } else if (e.type === "slinger" || e.type === "slingerBoss") {
                 palette = ["#FFA500", "#ffb84d", "#ff9900", "#ffcc80", "#8b5b00"];
               } else {
                 palette = [e.color];
@@ -3839,7 +4171,26 @@ const droplifelenght = 280;
               }
             }
             if (!(e.noLoot || e.noXP)) {
-              tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
+              if (e.type === "bruteBoss" || e.type === "slingerBoss") {
+                tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
+                for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
+                  const spread = 16;
+                  tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
+                    forceDrop: true,
+                    rarity: "Common"
+                  });
+                }
+                for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                  const xpAngle = Math.random() * Math.PI * 2;
+                  const xpDist = 14 + Math.random() * 34;
+                  xpDrops.push({
+                    x: e.x + Math.cos(xpAngle) * xpDist,
+                    y: e.y + Math.sin(xpAngle) * xpDist
+                  });
+                }
+              } else {
+                tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
+              }
             }
             releaseEnemyAt(i);
             continue;
@@ -3856,12 +4207,507 @@ const droplifelenght = 280;
       } else {
         const dx = player.x - e.x, dy = player.y - e.y;
         const dist = Math.hypot(dx, dy);
-        const isSlinger = e.type === "slinger";
+        if (e.type === "stalker") {
+          if (typeof e.blinkCooldown !== "number") e.blinkCooldown = 120 + Math.floor(Math.random() * 80);
+          if (typeof e.blinkCastTimer !== "number") e.blinkCastTimer = 0;
+          if (typeof e.blinkCastDuration !== "number") e.blinkCastDuration = 1;
+          if (typeof e.blinkRecoverTimer !== "number") e.blinkRecoverTimer = 0;
+          if (typeof e.blinkRecoverDuration !== "number") e.blinkRecoverDuration = 1;
+          if (typeof e.burstsLeft !== "number") e.burstsLeft = 0;
+          if (typeof e.burstTimer !== "number") e.burstTimer = 0;
+          if (typeof e.burstShotsLeft !== "number") e.burstShotsLeft = 0;
+          if (typeof e.pendingBursts !== "number") e.pendingBursts = 0;
+          if (typeof e.stalkerBurstInterval !== "number") e.stalkerBurstInterval = 120;
+          if (typeof e.stalkerBurstCooldown !== "number") e.stalkerBurstCooldown = 18 + Math.floor(Math.random() * 22);
+          if (typeof e.castFxCooldown !== "number") e.castFxCooldown = 0;
+          if (typeof e.stalkerAlpha !== "number") e.stalkerAlpha = 0.9;
+          if (typeof e.stalkerRoutineActive !== "boolean") e.stalkerRoutineActive = false;
+          if (typeof e.stalkerInitialBurstDone !== "boolean") e.stalkerInitialBurstDone = false;
+          if (typeof e.stalkerPreferredDistance !== "number") e.stalkerPreferredDistance = 180 + Math.random() * 120;
+          const legacyPadding = typeof e.stalkerEdgePadding === "number" ? e.stalkerEdgePadding : 120;
+          if (typeof e.stalkerEdgePaddingX !== "number") e.stalkerEdgePaddingX = legacyPadding;
+          if (typeof e.stalkerEdgePaddingY !== "number") e.stalkerEdgePaddingY = Math.max(legacyPadding, 170);
+
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const minCenterDist = e.stalkerPreferredDistance;
+          const edgePaddingX = Math.max(e.radius + 4, e.stalkerEdgePaddingX);
+          const edgePaddingY = Math.max(e.radius + 4, e.stalkerEdgePaddingY);
+
+          const isStalkerInRange = dist < (e.attackRange || 320) + player.radius;
+          if (!e.stalkerRoutineActive) {
+            if (!isStalkerInRange) {
+              if (dist > 0) {
+                e.x += (dx / dist) * e.speed * delta * SPEED_MULTIPLIER;
+                e.y += (dy / dist) * e.speed * delta * SPEED_MULTIPLIER;
+              }
+              continue;
+            }
+
+            if (!e.stalkerInitialBurstDone) {
+              const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+              const spread = 0.12;
+              const shotSpeed = 2.25;
+              for (let s = -1; s <= 1; s++) {
+                const shotAngle = angleToPlayer + (s * spread);
+                spawnProjectile(
+                  e.x,
+                  e.y,
+                  Math.cos(shotAngle) * shotSpeed,
+                  Math.sin(shotAngle) * shotSpeed,
+                  e.damage,
+                  4,
+                  "#66e8ff",
+                  "stalkerProjectile"
+                );
+              }
+              e.stalkerInitialBurstDone = true;
+            }
+
+            e.stalkerRoutineActive = true;
+            e.x = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, e.x));
+            e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
+            continue;
+          }
+
+          if (e.blinkCastTimer > 0) {
+            e.blinkCastTimer -= delta * SPEED_MULTIPLIER;
+            e.castFxCooldown -= delta * SPEED_MULTIPLIER;
+            if (e.castFxCooldown <= 0) {
+              e.castFxCooldown = 4;
+              for (let p = 0; p < 3; p++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 0.9 + Math.random() * 0.8;
+                spawnParticle(
+                  e.x,
+                  e.y,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
+                  16 + Math.random() * 10,
+                  "#7beeff",
+                  0.93,
+                  1.6 + Math.random() * 1.2,
+                  "enemyHit"
+                );
+              }
+            }
+
+            if (e.blinkCastTimer <= 0) {
+              for (let p = 0; p < 10; p++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.6 + Math.random() * 1.1;
+                spawnParticle(e.x, e.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 24 + Math.random() * 10, "#66e8ff", 0.93, 2 + Math.random() * 1.6, "enemyHit");
+              }
+
+              const minBlinkRadius = Math.min(canvas.width, canvas.height) * 0.28;
+              const maxBlinkRadius = Math.min(canvas.width, canvas.height) * 0.45;
+              const minBlinkFromPlayer = (typeof player.range === "number" ? player.range : player.radius) + 70;
+              let blinkTargetX = e.x;
+              let blinkTargetY = e.y;
+              for (let attempt = 0; attempt < 14; attempt++) {
+                const blinkAngle = Math.random() * Math.PI * 2;
+                const blinkRadius = minBlinkRadius + Math.random() * (maxBlinkRadius - minBlinkRadius);
+                const candidateX = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, centerX + Math.cos(blinkAngle) * blinkRadius));
+                const candidateY = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, centerY + Math.sin(blinkAngle) * blinkRadius));
+                const candidateDistToPlayer = Math.hypot(player.x - candidateX, player.y - candidateY);
+                blinkTargetX = candidateX;
+                blinkTargetY = candidateY;
+                if (candidateDistToPlayer >= minBlinkFromPlayer) break;
+              }
+              e.x = blinkTargetX;
+              e.y = blinkTargetY;
+
+              for (let p = 0; p < 10; p++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.6 + Math.random() * 1.1;
+                spawnParticle(e.x, e.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 24 + Math.random() * 10, "#66e8ff", 0.93, 2 + Math.random() * 1.6, "enemyHit");
+              }
+
+              e.pendingBursts = 1;
+              e.burstShotsLeft = 0;
+              e.blinkRecoverDuration = 22 + Math.floor(Math.random() * 8);
+              e.blinkRecoverTimer = e.blinkRecoverDuration;
+              e.blinkCastTimer = 0;
+            }
+          } else if (e.blinkRecoverTimer > 0) {
+            e.blinkRecoverTimer -= delta * SPEED_MULTIPLIER;
+            if (e.blinkRecoverTimer <= 0) {
+              e.burstsLeft = Math.max(e.burstsLeft, e.pendingBursts || 1);
+              e.pendingBursts = 0;
+              e.blinkCooldown = 145 + Math.floor(Math.random() * 95);
+            }
+          } else if (e.burstsLeft > 0) {
+            if (e.burstShotsLeft <= 0) {
+              const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+              const spread = 0.12;
+              const shotSpeed = 2.25;
+              for (let s = -1; s <= 1; s++) {
+                const shotAngle = angleToPlayer + (s * spread);
+                spawnProjectile(
+                  e.x,
+                  e.y,
+                  Math.cos(shotAngle) * shotSpeed,
+                  Math.sin(shotAngle) * shotSpeed,
+                  e.damage,
+                  4,
+                  "#66e8ff",
+                  "stalkerProjectile"
+                );
+              }
+              e.burstsLeft -= 1;
+              e.burstShotsLeft = 26;
+              if (e.burstsLeft <= 0) e.stalkerBurstCooldown = e.stalkerBurstInterval;
+            } else {
+              e.burstShotsLeft -= delta * SPEED_MULTIPLIER;
+            }
+          } else {
+            if (e.stalkerBurstCooldown > 0) {
+              e.stalkerBurstCooldown -= delta * SPEED_MULTIPLIER;
+              if (e.stalkerBurstCooldown < 0) e.stalkerBurstCooldown = 0;
+            }
+
+            if (e.blinkCooldown > 0) {
+              e.blinkCooldown -= delta * SPEED_MULTIPLIER;
+              if (e.blinkCooldown < 0) e.blinkCooldown = 0;
+            }
+            const playerBlinkRange = (typeof player.range === "number" ? player.range : player.radius) + 50;
+            const shouldBlinkAway = e.blinkCooldown <= 0 && dist <= playerBlinkRange;
+            if (shouldBlinkAway) {
+              e.blinkCastDuration = 18 + Math.floor(Math.random() * 7);
+              e.blinkCastTimer = e.blinkCastDuration;
+              e.castFxCooldown = 0;
+            } else if (e.stalkerBurstCooldown <= 0) {
+              e.burstsLeft = Math.max(e.burstsLeft, 1);
+              e.burstShotsLeft = 0;
+              e.stalkerBurstCooldown = e.stalkerBurstInterval;
+            }
+          }
+
+          let targetStalkerAlpha = 0.9;
+          if (e.blinkCastTimer > 0) {
+            const castProgress = e.blinkCastDuration > 0
+              ? Math.max(0, Math.min(1, e.blinkCastTimer / e.blinkCastDuration))
+              : 0;
+            targetStalkerAlpha = 0.15 + (0.75 * castProgress);
+          } else if (e.blinkRecoverTimer > 0) {
+            const recoverProgress = e.blinkRecoverDuration > 0
+              ? Math.max(0, Math.min(1, 1 - (e.blinkRecoverTimer / e.blinkRecoverDuration)))
+              : 1;
+            targetStalkerAlpha = 0.2 + (0.7 * recoverProgress);
+          }
+          const alphaBlend = Math.min(1, 0.22 * delta * SPEED_MULTIPLIER);
+          e.stalkerAlpha += (targetStalkerAlpha - e.stalkerAlpha) * alphaBlend;
+          e.stalkerAlpha = Math.max(0.08, Math.min(0.95, e.stalkerAlpha));
+
+          const centerDx = e.x - centerX;
+          const centerDy = e.y - centerY;
+          const centerDist = Math.hypot(centerDx, centerDy);
+          if (centerDist < minCenterDist && centerDist > 0) {
+            e.x += (centerDx / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+            e.y += (centerDy / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+          }
+          e.x = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, e.x));
+          e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
+          continue;
+        }
+        if (e.type === "shielder") {
+          if (typeof e.shielderPreferredDistance !== "number") e.shielderPreferredDistance = 170 + Math.random() * 120;
+          if (typeof e.shieldRange !== "number") e.shieldRange = 230;
+          if (typeof e.shieldMaxLinks !== "number") e.shieldMaxLinks = 2;
+          if (typeof e.shieldReductionAmount !== "number") e.shieldReductionAmount = 0.75;
+          if (typeof e.shieldPersistDuration !== "number") e.shieldPersistDuration = 180;
+          if (typeof e.shielderAlpha !== "number") e.shielderAlpha = 0;
+          if (!Array.isArray(e.activeShieldTargets)) e.activeShieldTargets = [];
+          e.activeShieldTargets.length = 0;
+
+          const legacyPadding = typeof e.shielderEdgePadding === "number" ? e.shielderEdgePadding : 72;
+          if (typeof e.shielderEdgePaddingX !== "number") e.shielderEdgePaddingX = legacyPadding;
+          if (typeof e.shielderEdgePaddingY !== "number") e.shielderEdgePaddingY = Math.max(legacyPadding, 120);
+
+          if (typeof e.zoneLocked !== "boolean") e.zoneLocked = false;
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const maxStopDistance = Math.max(130, Math.min(canvas.width, canvas.height) * 0.5);
+          const minStopDistance = Math.max(90, maxStopDistance * 0.68);
+          if (typeof e.shielderStopDistance !== "number") {
+            e.shielderStopDistance = minStopDistance + Math.random() * (maxStopDistance - minStopDistance);
+          }
+
+          if (!e.zoneLocked) {
+            const centerDist = Math.hypot(e.x - centerX, e.y - centerY);
+            if (centerDist <= e.shielderStopDistance) {
+              e.zoneLocked = true;
+            } else {
+              const zoneDx = centerX - e.x;
+              const zoneDy = centerY - e.y;
+              const zoneDist = Math.hypot(zoneDx, zoneDy);
+              if (zoneDist > 0) {
+                e.x += (zoneDx / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
+                e.y += (zoneDy / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
+              }
+            }
+          }
+
+          const alliesInRange = enemies
+            .filter(target => target !== e && target.health > 0 && target.type !== "shielder")
+            .map(target => ({ target, dist: Math.hypot(target.x - e.x, target.y - e.y) }))
+            .filter(entry => entry.dist <= e.shieldRange)
+            .sort((a, b) => a.dist - b.dist)
+            .slice(0, Math.max(0, e.shieldMaxLinks));
+
+          for (const entry of alliesInRange) {
+            const target = entry.target;
+            const reduction = Math.max(0, Math.min(0.8, e.shieldReductionAmount));
+            if (!target.shielded || reduction > (target.shieldReduction || 0)) {
+              target.shielded = true;
+              target.shieldReduction = reduction;
+            }
+            target.shieldPersistTimer = Math.max(target.shieldPersistTimer || 0, e.shieldPersistDuration);
+            target.shieldedBy = e;
+            e.activeShieldTargets.push(target);
+          }
+
+          e.shielderAlpha = Math.min(1, e.shielderAlpha + (0.035 * delta * SPEED_MULTIPLIER));
+          continue;
+        }
+        if (e.type === "beamer") {
+          if (typeof e.beamCooldown !== "number") e.beamCooldown = 110 + Math.floor(Math.random() * 70);
+          if (typeof e.beamCastTimer !== "number") e.beamCastTimer = 0;
+          if (typeof e.beamCastDuration !== "number") e.beamCastDuration = 0;
+          if (typeof e.beamActiveTimer !== "number") e.beamActiveTimer = 0;
+          if (typeof e.beamDuration !== "number") e.beamDuration = 0;
+          if (typeof e.beamAngle !== "number") e.beamAngle = Math.atan2(player.y - e.y, player.x - e.x);
+          if (typeof e.beamLength !== "number") e.beamLength = 460;
+          if (typeof e.beamTravelHead !== "number") e.beamTravelHead = 0;
+          if (typeof e.beamTravelTail !== "number") e.beamTravelTail = 0;
+          if (typeof e.beamTravelSpeed !== "number") e.beamTravelSpeed = 0;
+          if (typeof e.beamSegmentLength !== "number") e.beamSegmentLength = Math.max(120, e.beamLength * 0.32);
+          if (typeof e.beamTickTimer !== "number") e.beamTickTimer = 0;
+          if (typeof e.beamGlow !== "number") e.beamGlow = 0;
+          if (typeof e.beamerAlpha !== "number") e.beamerAlpha = 0;
+          if (typeof e.beamerFacingAngle !== "number") e.beamerFacingAngle = Math.atan2(player.y - e.y, player.x - e.x);
+          if (typeof e.beamerPreferredDistance !== "number") e.beamerPreferredDistance = 190 + Math.random() * 140;
+          const legacyPadding = typeof e.beamerEdgePadding === "number" ? e.beamerEdgePadding : 72;
+          if (typeof e.beamerEdgePaddingX !== "number") e.beamerEdgePaddingX = legacyPadding;
+          if (typeof e.beamerEdgePaddingY !== "number") e.beamerEdgePaddingY = Math.max(legacyPadding, 84);
+
+          const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+          if (e.beamCastTimer <= 0 && e.beamActiveTimer <= 0) {
+            e.beamAngle = angleToPlayer;
+          }
+
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          const minCenterDist = e.beamerPreferredDistance;
+          const edgePaddingX = Math.max(e.radius + 4, e.beamerEdgePaddingX);
+          const edgePaddingY = Math.max(e.radius + 4, e.beamerEdgePaddingY);
+
+          if (e.beamCastTimer > 0) {
+            e.beamCastTimer -= delta * SPEED_MULTIPLIER;
+            if (e.beamCastTimer <= 0) {
+              e.beamDuration = 28 + Math.floor(Math.random() * 12);
+              e.beamActiveTimer = e.beamDuration;
+              e.beamTravelHead = 0;
+              e.beamTravelTail = 0;
+              e.beamSegmentLength = Math.max(120, e.beamLength * 0.32);
+              e.beamTravelSpeed = e.beamLength / Math.max(1, e.beamDuration * 0.78);
+              e.beamTickTimer = 0;
+            }
+          } else if (e.beamActiveTimer > 0) {
+            e.beamActiveTimer -= delta * SPEED_MULTIPLIER;
+            e.beamTravelHead += e.beamTravelSpeed * delta * SPEED_MULTIPLIER;
+            e.beamTravelTail = Math.max(0, e.beamTravelHead - e.beamSegmentLength);
+            e.beamTickTimer -= delta * SPEED_MULTIPLIER;
+
+            if (e.beamTickTimer <= 0) {
+              const beamStartX = e.x;
+              const beamStartY = e.y;
+              const headDist = Math.max(0, Math.min(e.beamLength, e.beamTravelHead));
+              const tailDist = Math.max(0, Math.min(headDist, e.beamTravelTail));
+              const segStartX = beamStartX + Math.cos(e.beamAngle) * tailDist;
+              const segStartY = beamStartY + Math.sin(e.beamAngle) * tailDist;
+              const segEndX = beamStartX + Math.cos(e.beamAngle) * headDist;
+              const segEndY = beamStartY + Math.sin(e.beamAngle) * headDist;
+
+              const segX = segEndX - segStartX;
+              const segY = segEndY - segStartY;
+              const segLenSq = segX * segX + segY * segY;
+              let distanceToBeam = Infinity;
+              if (segLenSq > 0) {
+                const t = Math.max(0, Math.min(1, ((player.x - segStartX) * segX + (player.y - segStartY) * segY) / segLenSq));
+                const closestX = segStartX + segX * t;
+                const closestY = segStartY + segY * t;
+                distanceToBeam = Math.hypot(player.x - closestX, player.y - closestY);
+              }
+
+              if (distanceToBeam <= player.radius + 9) {
+                player.health -= Math.max(1, e.damage);
+              }
+              e.beamTickTimer = 10;
+            }
+
+            if (e.beamActiveTimer <= 0) {
+              e.beamCooldown = 135 + Math.floor(Math.random() * 95);
+              e.beamTravelHead = 0;
+              e.beamTravelTail = 0;
+              e.beamTravelSpeed = 0;
+              e.beamGlow = 0;
+            }
+          } else {
+            e.beamCooldown -= delta * SPEED_MULTIPLIER;
+            if (e.beamCooldown <= 0) {
+              e.beamCastDuration = 24 + Math.floor(Math.random() * 10);
+              e.beamCastTimer = e.beamCastDuration;
+              e.beamLength = Math.max(e.beamLength || 0, Math.hypot(canvas.width, canvas.height) + 120);
+              e.beamAngle = Math.atan2(player.y - e.y, player.x - e.x);
+              e.beamerFacingAngle = e.beamAngle;
+            }
+          }
+
+          const desiredFacingAngle = (e.beamCastTimer > 0 || e.beamActiveTimer > 0)
+            ? e.beamAngle
+            : angleToPlayer;
+          let facingDiff = desiredFacingAngle - e.beamerFacingAngle;
+          while (facingDiff > Math.PI) facingDiff -= Math.PI * 2;
+          while (facingDiff < -Math.PI) facingDiff += Math.PI * 2;
+          const maxTurnPerFrame = 0.12 * delta * SPEED_MULTIPLIER;
+          if (Math.abs(facingDiff) <= maxTurnPerFrame) {
+            e.beamerFacingAngle = desiredFacingAngle;
+          } else {
+            e.beamerFacingAngle += Math.sign(facingDiff) * maxTurnPerFrame;
+          }
+
+          const targetGlow = e.beamActiveTimer > 0 ? 1 : (e.beamCastTimer > 0 ? 0.5 : 0.12);
+          e.beamGlow += (targetGlow - e.beamGlow) * Math.min(1, 0.18 * delta * SPEED_MULTIPLIER);
+          e.beamGlow = Math.max(0.08, Math.min(1, e.beamGlow));
+          e.beamerAlpha = Math.min(1, e.beamerAlpha + (0.045 * delta * SPEED_MULTIPLIER));
+
+          const centerDx = e.x - centerX;
+          const centerDy = e.y - centerY;
+          const centerDist = Math.hypot(centerDx, centerDy);
+          if (e.beamCastTimer <= 0) {
+            if (centerDist < minCenterDist && centerDist > 0) {
+              e.x += (centerDx / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+              e.y += (centerDy / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+            }
+          }
+          e.x = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, e.x));
+          e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
+          continue;
+        }
+        const isSlinger = e.type === "slinger" || e.type === "slingerBoss";
+        const isSlingerBossEntering = e.type === "slingerBoss" && e.slingerBossEntering !== false;
+        if (e.type === "slingerBoss") {
+          const centerX = canvas.width * 0.5;
+          const centerY = canvas.height * 0.5;
+          const centerDx = centerX - e.x;
+          const centerDy = centerY - e.y;
+          const centerDist = Math.hypot(centerDx, centerDy);
+          const arrivalThreshold = Math.max(10, e.radius * 0.7);
+          if (e.slingerBossEntering !== false) {
+            const paddingX = typeof e.slingerBossEdgePaddingX === "number" ? e.slingerBossEdgePaddingX : 110;
+            const paddingY = typeof e.slingerBossEdgePaddingY === "number" ? e.slingerBossEdgePaddingY : 150;
+            const minX = paddingX;
+            const maxX = canvas.width - paddingX;
+            const minY = paddingY;
+            const maxY = canvas.height - paddingY;
+            const insidePaddedArea = e.x >= minX && e.x <= maxX && e.y >= minY && e.y <= maxY;
+            if (typeof e.slingerBossEntryStage !== "string") e.slingerBossEntryStage = "padding";
+
+            if (e.slingerBossEntryStage === "padding") {
+              const entrySpeed = typeof e.slingerBossEntrySpeed === "number" ? e.slingerBossEntrySpeed : (e.speed * 1.9);
+              if (centerDist > 0) {
+                e.x += (centerDx / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+                e.y += (centerDy / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+              }
+              if (insidePaddedArea) {
+                e.slingerBossEntryStage = "center";
+              }
+            } else {
+              if (centerDist > 0) {
+                e.x += (centerDx / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+                e.y += (centerDy / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+              }
+              if (centerDist <= arrivalThreshold) {
+                e.slingerBossEntering = false;
+              }
+            }
+          } else {
+            if (centerDist > 0.8) {
+              const settleSpeed = Math.min(0.22, e.speed * 0.2);
+              e.x += (centerDx / centerDist) * settleSpeed * delta * SPEED_MULTIPLIER;
+              e.y += (centerDy / centerDist) * settleSpeed * delta * SPEED_MULTIPLIER;
+            }
+          }
+        }
         const isTouchingPlayer = dist < (e.radius + player.radius);
         const isSlingerInRange = dist < (e.attackRange || 20) + player.radius;
-        const canAttackNow = isSlinger ? isSlingerInRange : isTouchingPlayer;
+        const canAttackNow = e.type === "slingerBoss"
+          ? (e.slingerBossEntryStage !== "padding")
+          : (isSlinger ? isSlingerInRange : isTouchingPlayer);
         if (canAttackNow) {
-          if (e.attackCooldown <= 0) {
+          if (isSlinger && e.type === "slingerBoss") {
+            const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+            const maxHealth = Math.max(1, typeof e.maxHealth === "number" ? e.maxHealth : e.health);
+            const healthRatio = Math.max(0, Math.min(1, e.health / maxHealth));
+            let phase = 1;
+            if (healthRatio <= 0.34) phase = 3;
+            else if (healthRatio <= 0.67) phase = 2;
+            e.slingerBossPhase = phase;
+
+            let firedAny = false;
+            const fireShot = (shotAngle, shotSpeed, shotDamage, shotRadius, shotType, shotColor) => {
+              firedAny = true;
+              return spawnProjectile(
+                e.x,
+                e.y,
+                Math.cos(shotAngle) * shotSpeed,
+                Math.sin(shotAngle) * shotSpeed,
+                shotDamage,
+                shotRadius,
+                shotColor,
+                shotType
+              );
+            };
+
+            const cooldownStep = delta * SPEED_MULTIPLIER;
+            if (typeof e.slingerBossFragCooldown !== "number") e.slingerBossFragCooldown = 0;
+            e.slingerBossFragCooldown -= cooldownStep;
+            if (e.slingerBossFragCooldown <= 0) {
+              const shell = fireShot(angleToPlayer, 1.28, e.damage + 1, 9.2, "slingerBossFragShell", "#ffd08a");
+              shell.fragTargetX = player.x;
+              shell.fragTargetY = player.y;
+              shell.fragmentCount = 8;
+              shell.fragmentDamage = Math.max(1, e.damage * 0.75);
+              shell.fragmentRadius = 5.2;
+              shell.lifeTimer = 170;
+              e.slingerBossFragCooldown = phase === 1 ? 180 : (phase === 2 ? 135 : 66);
+            }
+
+            if (phase !== 3 && e.attackCooldown <= 0) {
+              if (phase === 1) {
+                fireShot(angleToPlayer, 1.62, e.damage, 7, "slingerBossProjectile", "#ffb347");
+                e.attackCooldown = 34;
+              } else if (phase === 2) {
+                const pelletCount = 5;
+                const spread = 0.42;
+                for (let pelletIndex = 0; pelletIndex < pelletCount; pelletIndex++) {
+                  const t = pelletCount <= 1 ? 0.5 : (pelletIndex / (pelletCount - 1));
+                  const pelletAngle = angleToPlayer + ((t - 0.5) * spread);
+                  fireShot(pelletAngle, 1.45, Math.max(1, e.damage - 0.25), 6.5, "slingerBossProjectile", "#ffb347");
+                }
+                e.attackCooldown = 60;
+              }
+            }
+
+            if (firedAny) {
+              try {
+                let enemyLaserSound = new Audio('laser.wav');
+                enemyLaserSound.volume = window.sentinelVolume.enemyProjectile;
+                enemyLaserSound.play();
+              } catch (e) {}
+            }
+          } else if (e.attackCooldown <= 0) {
             if (isSlinger) {
               const angle = Math.atan2(player.y - e.y, player.x - e.x);
               const speed = 1.5;
@@ -3872,39 +4718,96 @@ const droplifelenght = 280;
                 enemyLaserSound.volume = window.sentinelVolume.enemyProjectile;
                 enemyLaserSound.play();
               } catch (e) {}
+              e.attackCooldown = 60;
             } else {
               player.health -= e.damage;
+              e.attackCooldown = 60;
             }
-            e.attackCooldown = 60;
           }
             if (!isSlinger) drawLine(e.x, e.y, player.x, player.y, "gray");
         } else {
-            if (e.type === "brute") {
-              if (typeof e.zoneTargetX !== "number" || typeof e.zoneTargetY !== "number") {
-                const centerX = canvas.width / 2;
-                const centerY = canvas.height / 2;
-                const maxDistance = Math.max(80, Math.min(canvas.width, canvas.height) * 0.35);
-                const minDistance = Math.max(40, maxDistance * 0.38);
-                const targetDistance = minDistance + Math.random() * (maxDistance - minDistance);
-                const targetAngle = Math.random() * Math.PI * 2;
-                const targetX = centerX + Math.cos(targetAngle) * targetDistance;
-                const targetY = centerY + Math.sin(targetAngle) * targetDistance;
-                e.zoneTargetX = Math.max(e.radius, Math.min(canvas.width - e.radius, targetX));
-                e.zoneTargetY = Math.max(e.radius, Math.min(canvas.height - e.radius, targetY));
-                e.zoneLocked = false;
+            if (e.type === "bruteBoss") {
+              const paddingX = typeof e.bruteBossEdgePaddingX === "number" ? e.bruteBossEdgePaddingX : 90;
+              const paddingY = typeof e.bruteBossEdgePaddingY === "number" ? e.bruteBossEdgePaddingY : 135;
+              const minX = paddingX;
+              const maxX = canvas.width - paddingX;
+              const minY = paddingY;
+              const maxY = canvas.height - paddingY;
+              const isInsidePaddedArea = e.x >= minX && e.x <= maxX && e.y >= minY && e.y <= maxY;
+
+              if (e.bruteBossEntering !== false) {
+                const entryTargetX = canvas.width * 0.5;
+                const entryTargetY = canvas.height * 0.5;
+                const entryDx = entryTargetX - e.x;
+                const entryDy = entryTargetY - e.y;
+                const entryDist = Math.hypot(entryDx, entryDy);
+                const entrySpeed = typeof e.bruteBossEntrySpeed === "number" ? e.bruteBossEntrySpeed : (e.speed * 2);
+                if (entryDist > 0) {
+                  e.x += (entryDx / entryDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+                  e.y += (entryDy / entryDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+                }
+                if (isInsidePaddedArea) {
+                  e.bruteBossEntering = false;
+                  if (typeof e.bruteBossNormalSpeed === "number") {
+                    e.speed = e.bruteBossNormalSpeed;
+                  }
+                }
+              }
+
+              if (e.bruteBossEntering === false) {
+                const currentNovaRadius = typeof e.novaRadius === "number"
+                  ? e.novaRadius
+                  : (typeof e.novaMinRadius === "number" ? e.novaMinRadius : (e.radius + 24));
+                const desiredDistance = Math.max(e.radius + 24, currentNovaRadius * 0.72);
+                const distanceTolerance = Math.max(16, currentNovaRadius * 0.1);
+
+                if (dist > desiredDistance + distanceTolerance) {
+                  if (dist > 0) {
+                    e.x += (dx / dist) * e.speed * delta * SPEED_MULTIPLIER;
+                    e.y += (dy / dist) * e.speed * delta * SPEED_MULTIPLIER;
+                  }
+                } else if (dist < desiredDistance - distanceTolerance) {
+                  if (dist > 0) {
+                    e.x -= (dx / dist) * e.speed * delta * SPEED_MULTIPLIER;
+                    e.y -= (dy / dist) * e.speed * delta * SPEED_MULTIPLIER;
+                  }
+                } else {
+                  const tangentX = -dy;
+                  const tangentY = dx;
+                  const tangentLength = Math.hypot(tangentX, tangentY);
+                  if (tangentLength > 0) {
+                    const tangentDirection = (Math.sin((e.spinAngle || 0) * 0.35) >= 0) ? 1 : -1;
+                    const strafeSpeed = e.speed * 0.6;
+                    e.x += (tangentX / tangentLength) * strafeSpeed * tangentDirection * delta * SPEED_MULTIPLIER;
+                    e.y += (tangentY / tangentLength) * strafeSpeed * tangentDirection * delta * SPEED_MULTIPLIER;
+                  }
+                }
+
+                e.x = Math.max(minX, Math.min(maxX, e.x));
+                e.y = Math.max(minY, Math.min(maxY, e.y));
+              }
+            } else if (e.type === "brute") {
+              if (typeof e.zoneLocked !== "boolean") e.zoneLocked = false;
+              const centerX = canvas.width / 2;
+              const centerY = canvas.height / 2;
+              const maxStopDistance = Math.max(90, Math.min(canvas.width, canvas.height) * 0.34);
+              const minStopDistance = Math.max(44, maxStopDistance * 0.42);
+              if (typeof e.bruteStopDistance !== "number") {
+                e.bruteStopDistance = minStopDistance + Math.random() * (maxStopDistance - minStopDistance);
               }
 
               if (!e.zoneLocked) {
-                const zoneDx = e.zoneTargetX - e.x;
-                const zoneDy = e.zoneTargetY - e.y;
-                const zoneDist = Math.hypot(zoneDx, zoneDy);
-                if (zoneDist <= 4) {
-                  e.x = e.zoneTargetX;
-                  e.y = e.zoneTargetY;
+                const centerDist = Math.hypot(e.x - centerX, e.y - centerY);
+                if (centerDist <= e.bruteStopDistance) {
                   e.zoneLocked = true;
                 } else {
-                  e.x += (zoneDx / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
-                  e.y += (zoneDy / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
+                  const zoneDx = centerX - e.x;
+                  const zoneDy = centerY - e.y;
+                  const zoneDist = Math.hypot(zoneDx, zoneDy);
+                  if (zoneDist > 0) {
+                    e.x += (zoneDx / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
+                    e.y += (zoneDy / zoneDist) * e.speed * delta * SPEED_MULTIPLIER;
+                  }
                 }
               }
             } else
@@ -3981,66 +4884,152 @@ const droplifelenght = 280;
             }
         }
       }
-      // Only decrement attackCooldown for mobs
-      if (typeof e.attackCooldown === "number") e.attackCooldown--;
+    }
 
-      // Prevent enemy overlap and update spin
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i];
-        // Prevent overlap
-        for (let j = 0; j < enemies.length; j++) {
-          if (i === j) continue;
-          const o = enemies[j];
-          // Skip boss-grunt collision for a couple seconds after spawn
-          if (
-            (e.type === "grunt" && o.type === "gruntBoss" && e.noBossCollision > 0) ||
-            (o.type === "grunt" && e.type === "gruntBoss" && o.noBossCollision > 0)
-          ) {
-            continue;
-          }
-          const ox = e.x - o.x;
-          const oy = e.y - o.y;
-          const d = Math.hypot(ox, oy);
-          // Use collisionRadius for overlap, fallback to radius if missing
-          const r1 = typeof e.collisionRadius === 'number' ? e.collisionRadius : e.radius;
-          const r2 = typeof o.collisionRadius === 'number' ? o.collisionRadius : o.radius;
-          const minDist = r1 + r2;
-          if (d < minDist && d > 0) {
-            const overlap = (minDist - d) / 2;
-            // Reduce push factor for all enemies for gentler separation
-            let pushFactorE = 0.25, pushFactorO = 0.25;
-            if (e.type === "gruntBoss") pushFactorE = 0.08;
-            else if (e.type === "brute") pushFactorE = 0.18;
-            if (o.type === "gruntBoss") pushFactorO = 0.08;
-            else if (o.type === "brute") pushFactorO = 0.18;
-            // Each enemy moves by its push factor
-            e.x += (ox / d) * overlap * pushFactorE * delta * SPEED_MULTIPLIER;
-            e.y += (oy / d) * overlap * pushFactorE * delta * SPEED_MULTIPLIER;
-            o.x -= (ox / d) * overlap * pushFactorO * delta * SPEED_MULTIPLIER;
-            o.y -= (oy / d) * overlap * pushFactorO * delta * SPEED_MULTIPLIER;
-          }
+    // Only decrement attackCooldown for mobs
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (typeof e.attackCooldown === "number") e.attackCooldown--;
+    }
+
+    // Prevent enemy overlap and update spin/hover once per enemy per frame
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      for (let j = 0; j < enemies.length; j++) {
+        if (i === j) continue;
+        const o = enemies[j];
+        if (
+          (e.type === "grunt" && o.type === "gruntBoss" && e.noBossCollision > 0) ||
+          (o.type === "grunt" && e.type === "gruntBoss" && o.noBossCollision > 0)
+        ) {
+          continue;
         }
-        // Consistent spin speed for all enemies
-        if (typeof e.spinAngle === "undefined") e.spinAngle = Math.random() * Math.PI * 2;
-        e.spinAngle += 0.18 * delta;
-        // Slinger hover effect (visual only)
-        let hoverY = e.y;
-        if (e.type === "slinger") {
-          if (typeof e.baseY === "undefined") e.baseY = e.y;
-          if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
-          e.hoverOffset += 0.8 * delta;
-          hoverY = e.y + Math.sin(e.hoverOffset) * 1;
+        const ox = e.x - o.x;
+        const oy = e.y - o.y;
+        const d = Math.hypot(ox, oy);
+        const r1 = typeof e.collisionRadius === 'number' ? e.collisionRadius : e.radius;
+        const r2 = typeof o.collisionRadius === 'number' ? o.collisionRadius : o.radius;
+        const minDist = r1 + r2;
+        const isBrutePair = (e.type === "brute" || e.type === "bruteBoss") && (o.type === "brute" || o.type === "bruteBoss");
+        const isShielderPair = e.type === "shielder" && o.type === "shielder";
+        const shouldUseExpandedSpacing = isBrutePair || isShielderPair;
+        const targetMinDist = shouldUseExpandedSpacing ? minDist * 3 : minDist;
+        if (d < targetMinDist && d > 0) {
+          const overlap = (targetMinDist - d) / 2;
+          let pushFactorE = 0.25, pushFactorO = 0.25;
+          if (e.type === "gruntBoss") pushFactorE = 0.08;
+          else if (e.type === "brute" || e.type === "bruteBoss") pushFactorE = 0.18;
+          else if (e.type === "stalker") pushFactorE = 0.16;
+          else if (e.type === "shielder") pushFactorE = 0.16;
+          else if (e.type === "beamer") pushFactorE = 0.16;
+          if (o.type === "gruntBoss") pushFactorO = 0.08;
+          else if (o.type === "brute" || o.type === "bruteBoss") pushFactorO = 0.18;
+          else if (o.type === "stalker") pushFactorO = 0.16;
+          else if (o.type === "shielder") pushFactorO = 0.16;
+          else if (o.type === "beamer") pushFactorO = 0.16;
+          if (shouldUseExpandedSpacing) {
+            pushFactorE = 0.3;
+            pushFactorO = 0.3;
+          }
+          e.x += (ox / d) * overlap * pushFactorE * delta * SPEED_MULTIPLIER;
+          e.y += (oy / d) * overlap * pushFactorE * delta * SPEED_MULTIPLIER;
+          o.x -= (ox / d) * overlap * pushFactorO * delta * SPEED_MULTIPLIER;
+          o.y -= (oy / d) * overlap * pushFactorO * delta * SPEED_MULTIPLIER;
         }
+      }
+
+      if (typeof e.spinAngle === "undefined") e.spinAngle = Math.random() * Math.PI * 2;
+      e.spinAngle += 0.18 * delta;
+      if (e.type === "slinger" || e.type === "slingerBoss") {
+        if (typeof e.baseY === "undefined") e.baseY = e.y;
+        if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
+        e.hoverOffset += 0.8 * delta;
       }
     }
   }
 
   function updateProjectiles(delta) {
     const frameScale = delta * SPEED_MULTIPLIER;
+    const emitBruteFireballNova = (x, y, areaRadius) => {
+      const resolvedRadius = Math.max(18, Number.isFinite(areaRadius) ? areaRadius : 72);
+      const burstCount = 28;
+      for (let burstIndex = 0; burstIndex < burstCount; burstIndex++) {
+        const angle = (Math.PI * 2 * burstIndex) / burstCount;
+        const speed = (resolvedRadius / 26) + Math.random() * (resolvedRadius / 40);
+        const flare = burstIndex < 10;
+        const color = flare ? "#fff200" : ["#ff6600", "#ffaa00", "#ff3300"][Math.floor(Math.random() * 3)];
+        const size = flare ? 6 + Math.random() * 2.5 : 3.2 + Math.random() * 2;
+        const life = flare ? 20 + Math.random() * 12 : 15 + Math.random() * 10;
+        const decay = flare ? 0.92 : 0.95;
+        spawnParticle(
+          x,
+          y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          life,
+          color,
+          decay,
+          size,
+          "novaFlare"
+        );
+      }
+    };
+
     for (let i = projectiles.length - 1; i >= 0; i--) {
       const p = projectiles[i];
       p.x += p.dx * frameScale;
       p.y += p.dy * frameScale;
+
+      if (p.type === "bruteBossFireball") {
+        p.lifeTimer = (typeof p.lifeTimer === "number" ? p.lifeTimer : 200) - frameScale;
+        p.particleCooldown = (typeof p.particleCooldown === "number" ? p.particleCooldown : 0) - frameScale;
+        if (p.particleCooldown <= 0) {
+          p.particleCooldown = 8;
+          const trailAngle = Math.atan2(-p.dy, -p.dx);
+          const spread = (Math.random() - 0.5) * 0.9;
+          const particleSpeed = 0.5 + Math.random() * 0.5;
+          spawnParticle(
+            p.x,
+            p.y,
+            Math.cos(trailAngle + spread) * particleSpeed,
+            Math.sin(trailAngle + spread) * particleSpeed,
+            14 + Math.floor(Math.random() * 12),
+            ["#ff6a00", "#ffb14d", "#ff4200"][Math.floor(Math.random() * 3)],
+            0.91 + Math.random() * 0.04,
+            2 + Math.random() * 2,
+            "enemyProjectile"
+          );
+        }
+      }
+
+      if (p.type === "slingerBossFragShell") {
+        p.lifeTimer = (typeof p.lifeTimer === "number" ? p.lifeTimer : 170) - frameScale;
+        const targetX = typeof p.fragTargetX === "number" ? p.fragTargetX : p.x;
+        const targetY = typeof p.fragTargetY === "number" ? p.fragTargetY : p.y;
+        const shellRadius = typeof p.radius === "number" ? p.radius : 9;
+        const distanceToTarget = Math.hypot(targetX - p.x, targetY - p.y);
+        if (distanceToTarget <= Math.max(7, shellRadius + 1) || p.lifeTimer <= 0) {
+          const fragmentCount = typeof p.fragmentCount === "number" ? p.fragmentCount : 8;
+          const fragmentDamage = Math.max(1, typeof p.fragmentDamage === "number" ? p.fragmentDamage : (p.damage * 0.75));
+          const fragmentRadius = typeof p.fragmentRadius === "number" ? p.fragmentRadius : 5.2;
+          for (let fragmentIndex = 0; fragmentIndex < fragmentCount; fragmentIndex++) {
+            const fragmentAngle = (Math.PI * 2 * fragmentIndex) / fragmentCount;
+            const fragmentSpeed = 1.95 + Math.random() * 0.45;
+            spawnProjectile(
+              targetX,
+              targetY,
+              Math.cos(fragmentAngle) * fragmentSpeed,
+              Math.sin(fragmentAngle) * fragmentSpeed,
+              fragmentDamage,
+              fragmentRadius,
+              "#ffb347",
+              "slingerBossFragment"
+            );
+          }
+          releaseProjectileAt(i);
+          continue;
+        }
+      }
 
       if (p.trail) {
         p.trail.push({ x: p.x, y: p.y });
@@ -4051,6 +5040,27 @@ const droplifelenght = 280;
       const dist = Math.hypot(player.x - p.x, player.y - p.y);
       if (dist < player.radius + projectileRadius) {
         player.health -= p.damage;
+        if (p.type === "bruteBossFireball") {
+          emitBruteFireballNova(p.x, p.y, p.burnRadius);
+          spawnBurningArea(p.x, p.y, {
+            radius: p.burnRadius,
+            duration: p.burnDuration,
+            tickInterval: p.burnTickInterval,
+            damage: p.burnDamage
+          });
+        }
+        releaseProjectileAt(i);
+        continue;
+      }
+
+      if (p.type === "bruteBossFireball" && p.lifeTimer <= 0) {
+        emitBruteFireballNova(p.x, p.y, p.burnRadius);
+        spawnBurningArea(p.x, p.y, {
+          radius: p.burnRadius,
+          duration: p.burnDuration,
+          tickInterval: p.burnTickInterval,
+          damage: p.burnDamage
+        });
         releaseProjectileAt(i);
         continue;
       }
@@ -4083,6 +5093,79 @@ const droplifelenght = 280;
 
   function drawProjectiles() {
     for (let p of projectiles) {
+      if (p.type === "bruteBossFireball") {
+        if (p.trail && p.trail.length > 1) {
+          ctx.save();
+          for (let i = 1; i < p.trail.length; i++) {
+            const prev = p.trail[i - 1];
+            const curr = p.trail[i];
+            const alpha = 0.16 + 0.3 * (i / p.trail.length);
+            ctx.beginPath();
+            ctx.moveTo(prev.x, prev.y);
+            ctx.lineTo(curr.x, curr.y);
+            ctx.strokeStyle = `rgba(255, 100, 10, ${alpha})`;
+            ctx.lineWidth = 3.2 - 1.5 * (i / p.trail.length);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        ctx.save();
+        const pulse = 0.72 + 0.28 * Math.sin(Date.now() / 110 + p.x * 0.05 + p.y * 0.05);
+        const outerRadius = (typeof p.radius === "number" ? p.radius : 10) * (0.95 + 0.22 * pulse);
+        const innerRadius = (typeof p.radius === "number" ? p.radius : 10) * 0.58;
+        ctx.globalAlpha = 0.84 * pulse;
+        ctx.shadowColor = "#ff5a00";
+        ctx.shadowBlur = 24 * pulse;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, outerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "#ff5a00";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, innerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffd27a";
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
+      if (p.type === "slingerBossProjectile" || p.type === "slingerBossFragment" || p.type === "slingerBossFragShell") {
+        if (p.trail && p.trail.length > 1) {
+          ctx.save();
+          for (let i = 1; i < p.trail.length; i++) {
+            const prev = p.trail[i - 1];
+            const curr = p.trail[i];
+            const alpha = 0.1 + 0.24 * (i / p.trail.length);
+            ctx.beginPath();
+            ctx.moveTo(prev.x, prev.y);
+            ctx.lineTo(curr.x, curr.y);
+            ctx.strokeStyle = `rgba(255, 170, 80, ${alpha})`;
+            ctx.lineWidth = 3.1 - 1.4 * (i / p.trail.length);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        ctx.save();
+        const pulse = 0.76 + 0.24 * Math.sin(Date.now() / 130 + p.x * 0.07 + p.y * 0.05);
+        const baseRadius = typeof p.radius === "number" ? p.radius : 6;
+        const outerRadius = baseRadius * (p.type === "slingerBossFragment" ? 1.12 : 1.26) * pulse;
+        const innerRadius = baseRadius * (p.type === "slingerBossFragment" ? 0.54 : 0.62);
+        ctx.globalAlpha = 0.86 * pulse;
+        ctx.shadowColor = p.type === "slingerBossFragShell" ? "#ffd08a" : "#ff9f1a";
+        ctx.shadowBlur = 18 * pulse;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, outerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color || "#ffb347";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, innerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff2c0";
+        ctx.fill();
+        ctx.restore();
+        continue;
+      }
       // Draw trail
       if (p.trail && p.trail.length > 1) {
         ctx.save();
@@ -4251,22 +5334,32 @@ const droplifelenght = 280;
         updateProjectiles(delta);
         autoAttack();
         handleWaveSpawning(delta);
-        const waveUsesBossGate = wave === 5;
+        const waveUsesBossGate = wave === 5 || wave === 10 || wave === 20;
         const finalBurstReached = burstCount !== Infinity && burstIndex >= burstCount;
         const allEnemiesCleared = enemies.length === 0;
-        const shouldAdvanceWave = !waveUsesBossGate && finalBurstReached && allEnemiesCleared;
-        if (shouldAdvanceWave) {
-          interWavePending = false;
-          interWaveDelayTimer = 0;
-          wave++;
-          try {
-            let warnAudio = new Audio('warning.wav');
-            warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0;
-            warnAudio.playbackRate = 0.7;
-            warnAudio.play();
-          } catch (e) {}
-          spawnWave();
-          burstTimer = burstInterval;
+        const allowTimedOrClearAdvance = !waveUsesBossGate && finalBurstReached;
+        if (allowTimedOrClearAdvance) {
+          if (!interWavePending) {
+            interWavePending = true;
+            interWaveDelayTimer = INTER_WAVE_DELAY_SECONDS;
+          } else {
+            interWaveDelayTimer -= delta;
+          }
+          const timerExpired = interWaveDelayTimer <= 0;
+          const shouldAdvanceWave = allEnemiesCleared || timerExpired;
+          if (shouldAdvanceWave) {
+            interWavePending = false;
+            interWaveDelayTimer = 0;
+            wave++;
+            try {
+              let warnAudio = new Audio('warning.wav');
+              warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0;
+              warnAudio.playbackRate = 0.7;
+              warnAudio.play();
+            } catch (e) {}
+            spawnWave();
+            burstTimer = burstInterval;
+          }
         } else {
           interWavePending = false;
           interWaveDelayTimer = 0;
@@ -4385,6 +5478,7 @@ const droplifelenght = 280;
       drawParticlesOfType("enemyDeath")
       drawParticlesOfType("dust")
       drawParticlesOfType("novaFlare")
+      drawParticlesOfType("burnZone")
       drawParticlesOfType("gruntNova")
 
 
@@ -4409,6 +5503,7 @@ const droplifelenght = 280;
         const barHeight = 4; // Skinnier bars
         const barX = player.x - barWidth / 2;
         let barY = player.y - player.radius - 18;
+        const healthBarY = barY;
 
         // Health bar
         ctx.save();
@@ -4423,6 +5518,7 @@ const droplifelenght = 280;
 
         // XP bar (drawn above health bar)
         barY -= barHeight + 3; // Slightly less gap for skinnier bars
+        const xpBarY = barY;
         ctx.save();
         ctx.lineWidth = 2;
         ctx.strokeStyle = "#222";
@@ -4432,6 +5528,32 @@ const droplifelenght = 280;
         ctx.stroke();
         ctx.fillRect(barX, barY, barWidth * (xp / xpToLevel), barHeight);
         ctx.restore();
+
+        if (statPoints > 0) {
+          const arrowX = barX + barWidth + 10;
+          const arrowTopY = xpBarY - 2;
+          const arrowBottomY = healthBarY + barHeight + 2;
+          const arrowMidY = arrowTopY + 6;
+          ctx.save();
+          ctx.strokeStyle = "#00ff88";
+          ctx.fillStyle = "#00ff88";
+          ctx.shadowColor = "#00ff88";
+          ctx.shadowBlur = 10;
+          ctx.lineWidth = 2;
+
+          ctx.beginPath();
+          ctx.moveTo(arrowX, arrowBottomY);
+          ctx.lineTo(arrowX, arrowMidY);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(arrowX, arrowTopY);
+          ctx.lineTo(arrowX - 4, arrowMidY);
+          ctx.lineTo(arrowX + 4, arrowMidY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
       }
 
       // Player feedback: green flash when level up
@@ -4589,7 +5711,7 @@ const droplifelenght = 280;
 
       enemies.forEach(e => {
                 // Draw boss health bar above boss
-                if (e.type === "gruntBoss") {
+                if (e.type === "gruntBoss" || e.type === "bruteBoss" || e.type === "slingerBoss") {
                   const barWidth = 80;
                   const barHeight = 8;
                   const barX = e.x - barWidth / 2;
@@ -4602,7 +5724,7 @@ const droplifelenght = 280;
                   ctx.globalAlpha = 0.92;
                   ctx.lineWidth = 3;
                   ctx.strokeStyle = "#222";
-                  ctx.fillStyle = "#e00000";
+                  ctx.fillStyle = e.type === "bruteBoss" ? "#ff6a00" : (e.type === "slingerBoss" ? "#ff9f1a" : "#e00000");
                   ctx.beginPath();
                   ctx.rect(barX, barY, barWidth, barHeight);
                   ctx.stroke();
@@ -4612,16 +5734,18 @@ const droplifelenght = 280;
                   ctx.fillStyle = "#fff";
                   ctx.textAlign = "center";
                   ctx.textBaseline = "bottom";
-                  ctx.fillText("Shard Major", e.x, barY - 2);
+                  ctx.fillText(e.type === "bruteBoss" ? "Brute Major" : (e.type === "slingerBoss" ? "Slinger Major" : "Shard Major"), e.x, barY - 2);
                   ctx.restore();
                 }
-        // Slinger hover effect (visual only)
+        // Hover effect (visual only) for slinger and stalker
+        let hoverX = e.x;
         let hoverY = e.y;
-        if (e.type === "slinger") {
-          if (typeof e.baseY === "undefined") e.baseY = e.y;
+        if (e.type === "slinger" || e.type === "slingerBoss" || e.type === "stalker" || e.type === "beamer" || e.type === "shielder") {
           if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
           e.hoverOffset += 0.04;
-          hoverY = e.y + Math.sin(e.hoverOffset) * 0.2;
+          const hoverRadius = e.type === "stalker" ? 2.8 : (e.type === "beamer" ? 2.5 : (e.type === "shielder" ? 2.3 : 2.2));
+          hoverX = e.x + Math.cos(e.hoverOffset) * hoverRadius;
+          hoverY = e.y + Math.sin(e.hoverOffset * 0.93) * (hoverRadius * 0.58);
         }
 
         // Draw fading shadows from each light
@@ -4649,7 +5773,7 @@ const droplifelenght = 280;
             const shadowY = dirY * shadowOffset;
             // Make brute shadow larger from lights
             let shadowLength, shadowWidth;
-            if (e.type === "brute") {
+            if (e.type === "brute" || e.type === "bruteBoss") {
               shadowLength = e.radius * 2.7;
               shadowWidth = e.radius * 1.1;
             } else {
@@ -4670,6 +5794,27 @@ const droplifelenght = 280;
         });
         ctx.restore();
 
+        if (e.shielded) {
+          ctx.save();
+          const shieldBaseX = hoverX;
+          const shieldBaseY = hoverY;
+          const shieldRadius = e.radius + 6;
+          ctx.globalAlpha = 0.28;
+          ctx.fillStyle = "rgba(125, 255, 230, 0.38)";
+          ctx.shadowColor = "#7dffe6";
+          ctx.shadowBlur = 16;
+          ctx.beginPath();
+          ctx.arc(shieldBaseX, shieldBaseY, shieldRadius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 0.82;
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#d8fff4";
+          ctx.beginPath();
+          ctx.arc(shieldBaseX, shieldBaseY, shieldRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
         ctx.save();
         ctx.shadowColor = e.color;
         ctx.shadowBlur = 12;
@@ -4686,7 +5831,7 @@ const droplifelenght = 280;
           ctx.rotate(e.spinAngle);
           ctx.drawImage(gruntImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
-        } else if (e.type === "brute") {
+        } else if (e.type === "brute" || e.type === "bruteBoss") {
           ctx.save();
           ctx.shadowColor = "#0000009f";
           ctx.shadowBlur = 12;
@@ -4699,16 +5844,22 @@ const droplifelenght = 280;
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.arc(e.x, e.y, e.novaRadius || (e.radius + 8), 0, Math.PI * 2);
-          ctx.strokeStyle = e.novaCue ? "#fff200" : "#ff6600";
-          ctx.shadowColor = e.novaCue ? "#fff200" : "#ff6600";
-          ctx.shadowBlur = e.novaCue ? 24 : 12;
+          if (e.type === "bruteBoss") {
+            ctx.strokeStyle = e.novaCue ? "#ff8a00" : "#ffaa00";
+            ctx.shadowColor = e.novaCue ? "#ff8a00" : "#ffaa00";
+            ctx.shadowBlur = e.novaCue ? 22 : 10;
+          } else {
+            ctx.strokeStyle = e.novaCue ? "#fff200" : "#ff6600";
+            ctx.shadowColor = e.novaCue ? "#fff200" : "#ff6600";
+            ctx.shadowBlur = e.novaCue ? 24 : 12;
+          }
           ctx.stroke();
           ctx.restore();
-        } else if (e.type === "slinger") {
+        } else if (e.type === "slinger" || e.type === "slingerBoss") {
           ctx.save();
           ctx.shadowColor = "#00000071";
           ctx.shadowBlur = 12;
-          ctx.translate(e.x, hoverY);
+          ctx.translate(hoverX, hoverY);
           ctx.drawImage(slingerImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
         } else if (e.type === "kamikaze") {
@@ -4718,6 +5869,155 @@ const droplifelenght = 280;
           ctx.translate(e.x, e.y);
           ctx.drawImage(kamikazeImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
+        } else if (e.type === "stalker") {
+          ctx.save();
+          ctx.translate(hoverX, hoverY);
+          const stalkerAlpha = typeof e.stalkerAlpha === "number" ? e.stalkerAlpha : 0.9;
+          ctx.globalAlpha = stalkerAlpha;
+          if (stalkerImg && stalkerImg.complete && stalkerImg.naturalWidth > 0) {
+            const drawScale = 4.1;
+            ctx.shadowColor = "#000000";
+            ctx.shadowBlur = 14;
+            ctx.drawImage(stalkerImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
+          } else {
+            ctx.fillStyle = "#66e8ff";
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = Math.max(0.1, stalkerAlpha * 0.85);
+            ctx.strokeStyle = "#b7f6ff";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius + 3, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else if (e.type === "beamer") {
+          ctx.save();
+          ctx.translate(hoverX, hoverY);
+          const beamGlow = typeof e.beamGlow === "number" ? e.beamGlow : 0.12;
+          const beamerAlpha = typeof e.beamerAlpha === "number" ? e.beamerAlpha : 1;
+          const beamerFacingAngle = typeof e.beamerFacingAngle === "number" ? e.beamerFacingAngle : Math.atan2(player.y - hoverY, player.x - hoverX);
+          const castAlpha = e.beamCastTimer > 0 ? 0.78 : 1;
+          ctx.globalAlpha = castAlpha * beamerAlpha;
+          ctx.rotate(beamerFacingAngle);
+          if (beamerImg && beamerImg.complete && beamerImg.naturalWidth > 0) {
+            const drawScale = 4.2;
+            ctx.shadowColor = "#0077ff";
+            ctx.shadowBlur = 10 + (beamGlow * 8);
+            ctx.drawImage(beamerImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
+          } else {
+            ctx.fillStyle = "#5ecfff";
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * 0.85, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#d6f3ff";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius + 2, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          if ((e.beamCastTimer > 0 || e.beamActiveTimer > 0) && typeof e.beamAngle === "number") {
+            const beamStartX = hoverX;
+            const beamStartY = hoverY;
+            const beamLength = typeof e.beamLength === "number" ? e.beamLength : 460;
+            const isActiveBeam = e.beamActiveTimer > 0;
+            const beamHeadDist = isActiveBeam
+              ? Math.max(0, Math.min(beamLength, typeof e.beamTravelHead === "number" ? e.beamTravelHead : beamLength))
+              : beamLength;
+            const beamTailDist = isActiveBeam
+              ? Math.max(0, Math.min(beamHeadDist, typeof e.beamTravelTail === "number" ? e.beamTravelTail : 0))
+              : 0;
+            const beamSegStartX = beamStartX + Math.cos(e.beamAngle) * beamTailDist;
+            const beamSegStartY = beamStartY + Math.sin(e.beamAngle) * beamTailDist;
+            const beamSegEndX = beamStartX + Math.cos(e.beamAngle) * beamHeadDist;
+            const beamSegEndY = beamStartY + Math.sin(e.beamAngle) * beamHeadDist;
+            const beamAlpha = (isActiveBeam ? 0.75 : 0.5) * (typeof e.beamerAlpha === "number" ? e.beamerAlpha : 1);
+            const beamWidth = e.beamActiveTimer > 0 ? 5.5 : 1.6;
+            const beamLineColor = isActiveBeam ? "#6ad3ff" : "#ff2222";
+            const beamShadowColor = isActiveBeam ? "#4ecbff" : "#ff2c2c";
+            const beamCoreColor = isActiveBeam ? "#d4f5ff" : "#ffd0d0";
+            const beamTipColor = isActiveBeam ? "#dcf8ff" : "#ffdede";
+
+            ctx.save();
+            ctx.globalAlpha = beamAlpha;
+            ctx.strokeStyle = beamLineColor;
+            ctx.lineWidth = beamWidth;
+            ctx.shadowColor = beamShadowColor;
+            ctx.shadowBlur = isActiveBeam ? 20 : 14;
+            ctx.beginPath();
+            ctx.moveTo(beamSegStartX, beamSegStartY);
+            ctx.lineTo(beamSegEndX, beamSegEndY);
+            ctx.stroke();
+
+            if (isActiveBeam) {
+              ctx.globalAlpha = 0.75;
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = beamCoreColor;
+              ctx.beginPath();
+              ctx.moveTo(beamSegStartX, beamSegStartY);
+              ctx.lineTo(beamSegEndX, beamSegEndY);
+              ctx.stroke();
+
+              ctx.globalAlpha = 0.88;
+              ctx.fillStyle = beamTipColor;
+              ctx.beginPath();
+              ctx.arc(beamSegEndX, beamSegEndY, 3.6, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
+        } else if (e.type === "shielder") {
+          ctx.save();
+          ctx.translate(hoverX, hoverY);
+          const shielderAlpha = typeof e.shielderAlpha === "number" ? e.shielderAlpha : 1;
+          ctx.globalAlpha = shielderAlpha;
+          if (shielderImg && shielderImg.complete && shielderImg.naturalWidth > 0) {
+            const drawScale = 4.0;
+            ctx.shadowColor = "#78ffd6";
+            ctx.shadowBlur = 12;
+            ctx.drawImage(shielderImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
+          } else {
+            ctx.shadowColor = "#78ffd6";
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = "#4be6c3";
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * 0.82, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#d7fff2";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius + 2.5, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          const linkedAllies = Array.isArray(e.activeShieldTargets)
+            ? e.activeShieldTargets.filter(other => other && other.health > 0)
+            : [];
+          if (linkedAllies.length > 0) {
+            ctx.save();
+            for (const ally of linkedAllies) {
+              const allyHoverY = (typeof ally.hoverOffset === "number")
+                ? ally.y + Math.sin(ally.hoverOffset * 0.93) * 0.8
+                : ally.y;
+              const linkAngle = Math.atan2(allyHoverY - hoverY, ally.x - hoverX);
+              const linkStartX = hoverX + Math.cos(linkAngle) * (e.radius + 4);
+              const linkStartY = hoverY + Math.sin(linkAngle) * (e.radius + 4);
+              ctx.globalAlpha = 0.55;
+              ctx.strokeStyle = "#7dffe6";
+              ctx.lineWidth = 2.2;
+              ctx.shadowColor = "#7dffe6";
+              ctx.shadowBlur = 10;
+              ctx.beginPath();
+              ctx.moveTo(linkStartX, linkStartY);
+              ctx.lineTo(ally.x, allyHoverY);
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
         } else {
           ctx.fillStyle = e.color;
           ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
@@ -4742,39 +6042,6 @@ const droplifelenght = 280;
 
 
       //-======================HUD AND STAT ALLOCATION======================-
-      // Draw stat allocation warning box under HUD overlay
-      if (statPoints > 0 && !showStats) {
-        ctx.save();
-        ctx.globalAlpha = 0.75;
-        ctx.fillStyle = '#152c16';
-        ctx.fillRect(canvas.width / 2 - 170, -10, 340, 110);
-        ctx.globalAlpha = 0.75;
-        ctx.shadowColor = '#00ffdd';
-        ctx.shadowBlur = 18;
-        ctx.strokeStyle = '#00ffdd';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(canvas.width / 2 - 170, -10, 340, 110);
-        ctx.shadowBlur = 0;
-        ctx.restore();
-        ctx.fillStyle = "#00ffdd";
-        ctx.font = "bold 16px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("LEVEL UP!", canvas.width / 2, 80);
-        ctx.globalAlpha = 0.75;
-        ctx.fillStyle = '#152c16';
-        ctx.fillRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
-        ctx.globalAlpha = 0.75;
-        ctx.shadowColor = '#00ffdd';
-        ctx.shadowBlur = 18;
-        ctx.strokeStyle = '#00ffdd';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = "#00ffdd";
-        ctx.font = "bold 16px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("[1]-> Range  [2]-> Power  [3]-> Atk Speed  [4]-> Movement  [5]-> Vitality  [6]-> Pickup", canvas.width / 2, canvas.height - 85);
-      }
       // Draw HUD overlay image after stat allocation boxes
       if (hudImg.complete && hudImg.naturalWidth > 0) {
         ctx.save();
@@ -4838,12 +6105,18 @@ const droplifelenght = 280;
         const elapsedSeconds = (Date.now() - window._gameOverTime) / 1000;
         const remainingSeconds = Math.max(0, 5 - Math.floor(elapsedSeconds));
         
-        // Check if this is a second death
-        if (window._playerUsedContinue) {
-          // Second death: show acknowledgment message
+        const editorTimerExpired = window._editorSessionActive && !window._playerUsedContinue && elapsedSeconds >= 5;
+
+        // Second death, or editor first-death timer expired
+        if (window._playerUsedContinue || editorTimerExpired) {
+          // Second death: editor session stays in game-over state
           ctx.font = "bold 20px sans-serif";
           ctx.fillStyle = "white";
-          ctx.fillText("Click to return to Menu", canvas.width / 2, canvas.height / 2 + 60);
+          if (window._editorSessionActive) {
+            ctx.fillText("Press O to open Editor and spawn a wave", canvas.width / 2, canvas.height / 2 + 60);
+          } else {
+            ctx.fillText("Click to return to Menu", canvas.width / 2, canvas.height / 2 + 60);
+          }
         } else {
           // First death: show continue option with timer
           ctx.font = "bold 20px sans-serif";
@@ -4855,8 +6128,8 @@ const droplifelenght = 280;
         ctx.fillStyle = "#00ffdd";
         ctx.fillText(`Collected Bytes: ${runCollectedBytes}`, canvas.width / 2, canvas.height / 2 + 96);
         
-        // Auto-return to menu after 5 seconds (only on first death)
-        if (!window._playerUsedContinue && remainingSeconds === 0 && elapsedSeconds >= 5) {
+        // Auto-return to menu after 5 seconds (only on first death, outside editor sessions)
+        if (!window._editorSessionActive && !window._playerUsedContinue && remainingSeconds === 0 && elapsedSeconds >= 5) {
           finalizeRunBytes();
           showMenuScreen = true;
           window._playMenuAmbienceOnShowMenu = true;
