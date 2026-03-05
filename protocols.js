@@ -76,6 +76,7 @@ const ProtocolSystem = {
   protocolBoard: {},
   activeProtocols: [],
   starterProtocols: [],
+  favoriteProtocols: [],
   runDiscoveredProtocols: [],
   selectedFamily: "Targeting",
   selectedProtocol: null,
@@ -117,7 +118,8 @@ const ProtocolSystem = {
     try {
       const payload = {
         protocolBoard: {},
-        starterProtocols: Array.isArray(this.starterProtocols) ? [...this.starterProtocols] : []
+        starterProtocols: Array.isArray(this.starterProtocols) ? [...this.starterProtocols] : [],
+        favoriteProtocols: Array.isArray(this.favoriteProtocols) ? [...this.favoriteProtocols] : []
       };
 
       Object.keys(this.protocolBoard).forEach(name => {
@@ -159,6 +161,10 @@ const ProtocolSystem = {
         this.starterProtocols = saved.starterProtocols.filter(name => PROTOCOLS[name] && this.protocolBoard[name]?.discovered).slice(0, 2);
       }
 
+      if (saved && Array.isArray(saved.favoriteProtocols)) {
+        this.favoriteProtocols = saved.favoriteProtocols.filter(name => !!PROTOCOLS[name]);
+      }
+
       if (migrated) {
         this.savePersistentData();
       }
@@ -193,6 +199,15 @@ const ProtocolSystem = {
     }
 
     return false;
+  },
+
+  // Discover a protocol for current run only (no permanent unlock/save)
+  discoverRunOnly: function(protocolName) {
+    if (!PROTOCOLS[protocolName]) return false;
+    if (this.runDiscoveredProtocols.includes(protocolName)) return false;
+    this.runDiscoveredProtocols.push(protocolName);
+    console.log(`✓ Run-only discovered: ${protocolName}`);
+    return true;
   },
 
   // Mark protocol as seen in UI (clears NEW highlight)
@@ -391,6 +406,27 @@ const ProtocolSystem = {
       return true;
     }
     return false;
+  },
+
+  // Favorite protocol helpers
+  isFavorite: function(protocolName) {
+    return this.favoriteProtocols.includes(protocolName);
+  },
+
+  toggleFavorite: function(protocolName) {
+    if (!PROTOCOLS[protocolName]) return false;
+    const idx = this.favoriteProtocols.indexOf(protocolName);
+    if (idx >= 0) {
+      this.favoriteProtocols.splice(idx, 1);
+    } else {
+      this.favoriteProtocols.push(protocolName);
+    }
+    this.savePersistentData();
+    return true;
+  },
+
+  getFavorites: function() {
+    return [...this.favoriteProtocols];
   },
 
   // Initialize run with starter protocols
