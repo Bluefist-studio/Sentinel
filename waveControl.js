@@ -302,7 +302,7 @@ window.SentinelWaveControl = (function () {
 
     for (let i = 0; i < count; i++) {
       const { x, y } = randomEdgeSpawn();
-      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave * 1.3), damage = 1, attackRange = 20, color = "magenta";
+      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave * 1.3), damage = 1, attackRange = 22, color = "magenta";
       const spinAngle = Math.random() * Math.PI * 2;
       const spinSpeed = (Math.random() - 0.5) * 0.02;
       const enemy = ctx.spawnEnemy();
