@@ -1405,9 +1405,24 @@ window.onload = function () {
     }
   }
 
+  function returnToMainMenu() {
+    finalizeRunBytes();
+    showMenuScreen = true;
+    window._playMenuAmbienceOnShowMenu = true;
+    showMenu();
+    window._playMenuAmbienceOnShowMenu = false;
+    gameOver = false;
+    window._gameOverTime = undefined;
+    window._playerUsedContinue = false;
+    followMouse = false;
+    paused = false;
+    showStats = false;
+  }
+
   totalCollectedBytes = loadCollectedBytes();
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
+  let returnToMenuModalOpen = false;
   window._editorSessionActive = false;
   const protocolWarnings = [];
   let selectedProtocol = -1;
@@ -1420,6 +1435,121 @@ window.onload = function () {
   let mouseX = 512, mouseY = 425;
   let followMouse = false;
 
+  function showReturnToMenuModal() {
+    if (returnToMenuModalOpen || !gameStarted || showMenuScreen) return;
+    returnToMenuModalOpen = true;
+
+    const previousFollowMouse = followMouse;
+    const previousPaused = paused;
+    const previousShowStats = showStats;
+
+    followMouse = false;
+    paused = true;
+    showStats = true;
+
+    const confirmOverlay = document.createElement("div");
+    confirmOverlay.style.position = "fixed";
+    confirmOverlay.style.left = "0";
+    confirmOverlay.style.top = "0";
+    confirmOverlay.style.width = "100vw";
+    confirmOverlay.style.height = "100vh";
+    confirmOverlay.style.background = "rgba(0, 0, 0, 0.74)";
+    confirmOverlay.style.display = "flex";
+    confirmOverlay.style.alignItems = "center";
+    confirmOverlay.style.justifyContent = "center";
+    confirmOverlay.style.zIndex = "1200";
+
+    const confirmPanel = document.createElement("div");
+    confirmPanel.style.width = "min(460px, 90vw)";
+    confirmPanel.style.background = "rgba(0, 20, 30, 0.98)";
+    confirmPanel.style.border = "2px solid #00ffdd";
+    confirmPanel.style.borderRadius = "10px";
+    confirmPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+    confirmPanel.style.padding = "16px";
+    confirmPanel.style.color = "#c8ffff";
+    confirmPanel.style.fontFamily = "sans-serif";
+    confirmOverlay.appendChild(confirmPanel);
+
+    const confirmTitle = document.createElement("div");
+    confirmTitle.textContent = "RETURN TO MAIN MENU";
+    confirmTitle.style.color = "#00ffdd";
+    confirmTitle.style.fontWeight = "bold";
+    confirmTitle.style.fontSize = "1.05rem";
+    confirmTitle.style.marginBottom = "10px";
+    confirmPanel.appendChild(confirmTitle);
+
+    const confirmMessage = document.createElement("div");
+    confirmMessage.textContent = "Do you want to go back to the main menu?";
+    confirmMessage.style.color = "#aaf6ff";
+    confirmMessage.style.fontSize = "0.95rem";
+    confirmMessage.style.lineHeight = "1.4";
+    confirmMessage.style.marginBottom = "14px";
+    confirmPanel.appendChild(confirmMessage);
+
+    const actionRow = document.createElement("div");
+    actionRow.style.display = "flex";
+    actionRow.style.justifyContent = "flex-end";
+    actionRow.style.gap = "8px";
+    confirmPanel.appendChild(actionRow);
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.style.padding = "0.5rem 0.85rem";
+    cancelBtn.style.borderRadius = "6px";
+    cancelBtn.style.border = "1px solid #2f9cad";
+    cancelBtn.style.background = "rgba(0,0,0,0.45)";
+    cancelBtn.style.color = "#c8ffff";
+    cancelBtn.style.cursor = "pointer";
+    actionRow.appendChild(cancelBtn);
+
+    const confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.textContent = "Main Menu";
+    confirmBtn.style.padding = "0.5rem 0.85rem";
+    confirmBtn.style.borderRadius = "6px";
+    confirmBtn.style.border = "1px solid #00ffdd";
+    confirmBtn.style.background = "rgba(0,0,0,0.55)";
+    confirmBtn.style.color = "#00ffdd";
+    confirmBtn.style.cursor = "pointer";
+    actionRow.appendChild(confirmBtn);
+
+    const closeModal = (confirmed) => {
+      if (!returnToMenuModalOpen) return;
+      returnToMenuModalOpen = false;
+      document.removeEventListener("keydown", onModalKeyDown);
+      confirmOverlay.remove();
+      if (confirmed) {
+        returnToMainMenu();
+      } else {
+        followMouse = previousFollowMouse;
+        paused = previousPaused;
+        showStats = previousShowStats;
+      }
+    };
+
+    const onModalKeyDown = (evt) => {
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        closeModal(false);
+      } else if (evt.key === "Enter") {
+        evt.preventDefault();
+        closeModal(true);
+      }
+    };
+
+    cancelBtn.addEventListener("click", () => closeModal(false));
+    confirmBtn.addEventListener("click", () => closeModal(true));
+    confirmOverlay.addEventListener("click", (evt) => {
+      if (evt.target === confirmOverlay) {
+        closeModal(false);
+      }
+    });
+
+    document.addEventListener("keydown", onModalKeyDown);
+    document.body.appendChild(confirmOverlay);
+  }
+
   let burstCount = 3, burstIndex = 0, burstTimer = 0;
   // Burst interval in frames (higher = longer pause between bursts)
   let burstInterval = 120; // Increased for bigger cooldown
@@ -1431,12 +1561,13 @@ window.onload = function () {
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
   const KAMIKAZE_DEATH_PARTICLE_COUNT = 8;
   const MAX_PARTICLES = 1400;
+  const MAX_XPDROP_PARTICLES = 240;
 
   if (typeof window.SentinelWaveEnemyHealthModifier !== "number") {
-    window.SentinelWaveEnemyHealthModifier = 1.2;
+    window.SentinelWaveEnemyHealthModifier = 1.3;
   }
   if (typeof window.SentinelWaveEnemyDamageModifier !== "number") {
-    window.SentinelWaveEnemyDamageModifier = 4;
+    window.SentinelWaveEnemyDamageModifier = 3;
   }
 
   function applyWaveEnemyModifiers(enemy) {
@@ -1773,12 +1904,10 @@ window.onload = function () {
   document.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
     keys[k] = true;
-    if (k === "r" && gameOver) {
-      finalizeRunBytes();
-      showMenuScreen = true;
-      window._playMenuAmbienceOnShowMenu = true;
-      showMenu();
-      window._playMenuAmbienceOnShowMenu = false;
+    if ((k === "escape" || k === "r") && gameStarted && !showMenuScreen) {
+      e.preventDefault();
+      showReturnToMenuModal();
+      return;
     }
     if (k === "e") { showStats = !showStats; paused = showStats; }
     if (k === "o") {
@@ -1943,6 +2072,8 @@ window.onload = function () {
       customStalkers: window._customStalkers,
       customBossMinors: window._customBossMinors,
       customBosses: window._customBosses,
+      customSlingerBosses: window._customSlingerBosses,
+      customBruteBosses: window._customBruteBosses,
       mobIntervals: window._customMobBurstIntervals
     }),
     getWavePresetConfig: (targetWave) => {
@@ -1965,6 +2096,8 @@ window.onload = function () {
         customStalkers: Array.isArray(window._customStalkers) ? window._customStalkers.slice() : window._customStalkers,
         customBossMinors: Array.isArray(window._customBossMinors) ? window._customBossMinors.slice() : window._customBossMinors,
         customBosses: Array.isArray(window._customBosses) ? window._customBosses.slice() : window._customBosses,
+        customSlingerBosses: Array.isArray(window._customSlingerBosses) ? window._customSlingerBosses.slice() : window._customSlingerBosses,
+        customBruteBosses: Array.isArray(window._customBruteBosses) ? window._customBruteBosses.slice() : window._customBruteBosses,
         customMobBurstIntervals: window._customMobBurstIntervals ? { ...window._customMobBurstIntervals } : null,
         bossMinorBursts: Array.isArray(window._bossMinorBursts) ? window._bossMinorBursts.slice() : window._bossMinorBursts,
         bossMinorCount: window._bossMinorCount,
@@ -1996,6 +2129,8 @@ window.onload = function () {
           customStalkers: Array.isArray(window._customStalkers) ? window._customStalkers.slice() : window._customStalkers,
           customBossMinors: Array.isArray(window._customBossMinors) ? window._customBossMinors.slice() : window._customBossMinors,
           customBosses: Array.isArray(window._customBosses) ? window._customBosses.slice() : window._customBosses,
+          customSlingerBosses: Array.isArray(window._customSlingerBosses) ? window._customSlingerBosses.slice() : window._customSlingerBosses,
+          customBruteBosses: Array.isArray(window._customBruteBosses) ? window._customBruteBosses.slice() : window._customBruteBosses,
           mobIntervals: window._customMobBurstIntervals ? { ...window._customMobBurstIntervals } : undefined
         };
       } catch (_) {
@@ -2018,6 +2153,8 @@ window.onload = function () {
         window._customStalkers = savedState.customStalkers;
         window._customBossMinors = savedState.customBossMinors;
         window._customBosses = savedState.customBosses;
+        window._customSlingerBosses = savedState.customSlingerBosses;
+        window._customBruteBosses = savedState.customBruteBosses;
         window._customMobBurstIntervals = savedState.customMobBurstIntervals;
         window._bossMinorBursts = savedState.bossMinorBursts;
         window._bossMinorCount = savedState.bossMinorCount;
@@ -2090,7 +2227,9 @@ window.onload = function () {
           customKamikazes: Array.isArray(previewOverride.customKamikazes) ? previewOverride.customKamikazes.slice() : undefined,
           customStalkers: Array.isArray(previewOverride.customStalkers) ? previewOverride.customStalkers.slice() : undefined,
           customBossMinors: Array.isArray(previewOverride.customBossMinors) ? previewOverride.customBossMinors.slice() : undefined,
-          customBosses: Array.isArray(previewOverride.customBosses) ? previewOverride.customBosses.slice() : undefined
+          customBosses: Array.isArray(previewOverride.customBosses) ? previewOverride.customBosses.slice() : undefined,
+          customSlingerBosses: Array.isArray(previewOverride.customSlingerBosses) ? previewOverride.customSlingerBosses.slice() : undefined,
+          customBruteBosses: Array.isArray(previewOverride.customBruteBosses) ? previewOverride.customBruteBosses.slice() : undefined
         };
         burstCount = previewOverride.burstCount;
         burstInterval = previewOverride.burstInterval;
@@ -5084,6 +5223,22 @@ const droplifelenght = 280;
     for (let i = particles.length - 1; i >= 0; i--) {
       if (particles[i].life <= 0) releaseParticleAt(i);
     }
+
+    let xpDropParticleCount = 0;
+    for (let i = 0; i < particles.length; i++) {
+      if (particles[i].type === "xpDrop") xpDropParticleCount++;
+    }
+    if (xpDropParticleCount > MAX_XPDROP_PARTICLES) {
+      let toRemove = xpDropParticleCount - MAX_XPDROP_PARTICLES;
+      for (let i = 0; i < particles.length && toRemove > 0; i++) {
+        if (particles[i].type === "xpDrop") {
+          releaseParticleAt(i);
+          i--;
+          toRemove--;
+        }
+      }
+    }
+
     if (particles.length > MAX_PARTICLES) {
       while (particles.length > MAX_PARTICLES) {
         releaseParticleAt(0);
