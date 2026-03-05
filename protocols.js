@@ -80,6 +80,29 @@ const ProtocolSystem = {
   runDiscoveredProtocols: [],
   selectedFamily: "Targeting",
   selectedProtocol: null,
+  editorDiscoverAllEnabled: false,
+
+  isEditorDiscoverAllEnabled: function() {
+    return !!this.editorDiscoverAllEnabled;
+  },
+
+  isEditorDiscoverAllActive: function() {
+    return !!this.editorDiscoverAllEnabled && !!window._editorSessionActive;
+  },
+
+  setEditorDiscoverAllEnabled: function(enabled) {
+    this.editorDiscoverAllEnabled = !!enabled;
+    return this.editorDiscoverAllEnabled;
+  },
+
+  isDiscovered: function(protocolName, forCurrentRun = false) {
+    if (!PROTOCOLS[protocolName]) return false;
+    if (this.isEditorDiscoverAllActive()) return true;
+    if (forCurrentRun) {
+      return this.runDiscoveredProtocols.includes(protocolName);
+    }
+    return !!this.protocolBoard[protocolName]?.discovered;
+  },
 
   getDefaultUpgradeTier: function() {
     return this.upgradeTiers[0] || "Trivial";
@@ -342,7 +365,7 @@ const ProtocolSystem = {
   // Activate protocol
   activate: function(protocolName) {
     if (!PROTOCOLS[protocolName]) return false;
-    if (!this.runDiscoveredProtocols.includes(protocolName)) return false;
+    if (!this.isRunDiscovered(protocolName)) return false;
     if (this.activeProtocols.length >= 6) return false;
     if (this.activeProtocols.includes(protocolName)) return false;
     
@@ -372,17 +395,20 @@ const ProtocolSystem = {
 
   // Get discovered protocols
   getDiscovered: function() {
-    return Object.keys(this.protocolBoard).filter(name => this.protocolBoard[name].discovered);
+    return Object.keys(PROTOCOLS).filter(name => this.isDiscovered(name, false));
   },
 
   // Get run-discovered protocols (available for this run)
   getRunDiscovered: function() {
+    if (this.isEditorDiscoverAllActive()) {
+      return Object.keys(PROTOCOLS);
+    }
     return [...this.runDiscoveredProtocols];
   },
 
   // Check run discovery state
   isRunDiscovered: function(protocolName) {
-    return this.runDiscoveredProtocols.includes(protocolName);
+    return this.isDiscovered(protocolName, true);
   },
 
   // Get available protocols
@@ -433,10 +459,14 @@ const ProtocolSystem = {
   initializeRun: function() {
     this.activeProtocols = [];
     this.runDiscoveredProtocols = [];
+
+    if (this.isEditorDiscoverAllActive()) {
+      this.runDiscoveredProtocols = Object.keys(PROTOCOLS);
+    }
     
     // Start each run with only the selected starters discovered
     this.starterProtocols.slice(0, 2).forEach(p => {
-      if (PROTOCOLS[p] && this.protocolBoard[p].discovered) {
+      if (PROTOCOLS[p] && this.isDiscovered(p, false)) {
         if (!this.runDiscoveredProtocols.includes(p)) {
           this.runDiscoveredProtocols.push(p);
         }
@@ -487,7 +517,7 @@ const ProtocolSystem = {
             result[family][rarity].push({
               name: protocolName,
               ...p,
-              discovered: this.protocolBoard[protocolName].discovered,
+              discovered: this.isDiscovered(protocolName, false),
               upgrade: this.protocolBoard[protocolName].upgradeTier
             });
           }
