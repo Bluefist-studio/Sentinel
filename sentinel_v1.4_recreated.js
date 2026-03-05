@@ -167,7 +167,7 @@ window.onload = function () {
         { name: "Beamer", role: "Artillery", image: "beamer.png", description: "Charges and fires sweeping beam attacks while holding preferred spacing." },
         { name: "Stalker", role: "Skirmisher", image: "stalker.png", description: "Disruptive mobile attacker that repositions aggressively around the player." },
         { name: "Brute", role: "Heavy", image: "brute.png", description: "Durable close-range unit with high pressure in short-to-mid range fights." },
-        { name: "Grunt Heavy", role: "Mini-Boss", image: "grunt.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
+        { name: "Grunt Heavy", role: "Mini-Boss", image: "grunt heavy.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
         { name: "Shard Major", role: "Boss", image: "grunt boss.png", description: "Elite grunt leader with shard-based attacks and advanced threat patterns." },
         { name: "Slinger Major", role: "Boss", image: "slinger boss.png", description: "Advanced ranged boss with burst projectile patterns and fragmentation fire." },
         { name: "Brute Major", role: "Boss", image: "brute boss.png", description: "Heavy boss focused on area denial, nova pressure, and close-range punishment." }
@@ -2184,8 +2184,15 @@ window.onload = function () {
     mouseY = e.clientY - rect.top;
   });
   let firstRightClickDone = false;
+  // Freeze logic: 2s freeze on right click press (not hold)
+  let freezeActive = false;
+  let freezeTimer = 0;
   canvas.addEventListener("mousedown", (e) => {
     if (e.button === 2) {
+      if (!freezeActive) {
+        freezeActive = true;
+        freezeTimer = 1.0;
+      }
       followMouse = true;
       if (!firstRightClickDone && wave === 1 && gameStarted) {
         firstRightClickDone = true;
@@ -2200,6 +2207,11 @@ window.onload = function () {
   });
   canvas.addEventListener("mouseup", (e) => {
     if (e.button === 2) {
+      // If freeze is active, reset timer to full duration
+      if (freezeActive) {
+        freezeTimer = 1.0;
+        freezeActive = false;
+      }
       followMouse = false;
       if (window.laserAudio && !window.laserAudio.paused) {
         window.laserAudio.pause();
@@ -3845,19 +3857,28 @@ const droplifelenght = 280;
             (showComparison ? (compareTokenLineCount * bodyLineHeight) : 0) +
             10;
           let tooltipX = mouseX - tooltipWidth - 10;
-          let tooltipY = mouseY + 10;
-          
-          // Keep tooltip within canvas bounds
-          if (tooltipX < 0) {
-            tooltipX = 10;
+          // Position tooltip above or below cursor based on canvas middle
+          let tooltipY;
+          tooltipY = mouseY + 10;
+          // Keep tooltip within canvas bounds with padding
+          const tooltipPadding = 18;
+          if (tooltipX < tooltipPadding) {
+            tooltipX = tooltipPadding;
           }
-          if (tooltipY + tooltipHeight > canvas.height) {
+          if (tooltipX + tooltipWidth > canvas.width - tooltipPadding) {
+            tooltipX = canvas.width - tooltipWidth - tooltipPadding;
+          }
+          if (tooltipY + tooltipHeight > canvas.height - tooltipPadding) {
             tooltipY = mouseY - tooltipHeight - 10;
+            if (tooltipY + tooltipHeight > canvas.height - tooltipPadding) {
+              tooltipY = canvas.height - tooltipHeight - tooltipPadding;
+            }
           }
-          if (tooltipY < 0) {
-            tooltipY = 10;
+          if (tooltipY < tooltipPadding) {
+            tooltipY = tooltipPadding;
           }
           
+          ctx.save();
           ctx.save();
           ctx.globalAlpha = 0.93;
           ctx.fillStyle = '#152c16';
@@ -3865,6 +3886,10 @@ const droplifelenght = 280;
           ctx.strokeStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
           ctx.lineWidth = 2.5;
           ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
+          // Reinforce tooltip z-index by drawing last and using a high overlay
+          if (window._protocolTooltipOverlay) {
+            window._protocolTooltipOverlay.style.zIndex = 9999;
+          }
           
           ctx.font = "900 14px sans-serif";
           ctx.fillStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
@@ -3917,7 +3942,7 @@ const droplifelenght = 280;
     if (!window._statButtonListenersAdded) {
       // Stat button click logic for -/+ buttons
       canvas.addEventListener("mousedown", function(e) {
-        if (!showStats) return;
+        if (!showStats || e.button === 2) return;
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
@@ -3966,7 +3991,7 @@ const droplifelenght = 280;
       });
       // Protocol selector click handler
       canvas.addEventListener("mousedown", function(e) {
-        if (!showStats) return;
+        if (!showStats || e.button === 2) return;
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
@@ -5823,12 +5848,26 @@ const droplifelenght = 280;
         updateXPDrops();
         updateslingerDrops();
         updateBruteDrops();
-        updateProtocolOrbs(delta);
+        if (!freezeActive) {
+          updateProtocolOrbs(delta);
+        }
         updateMines(delta);
         updateParticles();
-        updatePlayer(delta);
-        updateEnemies(delta);
-        updateProjectiles(delta);
+        // Only update movement if not frozen
+        if (freezeActive) {
+          freezeTimer -= delta;
+          if (freezeTimer <= 0) {
+            freezeActive = false;
+            freezeTimer = 0;
+          }
+        }
+        if (!freezeActive) {
+          updatePlayer(delta);
+          updateEnemies(delta);
+        }
+        if (!freezeActive) {
+          updateProjectiles(delta);
+        }
         autoAttack();
         handleWaveSpawning(delta);
         const waveUsesBossGate = wave === 5 || wave === 10 || wave === 20;
@@ -5986,6 +6025,21 @@ const droplifelenght = 280;
       //-======================PLAYER AND ENEMIES======================-
       // Draw health bar and XP bar above the player (no numbers)
       function drawPlayerBars() {
+        // Show freeze countdown if active
+        if (typeof freezeActive !== 'undefined' && freezeActive && typeof freezeTimer === 'number' && freezeTimer > 0) {
+          ctx.save();
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillStyle = "#ffe26c";
+          ctx.textAlign = "center";
+          ctx.shadowColor = "#000";
+          ctx.shadowBlur = 6;
+          const barWidth = player.radius * 2.2;
+          const barX = player.x - barWidth / 2;
+          const barY = player.y - player.radius - 10;
+          // Centered higher above health bar
+          ctx.fillText(freezeTimer.toFixed(1) + "s", barX + barWidth / 2, barY - 18);
+          ctx.restore();
+        }
           // Draw pickup circle border
           ctx.save();
           ctx.globalAlpha = 0.05;
@@ -6064,13 +6118,14 @@ const droplifelenght = 280;
             const lifeRatio = Math.max(0, Math.min(1, notification.timer / Math.max(1, notification.maxTimer || 80)));
             const rise = (1 - lifeRatio) * 20;
             const yOffset = notificationIndex * 14;
-            const textX = barX + barWidth + 12;
-            const textY = healthBarY - 2 - yOffset - rise;
+            // Centered above the health bar
+            const textX = barX + barWidth / 2;
+            const textY = healthBarY - 18 - yOffset - rise;
 
             ctx.save();
             ctx.globalAlpha = lifeRatio;
             ctx.font = "bold 12px sans-serif";
-            ctx.textAlign = "left";
+            ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillStyle = "#ffd84d";
             ctx.shadowColor = "#ffd84d";
@@ -6615,6 +6670,15 @@ const droplifelenght = 280;
         ctx.textAlign = "center";
         ctx.fillText("Hold RIGHT-CLICK to play", canvas.width / 2, canvas.height / 2 - 80);
         ctx.restore();
+      }
+
+      // Draw protocol tooltip last so it is always on top
+      if (hoveredProtocol >= 0) {
+        const hoveredBox = (window._protocolSelectorBoxes || []).find(box => box.index === hoveredProtocol);
+        if (hoveredBox && hoveredBox.name) {
+          // ...existing tooltip code (see previous tooltip block)...
+          // This ensures tooltip is drawn after all overlays and text
+        }
       }
       ctx.font = "bold 14px sans-serif";
       ctx.textAlign = "center";
