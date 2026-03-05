@@ -2191,7 +2191,7 @@ window.onload = function () {
     if (e.button === 2) {
       if (!freezeActive) {
         freezeActive = true;
-        freezeTimer = 1.0;
+        freezeTimer = 0.5;
       }
       followMouse = true;
       if (!firstRightClickDone && wave === 1 && gameStarted) {
@@ -2209,7 +2209,7 @@ window.onload = function () {
     if (e.button === 2) {
       // If freeze is active, reset timer to full duration
       if (freezeActive) {
-        freezeTimer = 1.0;
+        freezeTimer = 0.5;
         freezeActive = false;
       }
       followMouse = false;
@@ -6753,3 +6753,4 @@ const droplifelenght = 280;
   requestAnimationFrame(gameLoop);
 
 }
+
