@@ -76,10 +76,10 @@ window.SentinelWaveControl = (function () {
 
   // Paste future editor code strings into these wave slots (16-50).
   const DEFAULT_WAVE_EDITOR_CODES = {
-    16: "SWC1:eyJ2ZXJzaW9uIjoyLCJvdmVycmlkZXMiOnsiMTYiOnsiYnVyc3RDb3VudCI6MzAsImJ1cnN0SW50ZXJ2YWxTZWNvbmRzIjoxLCJjdXN0b21CdXJzdHMiOlsyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMl0sImN1c3RvbVNsaW5nZXJzIjpbMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDJdLCJjdXN0b21LYW1pa2F6ZXMiOlsxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMV0sImN1c3RvbUJvc3NNaW5vcnMiOlsxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMV0sIm1vYkludGVydmFsc1NlY29uZHMiOnsiZ3J1bnRzIjowLjUsInNsaW5nZXJzIjozLCJrYW1pa2F6ZXMiOjMsImJvc3NNaW5vcnMiOjh9fX19",
-    17: "SWC2:eyJ2IjoxLCJvIjp7IjE3Ijp7ImJjIjozMCwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyXX0sImJyIjp7Im4iOjcsInAiOltbMCwxXSxbMiwxXSxbNCwxXSxbNiwyXV19LCJibSI6eyJuIjo5LCJwIjpbWzIsMV0sWzUsMV0sWzgsMV1dfX19fQ==",
-    18: "SWC2:eyJ2IjoxLCJvIjp7IjE4Ijp7ImJjIjozMCwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyLDIsMiwyXX0sImJyIjp7ImYiOlsxLDAsMSwwLDIsMV19LCJrIjp7ImYiOlsxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMV19fSwiMTkiOnsiYmMiOjEwLCJiaSI6MywiYnIiOnsibiI6NywicCI6W1swLDNdLFsyLDFdLFs0LDFdLFs2LDFdXX0sInN0Ijp7ImYiOlsyLDIsMiwyLDIsMiwyLDIsMiwyXX19LCIyMCI6eyJiYyI6MTAsImJpIjozLCJiciI6eyJuIjo3LCJwIjpbWzAsM10sWzIsMV0sWzQsMV0sWzYsMV1dfSwic3QiOnsiZiI6WzEsMSwxLDEsMSwxLDEsMSwxLDFdfSwiYm0iOnsiZiI6WzEsMSwxLDEsMSwxLDEsMSwxLDFdfX19fQ==",
-    19: "SWC2:eyJ2IjoxLCJvIjp7IjE5Ijp7ImJjIjoxMCwiYmkiOjMsImJyIjp7Im4iOjcsInAiOltbMCwzXSxbMiwxXSxbNCwxXSxbNiwxXV19LCJzdCI6eyJmIjpbMiwyLDIsMiwyLDIsMiwyLDIsMl19fX19",
+    16: "SWC2:eyJ2IjoxLCJvIjp7IjE2Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX19fX0=",
+    17: "SWC2:eyJ2IjoxLCJvIjp7IjE2Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX19LCIxNyI6eyJiYyI6MTYsImJpIjoxLCJnIjp7ImYiOlsyLDIsMiwyLDMsMywzLDMsNCwzLDQsMywyLDIsMiwyXX0sImJyIjp7Im4iOjgsInAiOltbMCwxXSxbMiwxXSxbNCwxXSxbNiwyXV19LCJibSI6eyJuIjoxMCwicCI6W1syLDFdLFs1LDFdLFs4LDFdXX19fX0=",
+    18: "SWC2:eyJ2IjoxLCJvIjp7IjE3Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImJtIjp7Im4iOjEwLCJwIjpbWzIsMV0sWzUsMV0sWzgsMV1dfX0sIjE4Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImsiOnsiZiI6WzEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDFdfSwiYm0iOnsibiI6MTUsInAiOltbMiwxXSxbNywxXSxbMTIsMV1dfX19fQ==",
+    19: "SWC2:eyJ2IjoxLCJvIjp7IjE3Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImJtIjp7Im4iOjEwLCJwIjpbWzIsMV0sWzUsMV0sWzgsMV1dfX0sIjE4Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImsiOnsiZiI6WzEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDFdfSwiYm0iOnsibiI6MTUsInAiOltbMiwxXSxbNywxXSxbMTIsMV1dfX0sIjE5Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMywyLDMsMiwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sInNsIjp7Im4iOjE1LCJwIjpbWzAsMV0sWzIsMV0sWzUsMV0sWzcsMV0sWzEwLDFdLFsxMiwxXV19LCJrIjp7Im4iOjE1LCJwIjpbWzIsMV0sWzcsMV0sWzEyLDFdXX0sImJtIjp7Im4iOjE1LCJwIjpbWzIsMV0sWzcsMV0sWzEyLDFdXX19fX0=",
     20: null, //Brute boss wave - no preset, must be configured in editor
     21: "SWC2:eyJ2IjoxLCJvIjp7IjIyIjp7ImJjIjo2LCJiaSI6NCwiYmUiOnsiZiI6WzIsMiwyLDIsMiwyXX0sImJtIjp7ImYiOlsxLDEsMSwxLDEsMV19fX19",
     22: null,
@@ -159,7 +159,9 @@ window.SentinelWaveControl = (function () {
       customKamikazes: makeRamp(Math.floor(nullWaveIndex * 0.16), 0.12, 0, 3),
       customStalkers: makeRamp(nullWaveIndex >= 11 ? 1 : 0, 0.04, 0, 2, 11),
       customBossMinors: makeRamp(nullWaveIndex >= 14 ? 1 : 0, 0.03, 0, 1, 14),
-      customBosses: makeRamp(nullWaveIndex >= 24 ? 1 : 0, 0.02, 0, 1, 24)
+      customBosses: makeRamp(nullWaveIndex >= 24 ? 1 : 0, 0.02, 0, 1, 24),
+      customSlingerBosses: makeRamp(0, 0, 0, 0),
+      customBruteBosses: makeRamp(0, 0, 0, 0)
     };
   }
 
@@ -173,8 +175,14 @@ window.SentinelWaveControl = (function () {
     window._customBeamers = Array.isArray(config.customBeamers) ? config.customBeamers.slice() : null;
     window._customKamikazes = Array.isArray(config.customKamikazes) ? config.customKamikazes.slice() : null;
     window._customStalkers = Array.isArray(config.customStalkers) ? config.customStalkers.slice() : null;
-    window._customBossMinors = Array.isArray(config.customBossMinors) ? config.customBossMinors.slice() : null;
-    window._customBosses = Array.isArray(config.customBosses) ? config.customBosses.slice() : null;
+    window._customBossMinors = Array.isArray(config.customGruntBossMinors)
+      ? config.customGruntBossMinors.slice()
+      : (Array.isArray(config.customBossMinors) ? config.customBossMinors.slice() : null);
+    window._customBosses = Array.isArray(config.customGruntBosses)
+      ? config.customGruntBosses.slice()
+      : (Array.isArray(config.customBosses) ? config.customBosses.slice() : null);
+    window._customSlingerBosses = Array.isArray(config.customSlingerBosses) ? config.customSlingerBosses.slice() : null;
+    window._customBruteBosses = Array.isArray(config.customBruteBosses) ? config.customBruteBosses.slice() : null;
     window._customMobBurstIntervals = normalizeMobIntervals(config.mobIntervals);
   }
 
@@ -610,6 +618,18 @@ window.SentinelWaveControl = (function () {
     }
   }
 
+  function spawnSlingerBossBurst(ctx, count) {
+    for (let i = 0; i < count; i++) {
+      spawnSlingerBoss(ctx);
+    }
+  }
+
+  function spawnBruteBossBurst(ctx, count) {
+    for (let i = 0; i < count; i++) {
+      spawnBruteBoss(ctx);
+    }
+  }
+
   function spawnWave(ctx) {
     if (!ctx) return;
 
@@ -626,6 +646,8 @@ window.SentinelWaveControl = (function () {
     window._customStalkers = null;
     window._customBossMinors = null;
     window._customBosses = null;
+    window._customSlingerBosses = null;
+    window._customBruteBosses = null;
     window._customMobBurstIntervals = null;
     window._bossMinorBursts = null;
     window._mobBurstElapsed = null;
@@ -700,6 +722,8 @@ window.SentinelWaveControl = (function () {
       window._customStalkers = null;
       window._customBossMinors = null;
       window._customBosses = null;
+      window._customSlingerBosses = null;
+      window._customBruteBosses = null;
       spawnSlingerBoss(ctx);
     } else if (wave === 11) {
       ctx.setBurstCount(15);
@@ -755,6 +779,8 @@ window.SentinelWaveControl = (function () {
       window._customStalkers = null;
       window._customBossMinors = null;
       window._customBosses = null;
+      window._customSlingerBosses = null;
+      window._customBruteBosses = null;
       spawnBruteBoss(ctx);
     } else if (wave >= 16) {
       configureCodeWave(ctx, wave);
@@ -824,6 +850,8 @@ window.SentinelWaveControl = (function () {
         const stalkers = getValue(previewOverride.customStalkers, burstIndex);
         const bossMinors = getValue(previewOverride.customBossMinors, burstIndex);
         const bosses = getValue(previewOverride.customBosses, burstIndex);
+        const slingerBosses = getValue(previewOverride.customSlingerBosses, burstIndex);
+        const bruteBosses = getValue(previewOverride.customBruteBosses, burstIndex);
 
         if (grunts > 0 && canSpawnByMobInterval(elapsedState, "grunts", getMobIntervalFor("grunts", burstInterval))) spawnBurst(ctx, grunts);
         if (brutes > 0 && canSpawnByMobInterval(elapsedState, "brutes", getMobIntervalFor("brutes", burstInterval))) spawnBruteBurst(ctx, brutes);
@@ -834,6 +862,8 @@ window.SentinelWaveControl = (function () {
         if (stalkers > 0 && canSpawnByMobInterval(elapsedState, "stalkers", getMobIntervalFor("stalkers", burstInterval))) spawnStalkerBurst(ctx, stalkers);
         if (bossMinors > 0 && canSpawnByMobInterval(elapsedState, "gruntbossminor", getMobIntervalFor("gruntbossminor", burstInterval))) spawnBossMinorBurst(ctx, bossMinors);
         if (bosses > 0 && canSpawnByMobInterval(elapsedState, "gruntboss", getMobIntervalFor("gruntboss", burstInterval))) spawnBossBurst(ctx, bosses);
+        if (slingerBosses > 0 && canSpawnByMobInterval(elapsedState, "slingerboss", getMobIntervalFor("slingerboss", burstInterval))) spawnSlingerBossBurst(ctx, slingerBosses);
+        if (bruteBosses > 0 && canSpawnByMobInterval(elapsedState, "bruteboss", getMobIntervalFor("bruteboss", burstInterval))) spawnBruteBossBurst(ctx, bruteBosses);
 
         if (window.sentinelDifficulty === "Apocalypse") {
           spawnKamikazeBurst(ctx, 1);
@@ -914,6 +944,18 @@ window.SentinelWaveControl = (function () {
         if (bossCount > 0 && canSpawnByMobInterval(elapsedState, "gruntboss", getMobIntervalFor("gruntboss", burstInterval))) {
           for (let i = 0; i < bossCount; i++) {
             spawnGruntBoss(ctx);
+          }
+        }
+        const slingerBossCount = getBurstValue(window._customSlingerBosses, burstIndex);
+        if (slingerBossCount > 0 && canSpawnByMobInterval(elapsedState, "slingerboss", getMobIntervalFor("slingerboss", burstInterval))) {
+          for (let i = 0; i < slingerBossCount; i++) {
+            spawnSlingerBoss(ctx);
+          }
+        }
+        const bruteBossCount = getBurstValue(window._customBruteBosses, burstIndex);
+        if (bruteBossCount > 0 && canSpawnByMobInterval(elapsedState, "bruteboss", getMobIntervalFor("bruteboss", burstInterval))) {
+          for (let i = 0; i < bruteBossCount; i++) {
+            spawnBruteBoss(ctx);
           }
         }
         if (grunts > 0 && canSpawnByMobInterval(elapsedState, "grunts", getMobIntervalFor("grunts", burstInterval))) spawnBurst(ctx, grunts);
