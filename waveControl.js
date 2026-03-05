@@ -245,7 +245,16 @@ window.SentinelWaveControl = (function () {
     enemy.burstMode = false;
     enemy.burstShotsLeft = 0;
     enemy.burstTimer = 0;
+    enemy.gruntBossEntering = true;
+    enemy.gruntBossEntryStage = "padding";
+    enemy.gruntBossEdgePaddingX = 110;
+    enemy.gruntBossEdgePaddingY = 150;
+    enemy.gruntBossNormalSpeed = enemy.speed;
+    enemy.gruntBossEntrySpeed = enemy.speed * 1.9;
     ctx.applyWaveEnemyModifiers(enemy);
+    enemy.gruntBossNormalSpeed = enemy.speed;
+    enemy.gruntBossEntrySpeed = enemy.speed * 1.9;
+    enemy.maxHealth = enemy.health;
 
     enemies[enemies.length - 1].gruntSpawnTimer = gruntSpawnTimer;
     enemies[enemies.length - 1].gruntSpawnInterval = gruntSpawnInterval;
@@ -879,7 +888,7 @@ window.SentinelWaveControl = (function () {
       return;
     }
 
-    if ((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5) || (wave >= 6 && wave <= 10 && burstIndex < burstCount) || (wave >= 11 && burstIndex < burstCount)) {
+    if ((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5) || (wave >= 6 && wave <= 9 && burstIndex < burstCount) || (wave >= 11 && burstIndex < burstCount)) {
       burstTimer += delta * SPEED_MULTIPLIER;
       if (burstTimer >= burstInterval) {
         burstTimer = 0;
@@ -901,17 +910,8 @@ window.SentinelWaveControl = (function () {
           spawnKamikazeBurst(ctx, 1);
         }
 
-        if (wave === 10) {
-          const slingerCount = 2 + Math.floor(Math.random() * 3);
-          spawnSlingerBurst(ctx, slingerCount);
-          const gruntCount = 2 + Math.floor(Math.random() * 3);
-          spawnBurst(ctx, gruntCount);
-          const bruteCount = getBurstValue(window._customBrutes, burstIndex);
-          if (bruteCount > 0) spawnBruteBurst(ctx, bruteCount);
-        } else {
-          if (slingers > 0 && canSpawnByMobInterval(elapsedState, "slingers", getMobIntervalFor("slingers", burstInterval))) spawnSlingerBurst(ctx, slingers);
-          if (brutes > 0 && canSpawnByMobInterval(elapsedState, "brutes", getMobIntervalFor("brutes", burstInterval))) spawnBruteBurst(ctx, brutes);
-        }
+        if (slingers > 0 && canSpawnByMobInterval(elapsedState, "slingers", getMobIntervalFor("slingers", burstInterval))) spawnSlingerBurst(ctx, slingers);
+        if (brutes > 0 && canSpawnByMobInterval(elapsedState, "brutes", getMobIntervalFor("brutes", burstInterval))) spawnBruteBurst(ctx, brutes);
 
         if (wave === 11) {
           const wave11KamikazeCount = getBurstValue(window._customKamikazes, burstIndex);
