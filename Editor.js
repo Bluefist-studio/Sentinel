@@ -6,6 +6,7 @@
 	let waveEditorOverlay = null;
 	let waveEditorWasPaused = false;
 	let autoScalePlayerToLoadedWave = true;
+	let discoverAllProtocolsInEditor = false;
 	const SWC2_ARRAY_FIELD_MAP = {
 		customBursts: "g",
 		customBrutes: "br",
@@ -560,10 +561,16 @@
 		const bridge = window.SentinelEditorBridge;
 		if (!bridge || typeof bridge.getWaveEditorState !== "function") return;
 		if (waveEditorOverlay) return;
+		discoverAllProtocolsInEditor = (typeof bridge.getEditorDiscoverAllProtocols === "function")
+			? !!bridge.getEditorDiscoverAllProtocols()
+			: false;
 
 		waveEditorWasPaused = typeof bridge.getPaused === "function" ? !!bridge.getPaused() : false;
 		if (typeof bridge.setPaused === "function") bridge.setPaused(true);
 		if (typeof bridge.setEditorSessionActive === "function") bridge.setEditorSessionActive(true);
+		if (typeof bridge.setEditorDiscoverAllProtocols === "function") {
+			bridge.setEditorDiscoverAllProtocols(discoverAllProtocolsInEditor);
+		}
 
 		const initialState = bridge.getWaveEditorState();
 		const selectedWaveState = { value: Math.max(1, initialState.wave || 1) };
@@ -624,6 +631,22 @@
 		sandboxNotice.style.borderRadius = "6px";
 		sandboxNotice.style.padding = "8px 10px";
 		panel.appendChild(sandboxNotice);
+
+		const protocolDiscoverToggleWrap = document.createElement("label");
+		protocolDiscoverToggleWrap.style.display = "flex";
+		protocolDiscoverToggleWrap.style.alignItems = "center";
+		protocolDiscoverToggleWrap.style.gap = "8px";
+		protocolDiscoverToggleWrap.style.marginBottom = "12px";
+		protocolDiscoverToggleWrap.style.color = "#d8ffff";
+		protocolDiscoverToggleWrap.style.fontSize = "0.9rem";
+		const protocolDiscoverToggle = document.createElement("input");
+		protocolDiscoverToggle.type = "checkbox";
+		protocolDiscoverToggle.checked = !!discoverAllProtocolsInEditor;
+		protocolDiscoverToggleWrap.appendChild(protocolDiscoverToggle);
+		const protocolDiscoverToggleText = document.createElement("span");
+		protocolDiscoverToggleText.textContent = "Discover all protocols in editor session";
+		protocolDiscoverToggleWrap.appendChild(protocolDiscoverToggleText);
+		panel.appendChild(protocolDiscoverToggleWrap);
 
 		const makeLabel = (text) => {
 			const label = document.createElement("div");
@@ -893,13 +916,40 @@
 		const loadCodeBtn = makeActionBtn("Load Code", "#9de8ff");
 		const copyCodeBtn = makeActionBtn("Copy Code", "#ffffff");
 
+		const editorHeaderSection = document.createElement("div");
+		editorHeaderSection.style.width = "100%";
+		editorHeaderSection.style.height = "auto";
+		editorHeaderSection.style.padding = "0 0 10px 0";
+		editorHeaderSection.style.display = "flex";
+		editorHeaderSection.style.alignItems = "center";
+		editorHeaderSection.style.justifyContent = "flex-start";
+		editorHeaderSection.style.position = "relative";
+		editorHeaderSection.style.zIndex = "10";
+
+		backToMenuBtn.textContent = "← Back to Menu";
+		backToMenuBtn.style.fontSize = "0.9rem";
+		backToMenuBtn.style.marginLeft = "3px";
+		backToMenuBtn.style.padding = "0.4rem 1rem";
+		backToMenuBtn.style.background = "rgba(0,0,0,0.7)";
+		backToMenuBtn.style.color = "#00ffdd";
+		backToMenuBtn.style.border = "2px solid #00ffdd";
+		backToMenuBtn.style.borderRadius = "6px";
+		backToMenuBtn.style.cursor = "pointer";
+		backToMenuBtn.style.transition = "background 0.2s";
+		backToMenuBtn.style.flex = "0 0 auto";
+		backToMenuBtn.style.minWidth = "auto";
+		backToMenuBtn.style.whiteSpace = "nowrap";
+		backToMenuBtn.addEventListener("mouseover", () => backToMenuBtn.style.background = "rgba(0,0,0,0.9)");
+		backToMenuBtn.addEventListener("mouseout", () => backToMenuBtn.style.background = "rgba(0,0,0,0.7)");
+		editorHeaderSection.appendChild(backToMenuBtn);
+		panel.insertBefore(editorHeaderSection, panel.firstChild);
+
 		actionRow.appendChild(loadBtn);
 		actionRow.appendChild(applyWaveBtn);
 		actionRow.appendChild(spawnNowBtn);
 		actionRow.appendChild(clearInputsBtn);
 		actionRow.appendChild(clearWaveBtn);
 		actionRow.appendChild(clearLootsBtn);
-		actionRow.appendChild(backToMenuBtn);
 		actionRow.appendChild(applyPlayerBtn);
 		actionRow.appendChild(clearAllBtn);
 		actionRow.appendChild(closeBtn);
@@ -1185,6 +1235,15 @@
 			playerStatus.textContent = autoScalePlayerToLoadedWave
 				? "Auto-scale is ON for Apply + Spawn Now."
 				: "Auto-scale is OFF.";
+		});
+		protocolDiscoverToggle.addEventListener("change", () => {
+			discoverAllProtocolsInEditor = !!protocolDiscoverToggle.checked;
+			if (typeof bridge.setEditorDiscoverAllProtocols === "function") {
+				bridge.setEditorDiscoverAllProtocols(discoverAllProtocolsInEditor);
+			}
+			playerStatus.textContent = discoverAllProtocolsInEditor
+				? "Editor protocol discover-all is ON."
+				: "Editor protocol discover-all is OFF.";
 		});
 		applyWaveBtn.addEventListener("click", () => applyWaveOverride(false));
 		spawnNowBtn.addEventListener("click", () => applyWaveOverride(true));
