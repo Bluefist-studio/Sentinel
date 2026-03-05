@@ -81,8 +81,8 @@ window.SentinelWaveControl = (function () {
     18: "SWC2:eyJ2IjoxLCJvIjp7IjE3Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImJtIjp7Im4iOjEwLCJwIjpbWzIsMV0sWzUsMV0sWzgsMV1dfX0sIjE4Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImsiOnsiZiI6WzEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDFdfSwiYm0iOnsibiI6MTUsInAiOltbMiwxXSxbNywxXSxbMTIsMV1dfX19fQ==",
     19: "SWC2:eyJ2IjoxLCJvIjp7IjE3Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImJtIjp7Im4iOjEwLCJwIjpbWzIsMV0sWzUsMV0sWzgsMV1dfX0sIjE4Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMyw0LDMsNCwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sImsiOnsiZiI6WzEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDFdfSwiYm0iOnsibiI6MTUsInAiOltbMiwxXSxbNywxXSxbMTIsMV1dfX0sIjE5Ijp7ImJjIjoxNiwiYmkiOjEsImciOnsiZiI6WzIsMiwyLDIsMywzLDMsMywyLDMsMiwzLDIsMiwyLDJdfSwiYnIiOnsibiI6OCwicCI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX0sInNsIjp7Im4iOjE1LCJwIjpbWzAsMV0sWzIsMV0sWzUsMV0sWzcsMV0sWzEwLDFdLFsxMiwxXV19LCJrIjp7Im4iOjE1LCJwIjpbWzIsMV0sWzcsMV0sWzEyLDFdXX0sImJtIjp7Im4iOjE1LCJwIjpbWzIsMV0sWzcsMV0sWzEyLDFdXX19fX0=",
     20: null, //Brute boss wave - no preset, must be configured in editor
-    21: "SWC2:eyJ2IjoxLCJvIjp7IjIyIjp7ImJjIjo2LCJiaSI6NCwiYmUiOnsiZiI6WzIsMiwyLDIsMiwyXX0sImJtIjp7ImYiOlsxLDEsMSwxLDEsMV19fX19",
-    22: null,
+    21: "SWC2:eyJ2IjoxLCJvIjp7IjIxIjp7ImJjIjoxMCwiYmkiOjQsImciOnsiZiI6WzIsMiwyLDIsMiwyLDIsMiwyLDJdfSwic3QiOnsiZiI6WzIsMiwyLDIsMiwyLDIsMiwyLDJdfSwibWkiOnsiZyI6MC4yNX19fX0=",
+    22: "SWC2:eyJ2IjoxLCJvIjp7IjIxIjp7ImJjIjoxMiwiYmkiOjMsInN0Ijp7ImYiOlsxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMV19LCJibSI6eyJmIjpbMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDFdfSwibWkiOnsic3QiOjMsImJtIjozfX0sIjIyIjp7ImJjIjoxMiwiYmkiOjMsInN0Ijp7ImYiOlsxLDEsMSwxLDEsMSwxLDEsMSwxLDEsMV19LCJibSI6eyJmIjpbMSwxLDEsMSwxLDEsMSwxLDEsMSwxLDFdfSwibWkiOnsic3QiOjMsImJtIjozfX19fQ==",
     23: null,
     24: null,
     25: null,
@@ -214,13 +214,19 @@ window.SentinelWaveControl = (function () {
   function spawnGruntBoss(ctx) {
     const enemies = ctx.getEnemies();
     const wave = ctx.getWave();
-    const gruntImg = ctx.getGruntSprite();
+    // Use brute heavy.png for brute heavy (gruntBossMinor)
+    let bruteHeavyImg = window._bruteHeavyImg;
+    if (!bruteHeavyImg) {
+      bruteHeavyImg = new window.Image();
+      bruteHeavyImg.src = "brute heavy.png";
+      window._bruteHeavyImg = bruteHeavyImg;
+    }
 
     let gruntSpawnTimer = 0;
     let gruntSpawnInterval = 420;
     let gruntSpawnCount = 1 + Math.floor(Math.random() * 2);
     const { x, y } = randomEdgeSpawn();
-    let radius = 26, collisionRadius = 30, speed = 0.4, health = 300 + (wave * 2), damage = 1, attackRange = 20, color = "magenta";
+    let radius = 34, collisionRadius = 40, speed = 0.4, health = 300 + (wave * 2), damage = 1, attackRange = 20, color = "magenta";
     const spinAngle = Math.random() * Math.PI * 2;
     const spinSpeed = (Math.random() - 0.5) * 0.02;
 
@@ -238,7 +244,7 @@ window.SentinelWaveControl = (function () {
     enemy.type = "gruntBoss";
     enemy.spinAngle = spinAngle;
     enemy.spinSpeed = spinSpeed;
-    enemy.sprite = gruntImg;
+    enemy.sprite = bruteHeavyImg;
     enemy.projectileCooldown = 0;
     enemy.projectileInterval = 120;
     enemy.projectileRadius = 22;
@@ -265,12 +271,11 @@ window.SentinelWaveControl = (function () {
     const enemies = ctx.getEnemies();
     const wave = ctx.getWave();
     const gruntImg = ctx.getGruntSprite();
-
     let gruntSpawnTimer = 0;
     let gruntSpawnInterval = 420;
     let gruntSpawnCount = 1 + Math.floor(Math.random() * 2);
     const { x, y } = randomEdgeSpawn();
-    let radius = 22, collisionRadius = 24, speed = 0.32, health = 150 + (wave * 1.5), damage = 1, attackRange = 20, color = "magenta";
+    let radius = 28, collisionRadius = 30, speed = 0.32, health = 150 + (wave * 2.5), damage = 1, attackRange = 20, color = "magenta";
     const spinAngle = Math.random() * Math.PI * 2;
     const spinSpeed = (Math.random() - 0.5) * 0.02;
 
