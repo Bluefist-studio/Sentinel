@@ -14,8 +14,10 @@
 		customBeamers: "be",
 		customKamikazes: "k",
 		customStalkers: "st",
-		customBossMinors: "bm",
-		customBosses: "bo"
+		customGruntBossMinors: "bm",
+		customGruntBosses: "bo",
+		customSlingerBosses: "sb",
+		customBruteBosses: "bb"
 	};
 	const SWC2_INTERVAL_FIELD_MAP = {
 		grunts: "g",
@@ -25,8 +27,10 @@
 		stalkers: "st",
 		brutes: "br",
 		kamikazes: "k",
-		bossMinors: "bm",
-		bosses: "bo"
+		gruntBossMinor: "bm",
+		gruntBoss: "bo",
+		slingerBoss: "sb",
+		bruteBoss: "bb"
 	};
 
 	function hasSupportedWaveCodePrefix(raw) {
@@ -49,11 +53,31 @@
 
 	function normalizeMobIntervals(intervals) {
 		if (!intervals || typeof intervals !== "object") return undefined;
-		const keys = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "bossMinors", "bosses"];
 		const out = {};
-		keys.forEach((key) => {
-			const raw = Number(intervals[key]);
-			if (Number.isFinite(raw) && raw > 0) out[key] = Math.round(raw);
+		const aliases = {
+			grunts: "grunts",
+			slingers: "slingers",
+			shielders: "shielders",
+			beamers: "beamers",
+			stalkers: "stalkers",
+			brutes: "brutes",
+			kamikazes: "kamikazes",
+			gruntBossMinor: "gruntBossMinor",
+			gruntBoss: "gruntBoss",
+			bossMinors: "bossMinors",
+			bosses: "bosses",
+			slingerBoss: "slingerBoss",
+			bruteBoss: "bruteBoss",
+			gruntbossminor: "gruntBossMinor",
+			gruntboss: "gruntBoss",
+			slingerboss: "slingerBoss",
+			bruteboss: "bruteBoss"
+		};
+		Object.entries(intervals).forEach(([inputKey, inputValue]) => {
+			const resolvedKey = aliases[inputKey];
+			if (!resolvedKey) return;
+			const raw = Number(inputValue);
+			if (Number.isFinite(raw) && raw > 0) out[resolvedKey] = Math.round(raw);
 		});
 		return Object.keys(out).length ? out : undefined;
 	}
@@ -75,6 +99,8 @@
 				customStalkers: Array.isArray(entry.customStalkers) ? entry.customStalkers.slice() : undefined,
 				customBossMinors: Array.isArray(entry.customBossMinors) ? entry.customBossMinors.slice() : undefined,
 				customBosses: Array.isArray(entry.customBosses) ? entry.customBosses.slice() : undefined,
+				customSlingerBosses: Array.isArray(entry.customSlingerBosses) ? entry.customSlingerBosses.slice() : undefined,
+				customBruteBosses: Array.isArray(entry.customBruteBosses) ? entry.customBruteBosses.slice() : undefined,
 				mobIntervals: normalizeMobIntervals(entry.mobIntervals)
 			};
 		});
@@ -96,8 +122,14 @@
 				customBeamers: Array.isArray(src.customBeamers) ? src.customBeamers.slice() : undefined,
 				customKamikazes: Array.isArray(src.customKamikazes) ? src.customKamikazes.slice() : undefined,
 				customStalkers: Array.isArray(src.customStalkers) ? src.customStalkers.slice() : undefined,
-				customBossMinors: Array.isArray(src.customBossMinors) ? src.customBossMinors.slice() : undefined,
-				customBosses: Array.isArray(src.customBosses) ? src.customBosses.slice() : undefined,
+				customGruntBossMinors: Array.isArray(src.customGruntBossMinors)
+					? src.customGruntBossMinors.slice()
+					: (Array.isArray(src.customBossMinors) ? src.customBossMinors.slice() : undefined),
+				customGruntBosses: Array.isArray(src.customGruntBosses)
+					? src.customGruntBosses.slice()
+					: (Array.isArray(src.customBosses) ? src.customBosses.slice() : undefined),
+				customSlingerBosses: Array.isArray(src.customSlingerBosses) ? src.customSlingerBosses.slice() : undefined,
+				customBruteBosses: Array.isArray(src.customBruteBosses) ? src.customBruteBosses.slice() : undefined,
 				mobIntervalsSeconds: src.mobIntervals
 					? {
 						grunts: src.mobIntervals.grunts ? Number(intervalUnitsToSeconds(src.mobIntervals.grunts).toFixed(3)) : undefined,
@@ -107,8 +139,10 @@
 						stalkers: src.mobIntervals.stalkers ? Number(intervalUnitsToSeconds(src.mobIntervals.stalkers).toFixed(3)) : undefined,
 						brutes: src.mobIntervals.brutes ? Number(intervalUnitsToSeconds(src.mobIntervals.brutes).toFixed(3)) : undefined,
 						kamikazes: src.mobIntervals.kamikazes ? Number(intervalUnitsToSeconds(src.mobIntervals.kamikazes).toFixed(3)) : undefined,
-						bossMinors: src.mobIntervals.bossMinors ? Number(intervalUnitsToSeconds(src.mobIntervals.bossMinors).toFixed(3)) : undefined,
-						bosses: src.mobIntervals.bosses ? Number(intervalUnitsToSeconds(src.mobIntervals.bosses).toFixed(3)) : undefined
+						gruntBossMinor: (src.mobIntervals.gruntBossMinor || src.mobIntervals.bossMinors) ? Number(intervalUnitsToSeconds(src.mobIntervals.gruntBossMinor || src.mobIntervals.bossMinors).toFixed(3)) : undefined,
+						gruntBoss: (src.mobIntervals.gruntBoss || src.mobIntervals.bosses) ? Number(intervalUnitsToSeconds(src.mobIntervals.gruntBoss || src.mobIntervals.bosses).toFixed(3)) : undefined,
+						slingerBoss: (src.mobIntervals.slingerBoss || src.mobIntervals.slingerboss) ? Number(intervalUnitsToSeconds(src.mobIntervals.slingerBoss || src.mobIntervals.slingerboss).toFixed(3)) : undefined,
+						bruteBoss: (src.mobIntervals.bruteBoss || src.mobIntervals.bruteboss) ? Number(intervalUnitsToSeconds(src.mobIntervals.bruteBoss || src.mobIntervals.bruteboss).toFixed(3)) : undefined
 					}
 					: undefined
 			};
@@ -144,8 +178,20 @@
 				customBeamers: Array.isArray(src.customBeamers) ? src.customBeamers.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customKamikazes: Array.isArray(src.customKamikazes) ? src.customKamikazes.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customStalkers: Array.isArray(src.customStalkers) ? src.customStalkers.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
-				customBossMinors: Array.isArray(src.customBossMinors) ? src.customBossMinors.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
-				customBosses: Array.isArray(src.customBosses) ? src.customBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
+				customBossMinors: Array.isArray(src.customGruntBossMinors)
+					? src.customGruntBossMinors.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0)
+					: (Array.isArray(src.customBossMinors) ? src.customBossMinors.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined),
+				customBosses: Array.isArray(src.customGruntBosses)
+					? src.customGruntBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0)
+					: (Array.isArray(src.customBosses) ? src.customBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined),
+				customGruntBossMinors: Array.isArray(src.customGruntBossMinors)
+					? src.customGruntBossMinors.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0)
+					: (Array.isArray(src.customBossMinors) ? src.customBossMinors.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined),
+				customGruntBosses: Array.isArray(src.customGruntBosses)
+					? src.customGruntBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0)
+					: (Array.isArray(src.customBosses) ? src.customBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined),
+				customSlingerBosses: Array.isArray(src.customSlingerBosses) ? src.customSlingerBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
+				customBruteBosses: Array.isArray(src.customBruteBosses) ? src.customBruteBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				mobIntervals: normalizeMobIntervals(
 					src.mobIntervalsSeconds
 						? {
@@ -156,8 +202,10 @@
 							stalkers: src.mobIntervalsSeconds.stalkers ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.stalkers)) : undefined,
 							brutes: src.mobIntervalsSeconds.brutes ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.brutes)) : undefined,
 							kamikazes: src.mobIntervalsSeconds.kamikazes ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.kamikazes)) : undefined,
-							bossMinors: src.mobIntervalsSeconds.bossMinors ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bossMinors)) : undefined,
-							bosses: src.mobIntervalsSeconds.bosses ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bosses)) : undefined
+							gruntBossMinor: (src.mobIntervalsSeconds.gruntBossMinor || src.mobIntervalsSeconds.bossMinors) ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.gruntBossMinor || src.mobIntervalsSeconds.bossMinors)) : undefined,
+							gruntBoss: (src.mobIntervalsSeconds.gruntBoss || src.mobIntervalsSeconds.bosses) ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.gruntBoss || src.mobIntervalsSeconds.bosses)) : undefined,
+							slingerBoss: src.mobIntervalsSeconds.slingerBoss ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.slingerBoss)) : undefined,
+							bruteBoss: src.mobIntervalsSeconds.bruteBoss ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bruteBoss)) : undefined
 						}
 						: undefined
 				)
@@ -185,23 +233,16 @@
 	function compressArrayForSWC2(list) {
 		const values = toNonNegativeIntList(list);
 		if (!values) return undefined;
-		let lastNonZero = -1;
-		for (let i = values.length - 1; i >= 0; i--) {
-			if (values[i] > 0) {
-				lastNonZero = i;
-				break;
-			}
-		}
-		if (lastNonZero < 0) return undefined;
-		const trimmed = values.slice(0, lastNonZero + 1);
+		const hasAnyNonZero = values.some((value) => value > 0);
+		if (!hasAnyNonZero) return undefined;
 		const pairs = [];
-		for (let i = 0; i < trimmed.length; i++) {
-			if (trimmed[i] > 0) pairs.push([i, trimmed[i]]);
+		for (let i = 0; i < values.length; i++) {
+			if (values[i] > 0) pairs.push([i, values[i]]);
 		}
-		if (pairs.length <= Math.floor(trimmed.length * 0.6)) {
-			return { n: trimmed.length, p: pairs };
+		if (pairs.length <= Math.floor(values.length * 0.6)) {
+			return { n: values.length, p: pairs };
 		}
-		return { f: trimmed };
+		return { f: values };
 	}
 
 	function expandArrayFromSWC2(value) {
@@ -439,6 +480,8 @@
 				customStalkers: override.customStalkers,
 				customBossMinors: override.customBossMinors,
 				customBosses: override.customBosses,
+				customSlingerBosses: override.customSlingerBosses,
+				customBruteBosses: override.customBruteBosses,
 				mobIntervals: normalizeMobIntervals(override.mobIntervals)
 			};
 		}
@@ -455,6 +498,8 @@
 				customStalkers: currentState.customStalkers,
 				customBossMinors: currentState.customBossMinors,
 				customBosses: currentState.customBosses,
+				customSlingerBosses: currentState.customSlingerBosses,
+				customBruteBosses: currentState.customBruteBosses,
 				mobIntervals: undefined
 			};
 		}
@@ -473,6 +518,8 @@
 					customStalkers: preset.customStalkers,
 					customBossMinors: preset.customBossMinors,
 					customBosses: preset.customBosses,
+					customSlingerBosses: preset.customSlingerBosses,
+					customBruteBosses: preset.customBruteBosses,
 					mobIntervals: normalizeMobIntervals(preset.mobIntervals)
 				};
 			}
@@ -489,6 +536,8 @@
 			customStalkers: undefined,
 			customBossMinors: undefined,
 			customBosses: undefined,
+			customSlingerBosses: undefined,
+			customBruteBosses: undefined,
 			mobIntervals: undefined
 		};
 	}
@@ -658,35 +707,27 @@
 		rowB.style.marginTop = "10px";
 		waveSection.appendChild(rowB);
 
-		const gruntWrap = document.createElement("div");
-		gruntWrap.appendChild(makeLabel("Grunts per burst (comma list)"));
-		const gruntInput = makeInput();
-		gruntWrap.appendChild(gruntInput);
-		rowB.appendChild(gruntWrap);
+		const createMobEntry = (parent, mobName) => {
+			const wrap = document.createElement("div");
+			const mobTitle = makeLabel(mobName);
+			mobTitle.style.color = "#00ffdd";
+			mobTitle.style.fontWeight = "bold";
+			wrap.appendChild(mobTitle);
+			wrap.appendChild(makeLabel("Per burst"));
+			const input = makeInput();
+			wrap.appendChild(input);
+			parent.appendChild(wrap);
+			return { wrap, input };
+		};
 
-		const slingerWrap = document.createElement("div");
-		slingerWrap.appendChild(makeLabel("Slingers per burst (comma list)"));
-		const slingerInput = makeInput();
-		slingerWrap.appendChild(slingerInput);
-		rowB.appendChild(slingerWrap);
-
-		const shielderWrap = document.createElement("div");
-		shielderWrap.appendChild(makeLabel("Shielders per burst (comma list)"));
-		const shielderInput = makeInput();
-		shielderWrap.appendChild(shielderInput);
-		rowB.appendChild(shielderWrap);
-
-		const beamerWrap = document.createElement("div");
-		beamerWrap.appendChild(makeLabel("Beamers per burst (comma list)"));
-		const beamerInput = makeInput();
-		beamerWrap.appendChild(beamerInput);
-		rowB.appendChild(beamerWrap);
-
-		const bruteWrap = document.createElement("div");
-		bruteWrap.appendChild(makeLabel("Brutes per burst (comma list)"));
-		const bruteInput = makeInput();
-		bruteWrap.appendChild(bruteInput);
-		rowB.appendChild(bruteWrap);
+		const { wrap: gruntWrap, input: gruntInput } = createMobEntry(rowB, "Grunts");
+		const { wrap: slingerWrap, input: slingerInput } = createMobEntry(rowB, "Slingers");
+		const { wrap: shielderWrap, input: shielderInput } = createMobEntry(rowB, "Shielders");
+		const { wrap: beamerWrap, input: beamerInput } = createMobEntry(rowB, "Beamers");
+		const { wrap: bruteWrap, input: bruteInput } = createMobEntry(rowB, "Brutes");
+		const { wrap: kamikazeWrap, input: kamikazeInput } = createMobEntry(rowB, "Kamikazes");
+		const { wrap: stalkerWrap, input: stalkerInput } = createMobEntry(rowB, "Stalkers");
+		const { wrap: bossMinorWrap, input: bossMinorInput } = createMobEntry(rowB, "Grunt Heavy");
 
 		const rowDivider = document.createElement("div");
 		rowDivider.style.height = "1px";
@@ -701,32 +742,12 @@
 		rowC.style.marginTop = "10px";
 		waveSection.appendChild(rowC);
 
-		const kamikazeWrap = document.createElement("div");
-		kamikazeWrap.appendChild(makeLabel("Kamikazes per burst (comma list)"));
-		const kamikazeInput = makeInput();
-		kamikazeWrap.appendChild(kamikazeInput);
-		rowC.appendChild(kamikazeWrap);
+		const { wrap: bossWrap, input: bossInput } = createMobEntry(rowC, "Grunt Boss");
+		const { wrap: slingerBossWrap, input: slingerBossInput } = createMobEntry(rowC, "Slinger Boss");
+		const { wrap: bruteBossWrap, input: bruteBossInput } = createMobEntry(rowC, "Brute Boss");
 
-		const stalkerWrap = document.createElement("div");
-		stalkerWrap.appendChild(makeLabel("Stalkers per burst (comma list)"));
-		const stalkerInput = makeInput();
-		stalkerWrap.appendChild(stalkerInput);
-		rowC.appendChild(stalkerWrap);
-
-		const bossMinorWrap = document.createElement("div");
-		bossMinorWrap.appendChild(makeLabel("Boss Minors per burst (comma list)"));
-		const bossMinorInput = makeInput();
-		bossMinorWrap.appendChild(bossMinorInput);
-		rowC.appendChild(bossMinorWrap);
-
-		const bossWrap = document.createElement("div");
-		bossWrap.appendChild(makeLabel("Grunt Bosses per burst (comma list)"));
-		const bossInput = makeInput();
-		bossWrap.appendChild(bossInput);
-		rowC.appendChild(bossWrap);
-
-		const addPairedIntervalInput = (wrap, labelText) => {
-			const label = makeLabel(labelText);
+		const addPairedIntervalInput = (wrap) => {
+			const label = makeLabel("Interval");
 			label.style.marginTop = "8px";
 			wrap.appendChild(label);
 			const input = makeInput();
@@ -734,15 +755,17 @@
 			return input;
 		};
 
-		const gruntIntervalInput = addPairedIntervalInput(gruntWrap, "Grunt interval (seconds)");
-		const slingerIntervalInput = addPairedIntervalInput(slingerWrap, "Slinger interval (seconds)");
-		const shielderIntervalInput = addPairedIntervalInput(shielderWrap, "Shielder interval (seconds)");
-		const beamerIntervalInput = addPairedIntervalInput(beamerWrap, "Beamer interval (seconds)");
-		const stalkerIntervalInput = addPairedIntervalInput(stalkerWrap, "Stalker interval (seconds)");
-		const bruteIntervalInput = addPairedIntervalInput(bruteWrap, "Brute interval (seconds)");
-		const kamikazeIntervalInput = addPairedIntervalInput(kamikazeWrap, "Kamikaze interval (seconds)");
-		const bossMinorIntervalInput = addPairedIntervalInput(bossMinorWrap, "Boss Minor interval (seconds)");
-		const bossIntervalInput = addPairedIntervalInput(bossWrap, "Boss interval (seconds)");
+		const gruntIntervalInput = addPairedIntervalInput(gruntWrap);
+		const slingerIntervalInput = addPairedIntervalInput(slingerWrap);
+		const shielderIntervalInput = addPairedIntervalInput(shielderWrap);
+		const beamerIntervalInput = addPairedIntervalInput(beamerWrap);
+		const stalkerIntervalInput = addPairedIntervalInput(stalkerWrap);
+		const bruteIntervalInput = addPairedIntervalInput(bruteWrap);
+		const kamikazeIntervalInput = addPairedIntervalInput(kamikazeWrap);
+		const bossMinorIntervalInput = addPairedIntervalInput(bossMinorWrap);
+		const bossIntervalInput = addPairedIntervalInput(bossWrap);
+		const slingerBossIntervalInput = addPairedIntervalInput(slingerBossWrap);
+		const bruteBossIntervalInput = addPairedIntervalInput(bruteBossWrap);
 
 		const waveStatus = document.createElement("div");
 		waveStatus.style.marginTop = "10px";
@@ -901,6 +924,8 @@
 			stalkerInput.value = formatWaveEditorList(source.customStalkers);
 			bossMinorInput.value = formatWaveEditorList(source.customBossMinors);
 			bossInput.value = formatWaveEditorList(source.customBosses);
+			slingerBossInput.value = formatWaveEditorList(source.customSlingerBosses);
+			bruteBossInput.value = formatWaveEditorList(source.customBruteBosses);
 			const mobIntervals = source.mobIntervals || {};
 			gruntIntervalInput.value = mobIntervals.grunts ? String(Number(intervalUnitsToSeconds(mobIntervals.grunts).toFixed(2))) : "";
 			slingerIntervalInput.value = mobIntervals.slingers ? String(Number(intervalUnitsToSeconds(mobIntervals.slingers).toFixed(2))) : "";
@@ -909,8 +934,10 @@
 			stalkerIntervalInput.value = mobIntervals.stalkers ? String(Number(intervalUnitsToSeconds(mobIntervals.stalkers).toFixed(2))) : "";
 			bruteIntervalInput.value = mobIntervals.brutes ? String(Number(intervalUnitsToSeconds(mobIntervals.brutes).toFixed(2))) : "";
 			kamikazeIntervalInput.value = mobIntervals.kamikazes ? String(Number(intervalUnitsToSeconds(mobIntervals.kamikazes).toFixed(2))) : "";
-			bossMinorIntervalInput.value = mobIntervals.bossMinors ? String(Number(intervalUnitsToSeconds(mobIntervals.bossMinors).toFixed(2))) : "";
-			bossIntervalInput.value = mobIntervals.bosses ? String(Number(intervalUnitsToSeconds(mobIntervals.bosses).toFixed(2))) : "";
+			bossMinorIntervalInput.value = (mobIntervals.gruntBossMinor || mobIntervals.bossMinors) ? String(Number(intervalUnitsToSeconds(mobIntervals.gruntBossMinor || mobIntervals.bossMinors).toFixed(2))) : "";
+			bossIntervalInput.value = (mobIntervals.gruntBoss || mobIntervals.bosses) ? String(Number(intervalUnitsToSeconds(mobIntervals.gruntBoss || mobIntervals.bosses).toFixed(2))) : "";
+			slingerBossIntervalInput.value = (mobIntervals.slingerBoss || mobIntervals.slingerboss) ? String(Number(intervalUnitsToSeconds(mobIntervals.slingerBoss || mobIntervals.slingerboss).toFixed(2))) : "";
+			bruteBossIntervalInput.value = (mobIntervals.bruteBoss || mobIntervals.bruteboss) ? String(Number(intervalUnitsToSeconds(mobIntervals.bruteBoss || mobIntervals.bruteboss).toFixed(2))) : "";
 			waveStatus.textContent = `Editing wave ${selectedWaveState.value}.`;
 		};
 
@@ -956,8 +983,10 @@
 				stalkers: parseMobIntervalField(stalkerIntervalInput.value),
 				brutes: parseMobIntervalField(bruteIntervalInput.value),
 				kamikazes: parseMobIntervalField(kamikazeIntervalInput.value),
-				bossMinors: parseMobIntervalField(bossMinorIntervalInput.value),
-				bosses: parseMobIntervalField(bossIntervalInput.value)
+				gruntBossMinor: parseMobIntervalField(bossMinorIntervalInput.value),
+				gruntBoss: parseMobIntervalField(bossIntervalInput.value),
+				slingerBoss: parseMobIntervalField(slingerBossIntervalInput.value),
+				bruteBoss: parseMobIntervalField(bruteBossIntervalInput.value)
 			};
 
 			if (Object.values(parsedMobIntervalsRaw).some(v => v === null)) {
@@ -974,6 +1003,8 @@
 			const parsedCustomStalkers = parseWaveEditorList(stalkerInput.value);
 			const parsedCustomBossMinors = parseWaveEditorList(bossMinorInput.value);
 			const parsedCustomBosses = parseWaveEditorList(bossInput.value);
+			const parsedCustomSlingerBosses = parseWaveEditorList(slingerBossInput.value);
+			const parsedCustomBruteBosses = parseWaveEditorList(bruteBossInput.value);
 
 			waveEditorOverrides[targetWave] = {
 				burstCount: parsedBurstCount,
@@ -987,6 +1018,10 @@
 				customStalkers: expandSingleValueList(parsedCustomStalkers, parsedBurstCount),
 				customBossMinors: expandSingleValueList(parsedCustomBossMinors, parsedBurstCount),
 				customBosses: expandSingleValueList(parsedCustomBosses, parsedBurstCount),
+				customGruntBossMinors: expandSingleValueList(parsedCustomBossMinors, parsedBurstCount),
+				customGruntBosses: expandSingleValueList(parsedCustomBosses, parsedBurstCount),
+				customSlingerBosses: expandSingleValueList(parsedCustomSlingerBosses, parsedBurstCount),
+				customBruteBosses: expandSingleValueList(parsedCustomBruteBosses, parsedBurstCount),
 				mobIntervals: parsedMobIntervals
 			};
 
@@ -1074,6 +1109,8 @@
 			stalkerInput.value = "";
 			bossMinorInput.value = "";
 			bossInput.value = "";
+			slingerBossInput.value = "";
+			bruteBossInput.value = "";
 			gruntIntervalInput.value = "";
 			slingerIntervalInput.value = "";
 			shielderIntervalInput.value = "";
@@ -1083,6 +1120,8 @@
 			kamikazeIntervalInput.value = "";
 			bossMinorIntervalInput.value = "";
 			bossIntervalInput.value = "";
+			slingerBossIntervalInput.value = "";
+			bruteBossIntervalInput.value = "";
 			waveStatus.textContent = `Wave ${selectedWaveState.value} inputs cleared.`;
 		};
 
