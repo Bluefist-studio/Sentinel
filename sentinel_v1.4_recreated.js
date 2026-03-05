@@ -45,9 +45,47 @@
   // Mine sprite
   const mineImg = new window.Image();
   mineImg.src = "mine.png";
+  // Grunt Boss sprite
+  const gruntBossImg = new window.Image();
+  gruntBossImg.src = "grunt boss.png";
+  // Slinger Boss sprite
+  const slingerBossImg = new window.Image();
+  slingerBossImg.src = "slinger boss.png";
 // Sentinel v1.4 Recreated - Core game logic
 
 window.onload = function () {
+  const uiSelectionStyle = document.createElement("style");
+  uiSelectionStyle.textContent = `
+    body, body * {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    input, textarea, [contenteditable="true"] {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+    button {
+      transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.12s ease;
+      will-change: transform;
+    }
+    button:hover {
+      filter: brightness(1.08);
+    }
+    button:active {
+      transform: translateY(1px) scale(0.98);
+      filter: brightness(0.94);
+    }
+    button:focus-visible {
+      outline: 2px solid #00ffdd;
+      outline-offset: 2px;
+    }
+  `;
+  document.head.appendChild(uiSelectionStyle);
+
   // Loading/Menu screen state
   let showLoadingScreen = true;
   let showMenuScreen = false;
@@ -118,6 +156,199 @@ window.onload = function () {
   });
   // Menu screen
   function showMenu() {
+    const ENEMY_GLOSSARY = {
+      factionName: "UNCLASSIFIED HOSTILES",
+      factionDescription: "Faction designation pending. This index summarizes observed hostile combat roles and behavior patterns.",
+      entries: [
+        { name: "Grunt", role: "Frontline", image: "grunt.png", description: "Basic close-range attacker that pushes directly toward the player." },
+        { name: "Kamikaze", role: "Suicide Diver", image: "kamikaze.png", description: "Fast suicide unit that pressures with explosives and mine drops." },
+        { name: "Slinger", role: "Ranged Harasser", image: "slinger.png", description: "Maintains distance and fires projectile shots at medium-to-long range." },
+        { name: "Shielder", role: "Support", image: "shielder.png", description: "Defensive support unit that protects nearby enemies with shielding links." },
+        { name: "Beamer", role: "Artillery", image: "beamer.png", description: "Charges and fires sweeping beam attacks while holding preferred spacing." },
+        { name: "Stalker", role: "Skirmisher", image: "stalker.png", description: "Disruptive mobile attacker that repositions aggressively around the player." },
+        { name: "Brute", role: "Heavy", image: "brute.png", description: "Durable close-range unit with high pressure in short-to-mid range fights." },
+        { name: "Grunt Heavy", role: "Mini-Boss", image: "grunt.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
+        { name: "Shard Major", role: "Boss", image: "grunt boss.png", description: "Elite grunt leader with shard-based attacks and advanced threat patterns." },
+        { name: "Slinger Major", role: "Boss", image: "slinger boss.png", description: "Advanced ranged boss with burst projectile patterns and fragmentation fire." },
+        { name: "Brute Major", role: "Boss", image: "brute boss.png", description: "Heavy boss focused on area denial, nova pressure, and close-range punishment." }
+      ]
+    };
+
+    function showEnemyGlossary() {
+      const glossaryOverlay = document.createElement("div");
+      glossaryOverlay.id = "enemyGlossaryOverlay";
+      glossaryOverlay.style.position = "fixed";
+      glossaryOverlay.style.left = 0;
+      glossaryOverlay.style.top = 0;
+      glossaryOverlay.style.width = "100vw";
+      glossaryOverlay.style.height = "100vh";
+      glossaryOverlay.style.background = "#000";
+      glossaryOverlay.style.display = "flex";
+      glossaryOverlay.style.flexDirection = "column";
+      glossaryOverlay.style.justifyContent = "center";
+      glossaryOverlay.style.alignItems = "center";
+      glossaryOverlay.style.zIndex = 1001;
+
+      const glossaryBg = document.createElement("img");
+      glossaryBg.src = "titlescreen.png";
+      glossaryBg.style.position = "absolute";
+      glossaryBg.style.left = "50%";
+      glossaryBg.style.top = "50%";
+      glossaryBg.style.transform = "translate(-50%, -50%)";
+      glossaryBg.style.width = "1024px";
+      glossaryBg.style.height = "768px";
+      glossaryBg.style.objectFit = "fill";
+      glossaryBg.style.zIndex = 0;
+      glossaryOverlay.appendChild(glossaryBg);
+
+      const panel = document.createElement("div");
+      panel.style.position = "relative";
+      panel.style.zIndex = 2;
+      panel.style.width = "940px";
+      panel.style.maxHeight = "720px";
+      panel.style.background = "rgba(0, 20, 30, 0.96)";
+      panel.style.border = "2px solid #00ffdd";
+      panel.style.borderRadius = "10px";
+      panel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      panel.style.padding = "16px";
+      panel.style.display = "flex";
+      panel.style.flexDirection = "column";
+      glossaryOverlay.appendChild(panel);
+
+      const topRow = document.createElement("div");
+      topRow.style.display = "flex";
+      topRow.style.alignItems = "center";
+      topRow.style.justifyContent = "space-between";
+      topRow.style.marginBottom = "10px";
+      panel.appendChild(topRow);
+
+      const title = document.createElement("h2");
+      title.textContent = "ENEMY GLOSSARY";
+      title.style.color = "#00ffdd";
+      title.style.margin = "0";
+      title.style.fontSize = "2rem";
+      title.style.textShadow = "0 0 14px rgba(0,255,221,0.7)";
+      topRow.appendChild(title);
+
+      const backBtn = document.createElement("button");
+      backBtn.textContent = "← Back to Menu";
+      backBtn.style.fontSize = "0.95rem";
+      backBtn.style.padding = "0.45rem 0.95rem";
+      backBtn.style.background = "rgba(0,0,0,0.7)";
+      backBtn.style.color = "#00ffdd";
+      backBtn.style.border = "2px solid #00ffdd";
+      backBtn.style.borderRadius = "6px";
+      backBtn.style.cursor = "pointer";
+      backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
+      backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
+      topRow.appendChild(backBtn);
+
+      const factionBlock = document.createElement("div");
+      factionBlock.style.border = "1px solid rgba(0,255,221,0.45)";
+      factionBlock.style.borderRadius = "8px";
+      factionBlock.style.padding = "10px 12px";
+      factionBlock.style.marginBottom = "12px";
+      factionBlock.style.background = "rgba(0, 35, 45, 0.52)";
+      panel.appendChild(factionBlock);
+
+      const factionName = document.createElement("div");
+      factionName.textContent = `Faction: ${ENEMY_GLOSSARY.factionName}`;
+      factionName.style.color = "#7ff9ff";
+      factionName.style.fontWeight = "bold";
+      factionName.style.marginBottom = "4px";
+      factionBlock.appendChild(factionName);
+
+      const factionDesc = document.createElement("div");
+      factionDesc.textContent = ENEMY_GLOSSARY.factionDescription;
+      factionDesc.style.color = "#c9feff";
+      factionDesc.style.fontSize = "0.92rem";
+      factionBlock.appendChild(factionDesc);
+
+      const listWrap = document.createElement("div");
+      listWrap.style.flex = "1";
+      listWrap.style.overflowY = "auto";
+      listWrap.style.border = "1px solid rgba(0,255,221,0.28)";
+      listWrap.style.borderRadius = "8px";
+      listWrap.style.padding = "10px";
+      panel.appendChild(listWrap);
+
+      ENEMY_GLOSSARY.entries.forEach((entry) => {
+        const card = document.createElement("div");
+        card.style.display = "grid";
+        card.style.gridTemplateColumns = "64px 1fr";
+        card.style.columnGap = "12px";
+        card.style.alignItems = "center";
+        card.style.border = "1px solid rgba(0,255,221,0.28)";
+        card.style.borderRadius = "8px";
+        card.style.padding = "10px";
+        card.style.marginBottom = "8px";
+        card.style.background = "rgba(0, 50, 64, 0.44)";
+        listWrap.appendChild(card);
+
+        const spriteWrap = document.createElement("div");
+        spriteWrap.style.width = "64px";
+        spriteWrap.style.height = "64px";
+        spriteWrap.style.border = "1px solid rgba(0,255,221,0.45)";
+        spriteWrap.style.borderRadius = "6px";
+        spriteWrap.style.background = "rgba(0, 20, 30, 0.8)";
+        spriteWrap.style.display = "flex";
+        spriteWrap.style.alignItems = "center";
+        spriteWrap.style.justifyContent = "center";
+        spriteWrap.style.overflow = "hidden";
+        card.appendChild(spriteWrap);
+
+        const sprite = document.createElement("img");
+        sprite.src = entry.image || "";
+        sprite.alt = entry.name;
+        sprite.style.maxWidth = "56px";
+        sprite.style.maxHeight = "56px";
+        sprite.style.objectFit = "contain";
+        sprite.addEventListener("error", () => {
+          sprite.remove();
+          const fallback = document.createElement("div");
+          fallback.textContent = entry.name.slice(0, 2).toUpperCase();
+          fallback.style.color = "#8ffaff";
+          fallback.style.fontSize = "0.82rem";
+          fallback.style.fontWeight = "bold";
+          spriteWrap.appendChild(fallback);
+        });
+        spriteWrap.appendChild(sprite);
+
+        const textCol = document.createElement("div");
+        textCol.style.display = "flex";
+        textCol.style.flexDirection = "column";
+        card.appendChild(textCol);
+
+        const name = document.createElement("div");
+        name.textContent = entry.name;
+        name.style.color = "#00ffdd";
+        name.style.fontWeight = "bold";
+        name.style.fontSize = "1rem";
+        textCol.appendChild(name);
+
+        const role = document.createElement("div");
+        role.textContent = `Role: ${entry.role}`;
+        role.style.color = "#8ffaff";
+        role.style.fontSize = "0.88rem";
+        role.style.marginTop = "2px";
+        textCol.appendChild(role);
+
+        const desc = document.createElement("div");
+        desc.textContent = entry.description;
+        desc.style.color = "#d4fcff";
+        desc.style.fontSize = "0.9rem";
+        desc.style.marginTop = "5px";
+        textCol.appendChild(desc);
+      });
+
+      backBtn.addEventListener("click", () => {
+        glossaryOverlay.remove();
+        showMenu();
+      });
+
+      document.body.appendChild(glossaryOverlay);
+    }
+
     const menuOverlay = document.createElement("div");
     menuOverlay.id = "menuOverlay";
     menuOverlay.style.position = "fixed";
@@ -194,8 +425,10 @@ window.onload = function () {
     const playBtn = makeMenuButton("Play", "#fff");
     const protocolBtn = makeMenuButton("Protocols", "#00ffdd");
     const waveEditorBtn = makeMenuButton("Wave Editor", "#6cf0ff");
+    const enemyGlossaryBtn = makeMenuButton("Enemy Glossary", "#8de7ff");
     buttonContainer.appendChild(playBtn);
     buttonContainer.appendChild(protocolBtn);
+    buttonContainer.appendChild(enemyGlossaryBtn);
     buttonContainer.appendChild(waveEditorBtn);
     menuOverlay.appendChild(buttonContainer);
     document.body.appendChild(menuOverlay);
@@ -226,6 +459,14 @@ window.onload = function () {
       if (window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
         window.SentinelEditor.showWaveEditor();
       }
+      window._showMainMenu = () => {
+        showMenu();
+      };
+    });
+
+    enemyGlossaryBtn.addEventListener("click", function() {
+      menuOverlay.remove();
+      showEnemyGlossary();
       window._showMainMenu = () => {
         showMenu();
       };
@@ -965,7 +1206,9 @@ window.onload = function () {
 
         const applyCardStyle = (isHovered) => {
           const protocolState = ProtocolSystem.protocolBoard[protocolName] || { discovered: false, isNew: false };
-          const discovered = protocolState.discovered;
+          const discovered = (typeof ProtocolSystem.isDiscovered === "function")
+            ? ProtocolSystem.isDiscovered(protocolName, false)
+            : protocolState.discovered;
           const isNew = protocolState.isNew;
           if (discovered) {
             card.style.background = isHovered ? "rgba(0, 100, 120, 0.9)" : "rgba(0, 77, 92, 0.8)";
@@ -1031,7 +1274,9 @@ window.onload = function () {
         // Protocol name
         const nameEl = document.createElement("div");
         nameEl.textContent = protocolName;
-        const discovered = state.discovered;
+        const discovered = (typeof ProtocolSystem.isDiscovered === "function")
+          ? ProtocolSystem.isDiscovered(protocolName, false)
+          : state.discovered;
         nameEl.style.color = discovered ? "#00ffdd" : "#888";
         nameEl.style.fontWeight = "bold";
         nameEl.style.fontSize = "1rem";
@@ -1077,7 +1322,9 @@ window.onload = function () {
           card.addEventListener("click", () => {
             const currentStarters = Array.isArray(ProtocolSystem.starterProtocols)
               ? ProtocolSystem.starterProtocols
-                  .filter(name => ProtocolSystem.protocolBoard[name]?.discovered)
+                  .filter(name => (typeof ProtocolSystem.isDiscovered === "function")
+                    ? ProtocolSystem.isDiscovered(name, false)
+                    : !!ProtocolSystem.protocolBoard[name]?.discovered)
                   .slice(0, 2)
               : [];
             const existingIndex = currentStarters.indexOf(protocolName);
@@ -1351,6 +1598,8 @@ window.onload = function () {
   gruntImg.src = "grunt.png";
   const bruteImg = new window.Image();
   bruteImg.src = "brute.png";
+  const bruteBossImg = new window.Image();
+  bruteBossImg.src = "brute boss.png";
   const slingerImg = new window.Image();
   slingerImg.src = "slinger.png";
   const kamikazeImg = new window.Image();
@@ -1373,6 +1622,7 @@ window.onload = function () {
   let runCollectedBytes = 0;
   let totalCollectedBytes = 0;
   let runBytesFinalized = false;
+  const bytePickupNotifications = [];
 
   function loadCollectedBytes() {
     try {
@@ -1394,6 +1644,14 @@ window.onload = function () {
     const value = Math.max(0, Math.floor(amount || 0));
     if (value <= 0) return;
     runCollectedBytes += value;
+    bytePickupNotifications.push({
+      amount: value,
+      timer: 80,
+      maxTimer: 80
+    });
+    while (bytePickupNotifications.length > 6) {
+      bytePickupNotifications.shift();
+    }
   }
 
   function finalizeRunBytes() {
@@ -2059,6 +2317,17 @@ window.onload = function () {
     setEditorSessionActive: (value) => {
       window._editorSessionActive = !!value;
     },
+    getEditorDiscoverAllProtocols: () => {
+      if (typeof ProtocolSystem.isEditorDiscoverAllEnabled === "function") {
+        return !!ProtocolSystem.isEditorDiscoverAllEnabled();
+      }
+      return false;
+    },
+    setEditorDiscoverAllProtocols: (value) => {
+      if (typeof ProtocolSystem.setEditorDiscoverAllEnabled === "function") {
+        ProtocolSystem.setEditorDiscoverAllEnabled(!!value);
+      }
+    },
     getWaveEditorState: () => ({
       wave,
       burstCount,
@@ -2346,6 +2615,10 @@ window.onload = function () {
     const wasRunDiscovered = typeof ProtocolSystem.isRunDiscovered === "function"
       ? ProtocolSystem.isRunDiscovered(orb.protocolName)
       : Array.isArray(ProtocolSystem.runDiscoveredProtocols) && ProtocolSystem.runDiscoveredProtocols.includes(orb.protocolName);
+    const isFavoriteProtocol = typeof ProtocolSystem.isFavorite === "function"
+      ? ProtocolSystem.isFavorite(orb.protocolName)
+      : false;
+    const favoriteWarningColor = "#ffd84d";
     const protocolInfluence = Math.max(0, Math.floor((PROTOCOLS[orb.protocolName]?.influence) || 0));
     if (!useRunOnlyDiscovery && protocolInfluence > 0) {
       collectRunBytes(protocolInfluence);
@@ -2377,14 +2650,16 @@ window.onload = function () {
       if (!wasRunDiscovered) {
         protocolWarnings.push({
           text: `NEW PROTOCOL ACQUIRED: ${orb.protocolName}`,
-          color: "#7bf4ff",
+          favorite: isFavoriteProtocol,
+          color: isFavoriteProtocol ? favoriteWarningColor : "#7bf4ff",
           timer: 210
         });
       }
       if (!useRunOnlyDiscovery && !wasPermanentlyDiscovered) {
         protocolWarnings.push({
           text: `NEW PROTOCOL UNLOCKED (DISCOVERED): ${orb.protocolName}`,
-          color: "#00ff88",
+          favorite: isFavoriteProtocol,
+          color: isFavoriteProtocol ? favoriteWarningColor : "#00ff88",
           timer: 230
         });
       }
@@ -2432,6 +2707,16 @@ window.onload = function () {
       ctx.shadowColor = warning.color;
       ctx.shadowBlur = 10;
       ctx.fillText(warning.text, canvas.width / 2, y);
+
+      if (warning.favorite) {
+        const textWidth = ctx.measureText(warning.text).width;
+        const rightLimit = (canvas.width / 2 + 305) - 16;
+        const starX = Math.min(rightLimit, (canvas.width / 2) + (textWidth / 2) + 12);
+        ctx.fillStyle = "#ffd84d";
+        ctx.shadowColor = "#ffd84d";
+        ctx.shadowBlur = 12;
+        ctx.fillText("✶", starX, y);
+      }
       ctx.shadowBlur = 0;
     }
     ctx.restore();
@@ -4779,10 +5064,37 @@ const droplifelenght = 280;
             }
           }
         }
+        if (e.type === "gruntBoss" && e.gruntBossEntering !== false) {
+          const centerX = canvas.width * 0.5;
+          const centerY = canvas.height * 0.5;
+          const centerDx = centerX - e.x;
+          const centerDy = centerY - e.y;
+          const centerDist = Math.hypot(centerDx, centerDy);
+          const paddingX = typeof e.gruntBossEdgePaddingX === "number" ? e.gruntBossEdgePaddingX : 110;
+          const paddingY = typeof e.gruntBossEdgePaddingY === "number" ? e.gruntBossEdgePaddingY : 150;
+          const minX = paddingX;
+          const maxX = canvas.width - paddingX;
+          const minY = paddingY;
+          const maxY = canvas.height - paddingY;
+          const insidePaddedArea = e.x >= minX && e.x <= maxX && e.y >= minY && e.y <= maxY;
+          const entrySpeed = typeof e.gruntBossEntrySpeed === "number" ? e.gruntBossEntrySpeed : (e.speed * 1.9);
+          if (centerDist > 0) {
+            e.x += (centerDx / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+            e.y += (centerDy / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+          }
+          if (insidePaddedArea) {
+            e.gruntBossEntering = false;
+            if (typeof e.gruntBossNormalSpeed === "number") {
+              e.speed = e.gruntBossNormalSpeed;
+            }
+          }
+        }
         const isTouchingPlayer = dist < (e.radius + player.radius);
         const isSlingerInRange = dist < (e.attackRange || 20) + player.radius;
         const canAttackNow = e.type === "slingerBoss"
           ? (e.slingerBossEntryStage !== "padding")
+          : (e.type === "gruntBoss" && e.gruntBossEntering !== false)
+            ? false
           : (isSlinger ? isSlingerInRange : isTouchingPlayer);
         if (canAttackNow) {
           if (isSlinger && e.type === "slingerBoss") {
@@ -4817,10 +5129,10 @@ const droplifelenght = 280;
               shell.fragTargetX = player.x;
               shell.fragTargetY = player.y;
               shell.fragmentCount = 8;
-              shell.fragmentDamage = Math.max(1, e.damage * 0.75);
+              shell.fragmentDamage = Math.max(0.5, e.damage * 0.45);
               shell.fragmentRadius = 5.2;
               shell.lifeTimer = 170;
-              e.slingerBossFragCooldown = phase === 1 ? 180 : (phase === 2 ? 135 : 66);
+              e.slingerBossFragCooldown = phase === 1 ? 240 : (phase === 2 ? 190 : 120);
             }
 
             if (phase !== 3 && e.attackCooldown <= 0) {
@@ -4828,15 +5140,41 @@ const droplifelenght = 280;
                 fireShot(angleToPlayer, 1.62, e.damage, 7, "slingerBossProjectile", "#ffb347");
                 e.attackCooldown = 34;
               } else if (phase === 2) {
-                const pelletCount = 5;
-                const spread = 0.42;
-                for (let pelletIndex = 0; pelletIndex < pelletCount; pelletIndex++) {
-                  const t = pelletCount <= 1 ? 0.5 : (pelletIndex / (pelletCount - 1));
-                  const pelletAngle = angleToPlayer + ((t - 0.5) * spread);
-                  fireShot(pelletAngle, 1.45, Math.max(1, e.damage - 0.25), 6.5, "slingerBossProjectile", "#ffb347");
+                const hasActiveAutoBurst = typeof e.slingerBossAutoShotsLeft === "number" && e.slingerBossAutoShotsLeft > 0;
+                if (!hasActiveAutoBurst) {
+                  e.slingerBossAutoShotsLeft = 10;
+                  e.slingerBossAutoShotTimer = 0;
+                  e.attackCooldown = 1;
                 }
-                e.attackCooldown = 60;
               }
+            }
+
+            if (phase === 2) {
+              if (typeof e.slingerBossAutoShotsLeft !== "number") e.slingerBossAutoShotsLeft = 0;
+              if (typeof e.slingerBossAutoShotTimer !== "number") e.slingerBossAutoShotTimer = 0;
+
+              if (e.slingerBossAutoShotsLeft > 0) {
+                e.slingerBossAutoShotTimer -= cooldownStep;
+                while (e.slingerBossAutoShotsLeft > 0 && e.slingerBossAutoShotTimer <= 0) {
+                  const sprayOffset = (Math.random() - 0.5) * 0.09;
+                  fireShot(
+                    angleToPlayer + sprayOffset,
+                    0.35,
+                    Math.max(1, e.damage - 0.3),
+                    6.3,
+                    "slingerBossProjectile",
+                    "#ffb347"
+                  );
+                  e.slingerBossAutoShotsLeft -= 1;
+                  e.slingerBossAutoShotTimer += 5;
+                }
+                if (e.slingerBossAutoShotsLeft <= 0) {
+                  e.attackCooldown = Math.max(e.attackCooldown, 84);
+                }
+              }
+            } else {
+              e.slingerBossAutoShotsLeft = 0;
+              e.slingerBossAutoShotTimer = 0;
             }
 
             if (firedAny) {
@@ -4865,7 +5203,9 @@ const droplifelenght = 280;
           }
             if (!isSlinger) drawLine(e.x, e.y, player.x, player.y, "gray");
         } else {
-            if (e.type === "bruteBoss") {
+            if (e.type === "gruntBoss" && e.gruntBossEntering !== false) {
+              // Grunt boss entry movement is handled above until it reaches the padded area.
+            } else if (e.type === "bruteBoss") {
               const paddingX = typeof e.bruteBossEdgePaddingX === "number" ? e.bruteBossEdgePaddingX : 90;
               const paddingY = typeof e.bruteBossEdgePaddingY === "number" ? e.bruteBossEdgePaddingY : 135;
               const minX = paddingX;
@@ -5078,7 +5418,9 @@ const droplifelenght = 280;
       }
 
       if (typeof e.spinAngle === "undefined") e.spinAngle = Math.random() * Math.PI * 2;
-      e.spinAngle += 0.18 * delta;
+      if (e.type !== "gruntBoss") {
+        e.spinAngle += 0.18 * delta;
+      }
       if (e.type === "slinger" || e.type === "slingerBoss") {
         if (typeof e.baseY === "undefined") e.baseY = e.y;
         if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
@@ -5149,11 +5491,11 @@ const droplifelenght = 280;
         const distanceToTarget = Math.hypot(targetX - p.x, targetY - p.y);
         if (distanceToTarget <= Math.max(7, shellRadius + 1) || p.lifeTimer <= 0) {
           const fragmentCount = typeof p.fragmentCount === "number" ? p.fragmentCount : 8;
-          const fragmentDamage = Math.max(1, typeof p.fragmentDamage === "number" ? p.fragmentDamage : (p.damage * 0.75));
+          const fragmentDamage = Math.max(0.5, typeof p.fragmentDamage === "number" ? p.fragmentDamage : (p.damage * 0.45));
           const fragmentRadius = typeof p.fragmentRadius === "number" ? p.fragmentRadius : 5.2;
           for (let fragmentIndex = 0; fragmentIndex < fragmentCount; fragmentIndex++) {
             const fragmentAngle = (Math.PI * 2 * fragmentIndex) / fragmentCount;
-            const fragmentSpeed = 1.95 + Math.random() * 0.45;
+            const fragmentSpeed = 1.2 + Math.random() * 0.25;
             spawnProjectile(
               targetX,
               targetY,
@@ -5709,6 +6051,34 @@ const droplifelenght = 280;
           ctx.fill();
           ctx.restore();
         }
+
+        if (bytePickupNotifications.length > 0) {
+          for (let notificationIndex = bytePickupNotifications.length - 1; notificationIndex >= 0; notificationIndex--) {
+            const notification = bytePickupNotifications[notificationIndex];
+            if (!paused) notification.timer -= 1;
+            if (notification.timer <= 0) {
+              bytePickupNotifications.splice(notificationIndex, 1);
+              continue;
+            }
+
+            const lifeRatio = Math.max(0, Math.min(1, notification.timer / Math.max(1, notification.maxTimer || 80)));
+            const rise = (1 - lifeRatio) * 20;
+            const yOffset = notificationIndex * 14;
+            const textX = barX + barWidth + 12;
+            const textY = healthBarY - 2 - yOffset - rise;
+
+            ctx.save();
+            ctx.globalAlpha = lifeRatio;
+            ctx.font = "bold 12px sans-serif";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = "#ffd84d";
+            ctx.shadowColor = "#ffd84d";
+            ctx.shadowBlur = 10;
+            ctx.fillText(`+${notification.amount} Bytes`, textX, textY);
+            ctx.restore();
+          }
+        }
       }
 
       // Player feedback: green flash when level up
@@ -5978,7 +6348,7 @@ const droplifelenght = 280;
         ctx.strokeStyle = "rgba(255, 80, 80, 0.0)";
         ctx.lineWidth = 1; ctx.stroke();
         // Draw magenta grunt, grunt boss, and grunt boss minor with grunt image
-        if ((e.type === "grunt" && e.color === "magenta") || e.type === "gruntBoss" || e.type === "gruntBossMinor") {
+        if ((e.type === "grunt" && e.color === "magenta") || e.type === "gruntBossMinor") {
           ctx.save();
           ctx.shadowColor = "#00000071";
           ctx.shadowBlur = 12;
@@ -5986,12 +6356,21 @@ const droplifelenght = 280;
           ctx.rotate(e.spinAngle);
           ctx.drawImage(gruntImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
+        } else if (e.type === "gruntBoss") {
+          ctx.save();
+          ctx.shadowColor = "#000000e0"; // Darker shadow
+          ctx.shadowBlur = 44; // Bigger glow
+          ctx.translate(e.x, e.y);
+          ctx.rotate(0); // No rotation for grunt boss
+          ctx.drawImage(gruntBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
+          ctx.restore();
         } else if (e.type === "brute" || e.type === "bruteBoss") {
           ctx.save();
           ctx.shadowColor = "#0000009f";
           ctx.shadowBlur = 12;
           ctx.translate(e.x, e.y);
-          ctx.drawImage(bruteImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
+          const bruteSprite = e.type === "bruteBoss" ? bruteBossImg : bruteImg;
+          ctx.drawImage(bruteSprite, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
           // Draw nova circle with cue
           ctx.save();
@@ -6015,7 +6394,11 @@ const droplifelenght = 280;
           ctx.shadowColor = "#00000071";
           ctx.shadowBlur = 12;
           ctx.translate(hoverX, hoverY);
-          ctx.drawImage(slingerImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
+          if (e.type === "slingerBoss") {
+            ctx.drawImage(slingerBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
+          } else {
+            ctx.drawImage(slingerImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
+          }
           ctx.restore();
         } else if (e.type === "kamikaze") {
           ctx.save();
