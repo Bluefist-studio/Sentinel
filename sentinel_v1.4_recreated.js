@@ -48,6 +48,9 @@
   // Grunt Boss sprite
   const gruntBossImg = new window.Image();
   gruntBossImg.src = "grunt boss.png";
+  // Grunt Heavy sprite
+  const gruntHeavyImg = new window.Image();
+  gruntHeavyImg.src = "grunt heavy.png";
   // Slinger Boss sprite
   const slingerBossImg = new window.Image();
   slingerBossImg.src = "slinger boss.png";
@@ -160,14 +163,14 @@ window.onload = function () {
       factionName: "UNCLASSIFIED HOSTILES",
       factionDescription: "Faction designation pending. This index summarizes observed hostile combat roles and behavior patterns.",
       entries: [
-        { name: "Grunt", role: "Frontline", image: "grunt.png", description: "Basic close-range attacker that pushes directly toward the player." },
+        { name: "Shard", role: "Frontline", image: "grunt.png", description: "Basic close-range attacker that pushes directly toward the player." },
         { name: "Kamikaze", role: "Suicide Diver", image: "kamikaze.png", description: "Fast suicide unit that pressures with explosives and mine drops." },
         { name: "Slinger", role: "Ranged Harasser", image: "slinger.png", description: "Maintains distance and fires projectile shots at medium-to-long range." },
         { name: "Shielder", role: "Support", image: "shielder.png", description: "Defensive support unit that protects nearby enemies with shielding links." },
         { name: "Beamer", role: "Artillery", image: "beamer.png", description: "Charges and fires sweeping beam attacks while holding preferred spacing." },
         { name: "Stalker", role: "Skirmisher", image: "stalker.png", description: "Disruptive mobile attacker that repositions aggressively around the player." },
         { name: "Brute", role: "Heavy", image: "brute.png", description: "Durable close-range unit with high pressure in short-to-mid range fights." },
-        { name: "Grunt Heavy", role: "Mini-Boss", image: "grunt heavy.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
+        { name: "Shard Heavy", role: "Mini-Boss", image: "grunt heavy.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
         { name: "Shard Major", role: "Boss", image: "grunt boss.png", description: "Elite grunt leader with shard-based attacks and advanced threat patterns." },
         { name: "Slinger Major", role: "Boss", image: "slinger boss.png", description: "Advanced ranged boss with burst projectile patterns and fragmentation fire." },
         { name: "Brute Major", role: "Boss", image: "brute boss.png", description: "Heavy boss focused on area denial, nova pressure, and close-range punishment." }
@@ -5443,8 +5446,11 @@ const droplifelenght = 280;
       }
 
       if (typeof e.spinAngle === "undefined") e.spinAngle = Math.random() * Math.PI * 2;
-      if (e.type !== "gruntBoss") {
-        e.spinAngle += 0.18 * delta;
+      // Only update spinAngle for non-gruntBoss and non-gruntBossMinor
+      if (e.type !== "gruntBoss" && e.type !== "gruntBossMinor") {
+        if (!paused) {
+          e.spinAngle += 0.18 * delta;
+        }
       }
       if (e.type === "slinger" || e.type === "slingerBoss") {
         if (typeof e.baseY === "undefined") e.baseY = e.y;
@@ -6402,8 +6408,8 @@ const droplifelenght = 280;
         ctx.arc(e.x, e.y, (e.radius > 20 ? 40 : 20), 0, Math.PI * 2);
         ctx.strokeStyle = "rgba(255, 80, 80, 0.0)";
         ctx.lineWidth = 1; ctx.stroke();
-        // Draw magenta grunt, grunt boss, and grunt boss minor with grunt image
-        if ((e.type === "grunt" && e.color === "magenta") || e.type === "gruntBossMinor") {
+        // Draw magenta grunt with grunt image
+        if (e.type === "grunt" && e.color === "magenta") {
           ctx.save();
           ctx.shadowColor = "#00000071";
           ctx.shadowBlur = 12;
@@ -6411,10 +6417,19 @@ const droplifelenght = 280;
           ctx.rotate(e.spinAngle);
           ctx.drawImage(gruntImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
+        // Draw grunt boss minor (Grunt Heavy) with grunt heavy image
+        } else if (e.type === "gruntBossMinor") {
+          ctx.save();
+          ctx.shadowColor = "#00000071";
+          ctx.shadowBlur = 28; // Bigger glow for grunt heavy
+          ctx.translate(e.x, e.y);
+          // No rotation for grunt heavy
+          ctx.drawImage(gruntHeavyImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
+          ctx.restore();
         } else if (e.type === "gruntBoss") {
           ctx.save();
           ctx.shadowColor = "#000000e0"; // Darker shadow
-          ctx.shadowBlur = 44; // Bigger glow
+          ctx.shadowBlur = 64; // Even bigger glow for grunt boss
           ctx.translate(e.x, e.y);
           ctx.rotate(0); // No rotation for grunt boss
           ctx.drawImage(gruntBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
@@ -6753,4 +6768,3 @@ const droplifelenght = 280;
   requestAnimationFrame(gameLoop);
 
 }
-
