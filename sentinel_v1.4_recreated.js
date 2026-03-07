@@ -79,6 +79,28 @@ window.resetAllProtocolDiscovery = function() {
   }
 };
 
+window.debugFramerateEnabled = false;
+window._debugKeyDown = false;
+window.addEventListener('keydown', function(e) {
+  // Toggle framerate debug with 'P' (only on initial press, not repeat)
+  if ((e.key === 'p' || e.key === 'P') && !window._debugKeyDown) {
+    window.debugFramerateEnabled = !window.debugFramerateEnabled;
+    window._debugKeyDown = true;
+    if (window.debugFramerateEnabled) {
+      console.log('[DEBUG] Framerate debug ENABLED');
+    } else {
+      console.log('[DEBUG] Framerate debug DISABLED');
+    }
+    e.preventDefault();
+  }
+});
+window.addEventListener('keyup', function(e) {
+  if (e.key === 'p' || e.key === 'P') {
+    window._debugKeyDown = false;
+    e.preventDefault();
+  }
+});
+
 window.onload = function () {
   const uiSelectionStyle = document.createElement("style");
   uiSelectionStyle.textContent = `
@@ -2246,12 +2268,33 @@ window.onload = function () {
       }
     }
   });
+
   // Hide cursor when holding right-click, show when released
+  let crosshairImg = new window.Image();
+  crosshairImg.src = "crosshair4m.png";
+  let crosshairCursorUrl = null;
+  crosshairImg.onload = function() {
+    // Dynamically set hotspot to center of image
+    const w = crosshairImg.width;
+    const h = crosshairImg.height;
+    crosshairCursorUrl = `url('crosshair4m.png') ${Math.floor(w/2)} ${Math.floor(h/2)}, crosshair`;
+  };
+
   canvas.addEventListener("mousedown", (e) => {
-    if (e.button === 2) canvas.style.cursor = "crosshair";
+    if (e.button === 2) {
+      // Use custom crosshair image as cursor, centered
+      if (crosshairCursorUrl) {
+        canvas.style.cursor = crosshairCursorUrl;
+      } else {
+        // fallback if image not loaded yet
+        canvas.style.cursor = "crosshair";
+      }
+    }
   });
   canvas.addEventListener("mouseup", (e) => {
-    if (e.button === 2) canvas.style.cursor = "default";
+    if (e.button === 2) {
+      canvas.style.cursor = "default";
+    }
   });
   // Reset cursor if context menu is triggered (failsafe)
   canvas.addEventListener("contextmenu", (e) => {
@@ -5698,18 +5741,7 @@ const droplifelenght = 280;
     const delta = (currentTimestamp - lastTimestamp) / 1000;
     lastTimestamp = currentTimestamp;
 
-    // Debug: log frame time and array sizes every 1s
-    if (currentTimestamp - _lastDebugLog > 1000) {
-      if (typeof particles !== 'undefined' && typeof mines !== 'undefined' && typeof enemies !== 'undefined') {
-        console.log('[DEBUG]',
-          'FrameTime(ms):', (delta * 1000).toFixed(2),
-          '| Particles:', particles.length,
-          '| Mines:', mines.length,
-          '| Enemies:', enemies.length
-        );
-      }
-      _lastDebugLog = currentTimestamp;
-    }
+    // ...existing code...
         // Draw wave announcement if timer is active
         // (waveAnnouncementTimer update will be made delta-based in next step)
         if (waveAnnouncementTimer > 0) {
@@ -6595,6 +6627,27 @@ const droplifelenght = 280;
       }
       drawHUD();
       drawProtocolWarnings();
+      // Draw debug text on top of HUD and overlays
+      if (window.debugFramerateEnabled) {
+        if (typeof particles !== 'undefined' && typeof mines !== 'undefined' && typeof enemies !== 'undefined') {
+          ctx.save();
+          ctx.font = 'bold 15px monospace';
+          ctx.fillStyle = '#00eaff';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          const fps = (1 / delta).toFixed(1);
+          const debugText =
+            'FrameRate (FPS): ' + fps +
+            '\nParticles: ' + particles.length +
+            ' | Mines: ' + mines.length +
+            ' | Enemies: ' + enemies.length;
+          const lines = debugText.split('\n');
+          lines.forEach((line, i) => {
+            ctx.fillText(line, 12, 12 + i * 20);
+          });
+          ctx.restore();
+        }
+      }
       
       // Update hovered protocol based on mouse position
       hoveredProtocol = -1;
