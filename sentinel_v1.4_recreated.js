@@ -1,3 +1,15 @@
+  // Expose byte reset and set to console
+  window.resetBytes = function() {
+    window.totalCollectedBytes = 0;
+    localStorage.setItem('sentinel.collectedBytes.v1', '0');
+    console.log('✓ Bytes reset to 0');
+  };
+
+  window.giveBytes100 = function() {
+    window.totalCollectedBytes = 100;
+    localStorage.setItem('sentinel.collectedBytes.v1', '100');
+    console.log('✓ 100 Bytes granted');
+  };
   // Fade out and stop menu ambience audio
   function fadeOutMenuAmbience(duration = 1000) {
     const ambience = window._menuAmbienceAudio;
@@ -55,6 +67,17 @@
   const slingerBossImg = new window.Image();
   slingerBossImg.src = "slinger boss.png";
 // Sentinel v1.4 Recreated - Core game logic
+
+// Expose protocol reset to console
+window.resetAllProtocolDiscovery = function() {
+  if (window.ProtocolSystem && typeof window.ProtocolSystem.resetDiscovery === 'function') {
+    window.ProtocolSystem.resetDiscovery();
+  } else if (typeof ProtocolSystem !== 'undefined' && typeof ProtocolSystem.resetDiscovery === 'function') {
+    ProtocolSystem.resetDiscovery();
+  } else {
+    console.warn('ProtocolSystem.resetDiscovery not found');
+  }
+};
 
 window.onload = function () {
   const uiSelectionStyle = document.createElement("style");
@@ -1532,8 +1555,7 @@ window.onload = function () {
                 ctx.save();
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.5;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 8;
+                // Removed shadowColor and shadowBlur for mobs
                 ctx.beginPath();
                 ctx.moveTo(x1, y1);
                 for (let i = 1; i < segments; i++) {
@@ -1564,8 +1586,7 @@ window.onload = function () {
                 ctx.textBaseline = "middle";
                 ctx.font = "bold 44px sans-serif";
                 ctx.fillStyle = "#00ffdd";
-                ctx.shadowColor = "#222";
-                ctx.shadowBlur = 18;
+                // Removed shadowColor and shadowBlur for mobs
                 // Animation: quick fade-in (first 20 frames), slower fade-out (last 40 frames)
                 let alpha = 1;
                 if (waveAnnouncementTimer > WAVE_ANNOUNCE_DURATION - 20) {
@@ -1821,8 +1842,8 @@ window.onload = function () {
   let enemiesToSpawn = 0;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
   const KAMIKAZE_DEATH_PARTICLE_COUNT = 8;
-  const MAX_PARTICLES = 1400;
-  const MAX_XPDROP_PARTICLES = 240;
+  const MAX_PARTICLES = 400;
+  const MAX_XPDROP_PARTICLES = 80;
 
   if (typeof window.SentinelWaveEnemyHealthModifier !== "number") {
     window.SentinelWaveEnemyHealthModifier = 1.3;
@@ -2027,10 +2048,8 @@ window.onload = function () {
         ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
         ctx.strokeStyle = "rgba(255, 187, 0, 0.55)";
         ctx.lineWidth = 8;
-        ctx.shadowColor = "#ffbb00";
-        ctx.shadowBlur = 32;
+        // Removed shadowColor and shadowBlur for mobs
         ctx.stroke();
-        ctx.shadowBlur = 0;
         ctx.restore();
         // Dramatic explosion particles (like kamikaze)
         for (let j = 0; j < KAMIKAZE_MINE_PARTICLE_COUNT; j++) {
@@ -2106,12 +2125,19 @@ window.onload = function () {
         const burnRadius = typeof m.radius === "number" ? m.radius : 72;
         const burnLifeRatio = Math.max(0, Math.min(1, (m.timer || 0) / 360));
         ctx.save();
-        const scorchGradient = ctx.createRadialGradient(m.x, m.y, burnRadius * 0.2, m.x, m.y, burnRadius);
-        scorchGradient.addColorStop(0, "rgba(35, 20, 15, 0.45)");
-        scorchGradient.addColorStop(0.7, "rgba(22, 14, 12, 0.28)");
-        scorchGradient.addColorStop(1, "rgba(8, 6, 6, 0.08)");
+        // Cache the gradient per mine, update if position or radius changes
+        if (!m._scorchGradient || m._scorchGradientParams === undefined ||
+            m._scorchGradientParams.x !== m.x ||
+            m._scorchGradientParams.y !== m.y ||
+            m._scorchGradientParams.radius !== burnRadius) {
+          m._scorchGradient = ctx.createRadialGradient(m.x, m.y, burnRadius * 0.2, m.x, m.y, burnRadius);
+          m._scorchGradient.addColorStop(0, "rgba(35, 20, 15, 0.45)");
+          m._scorchGradient.addColorStop(0.7, "rgba(22, 14, 12, 0.28)");
+          m._scorchGradient.addColorStop(1, "rgba(8, 6, 6, 0.08)");
+          m._scorchGradientParams = { x: m.x, y: m.y, radius: burnRadius };
+        }
         ctx.globalAlpha = 0.65 * burnLifeRatio;
-        ctx.fillStyle = scorchGradient;
+        ctx.fillStyle = m._scorchGradient;
         ctx.beginPath();
         ctx.arc(m.x, m.y, burnRadius, 0, Math.PI * 2);
         ctx.fill();
@@ -2134,11 +2160,9 @@ window.onload = function () {
       ctx.strokeStyle = "rgba(255, 187, 0, 0.28)";
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 8]);
-      ctx.shadowColor = "#ffbb00";
-      ctx.shadowBlur = 10;
+      // Removed shadowColor and shadowBlur for mobs
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.shadowBlur = 0;
 
       // Draw soft shadow under mine
       ctx.save();
@@ -2954,21 +2978,7 @@ window.onload = function () {
       }
 
       ctx.save();
-      const shadowDirX = -dirX;
-      const shadowDirY = -dirY;
-      const ovalCenterX = player.x + shadowDirX * (player.radius * 1.2);
-      const ovalCenterY = player.y + shadowDirY * (player.radius * 1.2);
-      const ovalLength = player.radius * 1.8;
-      const ovalWidth = player.radius * 0.7;
-      const ovalAngle = Math.atan2(shadowDirY, shadowDirX);
-      ctx.globalAlpha = 0.32;
-      ctx.fillStyle = 'rgba(0,0,0,0.38)';
-      ctx.translate(ovalCenterX, ovalCenterY);
-      ctx.rotate(ovalAngle);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, ovalLength, ovalWidth, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      // Removed custom shadow ellipse for mobs
 
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -4268,8 +4278,8 @@ const droplifelenght = 280;
                                       Math.sin(angle) * speed,
                                       2,
                                       e.projectileRadius,
-                                      "#ff33ff",
-                                      "gruntBossProjectile"
+                                      "#ffb347", // Slinger projectile color
+                                      "slingerProjectile" // Slinger projectile type
                                     );
                                     // Play laser sound for enemy projectile
                                     try {
@@ -5446,12 +5456,7 @@ const droplifelenght = 280;
       }
 
       if (typeof e.spinAngle === "undefined") e.spinAngle = Math.random() * Math.PI * 2;
-      // Only update spinAngle for non-gruntBoss and non-gruntBossMinor
-      if (e.type !== "gruntBoss" && e.type !== "gruntBossMinor") {
-        if (!paused) {
-          e.spinAngle += 0.18 * delta;
-        }
-      }
+      // Removed spin animation: spinAngle is set only at spawn and not updated
       if (e.type === "slinger" || e.type === "slingerBoss") {
         if (typeof e.baseY === "undefined") e.baseY = e.y;
         if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
@@ -5543,10 +5548,7 @@ const droplifelenght = 280;
         }
       }
 
-      if (p.trail) {
-        p.trail.push({ x: p.x, y: p.y });
-        if (p.trail.length > 8) p.trail.shift();
-      }
+      // Removed projectile trail/tail update
 
       const projectileRadius = typeof p.radius === "number" ? p.radius : 4;
       const dist = Math.hypot(player.x - p.x, player.y - p.y);
@@ -5621,107 +5623,45 @@ const droplifelenght = 280;
 
   function drawProjectiles() {
     for (let p of projectiles) {
-      if (p.type === "bruteBossFireball") {
-        if (p.trail && p.trail.length > 1) {
-          ctx.save();
-          for (let i = 1; i < p.trail.length; i++) {
-            const prev = p.trail[i - 1];
-            const curr = p.trail[i];
-            const alpha = 0.16 + 0.3 * (i / p.trail.length);
-            ctx.beginPath();
-            ctx.moveTo(prev.x, prev.y);
-            ctx.lineTo(curr.x, curr.y);
-            ctx.strokeStyle = `rgba(255, 100, 10, ${alpha})`;
-            ctx.lineWidth = 3.2 - 1.5 * (i / p.trail.length);
-            ctx.stroke();
-          }
-          ctx.restore();
-        }
-
-        ctx.save();
-        const pulse = 0.72 + 0.28 * Math.sin(Date.now() / 110 + p.x * 0.05 + p.y * 0.05);
-        const outerRadius = (typeof p.radius === "number" ? p.radius : 10) * (0.95 + 0.22 * pulse);
-        const innerRadius = (typeof p.radius === "number" ? p.radius : 10) * 0.58;
-        ctx.globalAlpha = 0.84 * pulse;
-        ctx.shadowColor = "#ff5a00";
-        ctx.shadowBlur = 24 * pulse;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, outerRadius, 0, Math.PI * 2);
-        ctx.fillStyle = "#ff5a00";
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, innerRadius, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffd27a";
-        ctx.fill();
-        ctx.restore();
+      // Skip drawing if projectile is completely outside the canvas
+      const r = typeof p.radius === "number" ? p.radius : 10;
+      if (
+        p.x + r < 0 ||
+        p.x - r > canvas.width ||
+        p.y + r < 0 ||
+        p.y - r > canvas.height
+      ) {
         continue;
       }
-      if (p.type === "slingerBossProjectile" || p.type === "slingerBossFragment" || p.type === "slingerBossFragShell") {
-        if (p.trail && p.trail.length > 1) {
-          ctx.save();
-          for (let i = 1; i < p.trail.length; i++) {
-            const prev = p.trail[i - 1];
-            const curr = p.trail[i];
-            const alpha = 0.1 + 0.24 * (i / p.trail.length);
-            ctx.beginPath();
-            ctx.moveTo(prev.x, prev.y);
-            ctx.lineTo(curr.x, curr.y);
-            ctx.strokeStyle = `rgba(255, 170, 80, ${alpha})`;
-            ctx.lineWidth = 3.1 - 1.4 * (i / p.trail.length);
-            ctx.stroke();
-          }
-          ctx.restore();
-        }
-
+      // Remove tail and pulsing from all enemy projectiles (gruntboss, slinger, slinger boss, stalker)
+      if (
+        p.type === "bruteBossFireball" ||
+        p.type === "slingerBossProjectile" ||
+        p.type === "slingerBossFragment" ||
+        p.type === "slingerBossFragShell" ||
+        p.type === "slingerProjectile" ||
+        p.type === "stalkerProjectile" ||
+        p.type === "gruntBossProjectile"
+      ) {
         ctx.save();
-        const pulse = 0.76 + 0.24 * Math.sin(Date.now() / 130 + p.x * 0.07 + p.y * 0.05);
-        const baseRadius = typeof p.radius === "number" ? p.radius : 6;
-        const outerRadius = baseRadius * (p.type === "slingerBossFragment" ? 1.12 : 1.26) * pulse;
-        const innerRadius = baseRadius * (p.type === "slingerBossFragment" ? 0.54 : 0.62);
-        ctx.globalAlpha = 0.86 * pulse;
-        ctx.shadowColor = p.type === "slingerBossFragShell" ? "#ffd08a" : "#ff9f1a";
-        ctx.shadowBlur = 18 * pulse;
+        const radius = typeof p.radius === "number" ? p.radius : 8;
+        ctx.globalAlpha = 0.9;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, outerRadius, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = p.color || "#ffb347";
         ctx.fill();
         ctx.globalAlpha = 1;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, innerRadius, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, radius * 0.62, 0, Math.PI * 2);
         ctx.fillStyle = "#fff2c0";
         ctx.fill();
         ctx.restore();
         continue;
       }
-      // Draw trail
-      if (p.trail && p.trail.length > 1) {
-        ctx.save();
-        for (let i = 1; i < p.trail.length; i++) {
-          const prev = p.trail[i - 1];
-          const curr = p.trail[i];
-          ctx.beginPath();
-          ctx.moveTo(prev.x, prev.y);
-          ctx.lineTo(curr.x, curr.y);
-          const alpha = 0.12 + 0.18 * (i / p.trail.length);
-          ctx.strokeStyle = `rgba(255, 180, 60, ${alpha})`;
-          ctx.lineWidth = 2.2 - 1.2 * (i / p.trail.length);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+
       // Pulsing glow
       ctx.save();
-      const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 120 + p.x + p.y);
-      ctx.globalAlpha = 0.7 * pulse;
-      ctx.shadowColor = "orange";
-      ctx.shadowBlur = 18 * pulse;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 8 * pulse, 0, Math.PI * 2);
-      ctx.fillStyle = "orange";
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
+
       // Inner core
       ctx.beginPath();
       ctx.arc(p.x, p.y, 5.2, 0, Math.PI * 2);
@@ -5748,6 +5688,7 @@ const droplifelenght = 280;
 
   let lastTimestamp = performance.now();
 
+  let _lastDebugLog = 0;
   function gameLoop(currentTimestamp) {
     if (typeof isGameBlocked === 'function' && isGameBlocked()) {
       requestAnimationFrame(gameLoop);
@@ -5756,6 +5697,19 @@ const droplifelenght = 280;
     // Calculate delta time in seconds
     const delta = (currentTimestamp - lastTimestamp) / 1000;
     lastTimestamp = currentTimestamp;
+
+    // Debug: log frame time and array sizes every 1s
+    if (currentTimestamp - _lastDebugLog > 1000) {
+      if (typeof particles !== 'undefined' && typeof mines !== 'undefined' && typeof enemies !== 'undefined') {
+        console.log('[DEBUG]',
+          'FrameTime(ms):', (delta * 1000).toFixed(2),
+          '| Particles:', particles.length,
+          '| Mines:', mines.length,
+          '| Enemies:', enemies.length
+        );
+      }
+      _lastDebugLog = currentTimestamp;
+    }
         // Draw wave announcement if timer is active
         // (waveAnnouncementTimer update will be made delta-based in next step)
         if (waveAnnouncementTimer > 0) {
@@ -6402,8 +6356,7 @@ const droplifelenght = 280;
         }
 
         ctx.save();
-        ctx.shadowColor = e.color;
-        ctx.shadowBlur = 12;
+        // Removed shadowColor and shadowBlur for grunt
         ctx.beginPath();
         ctx.arc(e.x, e.y, (e.radius > 20 ? 40 : 20), 0, Math.PI * 2);
         ctx.strokeStyle = "rgba(255, 80, 80, 0.0)";
@@ -6411,8 +6364,6 @@ const droplifelenght = 280;
         // Draw magenta grunt with grunt image
         if (e.type === "grunt" && e.color === "magenta") {
           ctx.save();
-          ctx.shadowColor = "#00000071";
-          ctx.shadowBlur = 12;
           ctx.translate(e.x, e.y);
           ctx.rotate(e.spinAngle);
           ctx.drawImage(gruntImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
@@ -6420,24 +6371,18 @@ const droplifelenght = 280;
         // Draw grunt boss minor (Grunt Heavy) with grunt heavy image
         } else if (e.type === "gruntBossMinor") {
           ctx.save();
-          ctx.shadowColor = "#00000071";
-          ctx.shadowBlur = 28; // Bigger glow for grunt heavy
           ctx.translate(e.x, e.y);
           // No rotation for grunt heavy
           ctx.drawImage(gruntHeavyImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
         } else if (e.type === "gruntBoss") {
           ctx.save();
-          ctx.shadowColor = "#000000e0"; // Darker shadow
-          ctx.shadowBlur = 64; // Even bigger glow for grunt boss
           ctx.translate(e.x, e.y);
           ctx.rotate(0); // No rotation for grunt boss
           ctx.drawImage(gruntBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
         } else if (e.type === "brute" || e.type === "bruteBoss") {
           ctx.save();
-          ctx.shadowColor = "#0000009f";
-          ctx.shadowBlur = 12;
           ctx.translate(e.x, e.y);
           const bruteSprite = e.type === "bruteBoss" ? bruteBossImg : bruteImg;
           ctx.drawImage(bruteSprite, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
@@ -6461,8 +6406,6 @@ const droplifelenght = 280;
           ctx.restore();
         } else if (e.type === "slinger" || e.type === "slingerBoss") {
           ctx.save();
-          ctx.shadowColor = "#00000071";
-          ctx.shadowBlur = 12;
           ctx.translate(hoverX, hoverY);
           if (e.type === "slingerBoss") {
             ctx.drawImage(slingerBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
@@ -6472,8 +6415,6 @@ const droplifelenght = 280;
           ctx.restore();
         } else if (e.type === "kamikaze") {
           ctx.save();
-          ctx.shadowColor = "#ff4444";
-          ctx.shadowBlur = 12;
           ctx.translate(e.x, e.y);
           ctx.drawImage(kamikazeImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
@@ -6484,8 +6425,6 @@ const droplifelenght = 280;
           ctx.globalAlpha = stalkerAlpha;
           if (stalkerImg && stalkerImg.complete && stalkerImg.naturalWidth > 0) {
             const drawScale = 4.1;
-            ctx.shadowColor = "#000000";
-            ctx.shadowBlur = 14;
             ctx.drawImage(stalkerImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
           } else {
             ctx.fillStyle = "#66e8ff";
@@ -6511,8 +6450,6 @@ const droplifelenght = 280;
           ctx.rotate(beamerFacingAngle);
           if (beamerImg && beamerImg.complete && beamerImg.naturalWidth > 0) {
             const drawScale = 4.2;
-            ctx.shadowColor = "#0077ff";
-            ctx.shadowBlur = 10 + (beamGlow * 8);
             ctx.drawImage(beamerImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
           } else {
             ctx.fillStyle = "#5ecfff";
@@ -6584,8 +6521,6 @@ const droplifelenght = 280;
           ctx.globalAlpha = shielderAlpha;
           if (shielderImg && shielderImg.complete && shielderImg.naturalWidth > 0) {
             const drawScale = 4.0;
-            ctx.shadowColor = "#78ffd6";
-            ctx.shadowBlur = 12;
             ctx.drawImage(shielderImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
           } else {
             ctx.shadowColor = "#78ffd6";
