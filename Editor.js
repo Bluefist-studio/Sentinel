@@ -1315,8 +1315,7 @@
 			}
 		});
 		closeBtn.addEventListener("click", () => {
-			applyWaveOverride(true);
-			applyPlayerValues();
+			// Only collapse/close the editor menu, do not apply or spawn
 			closeWaveEditor({ keepEditorSession: true });
 		});
 
