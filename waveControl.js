@@ -247,7 +247,7 @@ window.SentinelWaveControl = (function () {
     enemy.sprite = bruteHeavyImg;
     enemy.projectileCooldown = 0;
     enemy.projectileInterval = 120;
-    enemy.projectileRadius = 22;
+    enemy.projectileRadius = 8; // Match slinger projectile size
     enemy.burstMode = false;
     enemy.burstShotsLeft = 0;
     enemy.burstTimer = 0;
@@ -334,7 +334,7 @@ window.SentinelWaveControl = (function () {
 
     for (let i = 0; i < count; i++) {
       const { x, y } = randomEdgeSpawn();
-      let radius = 16, collisionRadius = 18, speed = 2, color = "#ff4444", damage = 3, health = 12 + (wave * 1.2);
+      let radius = 16, collisionRadius = 18, speed = 2, color = "#ff4444", damage = 3, health = 20 + (wave * 1.2);
       const enemy = ctx.spawnEnemy();
       enemy.x = x;
       enemy.y = y;
