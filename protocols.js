@@ -1,3 +1,4 @@
+
 //========= SENTINEL PROTOCOL SYSTEM =========//
 // Separate module for all protocol-related logic
 
@@ -12,7 +13,6 @@ const PROTOCOLS = {
   "Sightline Optimization": { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Range: 1, Health: 1, Pickup: -1 }, influence: 4, intent: "Defensive spacing" },
   "Precision Alignment": { family: "Targeting", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Range: 1, Power: 1 }, influence: 8, intent: "Pure damage targeting" },
   "Focus Optimization": { family: "Targeting", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Range: 1, Intensity: 1 }, influence: 7, intent: "Tempo ranged combat" },
-  
   // Targeting Family - Rare
   "Vector Mapping": { family: "Targeting", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Range: 1, Movement: 1, Pickup: 1, Power: -1, Health: -1 }, influence: 0, intent: "Control targeting" },
   "Range Analysis": { family: "Targeting", rarity: "Rare", tier: "Lower", structure: "3+/1−", statMods: { Range: 1, Health: 1, Pickup: 1, Power: -1 }, influence: 3, intent: "Defensive targeting" },
@@ -21,7 +21,6 @@ const PROTOCOLS = {
   "Tracking Matrix": { family: "Targeting", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Range: 1, Movement: 1, Intensity: 1, Health: -1 }, influence: 8, intent: "Reposition combat" },
   "Predictive Targeting": { family: "Targeting", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Range: 1, Power: 1, Intensity: 1 }, influence: 12, intent: "Peak offense targeting" },
   "Focus Tracking": { family: "Targeting", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Range: 1, Movement: 1, Power: 1 }, influence: 11, intent: "Precision mobility" },
-  
   // Overdrive Family - Common
   "Pulse Cycling": { family: "Overdrive", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Intensity: 1, Pickup: 1, Health: -1, Range: -1 }, influence: 0, intent: "Resource tempo" },
   "Combat Flow": { family: "Overdrive", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Intensity: 1, Movement: 1, Health: -1, Pickup: -1 }, influence: 4, intent: "Fragile speed" },
@@ -32,7 +31,6 @@ const PROTOCOLS = {
   "Kinetic Optimization": { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Intensity: 1, Range: 1, Movement: -1 }, influence: 4, intent: "Engagement uptime" },
   "Overclock Protocol": { family: "Overdrive", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Intensity: 1, Power: 1 }, influence: 9, intent: "Pure aggression" },
   "Hyper Cycle": { family: "Overdrive", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Intensity: 1, Movement: 1 }, influence: 7, intent: "Speed dominance" },
-  
   // Overdrive Family - Rare
   "Thermal Spike": { family: "Overdrive", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Intensity: 1, Power: 1, Pickup: 1, Health: -1, Range: -1 }, influence: 5, intent: "Aggro farming" },
   "Combat Cascade": { family: "Overdrive", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Intensity: 1, Movement: 1, Pickup: 1, Power: -1, Health: -1 }, influence: 1, intent: "Mobility tempo" },
@@ -43,7 +41,6 @@ const PROTOCOLS = {
   "Feedback Loop": { family: "Overdrive", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Intensity: 1, Power: 1, Health: 1, Range: -1 }, influence: 8, intent: "Bruiser tempo" },
   "Infinite Loop": { family: "Overdrive", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Intensity: 1, Power: 1, Movement: 1 }, influence: 12, intent: "Maximum aggression" },
   "Overdrive Matrix": { family: "Overdrive", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Intensity: 1, Range: 1, Movement: 1 }, influence: 10, intent: "Perfect tempo control" },
-  
   // Utility Family - Common
   "Recovery Routing": { family: "Utility", rarity: "Common", tier: "Lower", structure: "2+/1−", statMods: { Health: 1, Pickup: 1, Range: -1 }, influence: 0, intent: "Survival tradeoff" },
   "Soft Step Routine": { family: "Utility", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Movement: 1, Pickup: 1, Range: -1 }, influence: 1, intent: "Mobility learning" },
@@ -54,7 +51,6 @@ const PROTOCOLS = {
   "Stability Control": { family: "Utility", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Movement: 1, Health: 1, Pickup: -1 }, influence: 4, intent: "Reliable control" },
   "Mobility Protocol": { family: "Utility", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Movement: 1, Health: 1 }, influence: 5, intent: "Safe reposition" },
   "Logistics Manager": { family: "Utility", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Health: 1, Pickup: 1 }, influence: 3, intent: "Sustain economy" },
-  
   // Utility Family - Rare
   "Sustainment Protocol": { family: "Utility", rarity: "Rare", tier: "Lower", structure: "3+/1−", statMods: { Health: 1, Pickup: 1, Movement: 1, Range: -1 }, influence: 3, intent: "Survival specialist" },
   "Salvage Operations": { family: "Utility", rarity: "Rare", tier: "Lower", structure: "3+/1−", statMods: { Pickup: 1, Movement: 1, Range: 1, Power: -1 }, influence: 2, intent: "Resource mobility" },
@@ -67,8 +63,35 @@ const PROTOCOLS = {
   "Adaptive Systems": { family: "Utility", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Health: 1, Movement: 1, Range: 1 }, influence: 8, intent: "Defensive mastery" }
 };
 
+
 // Protocol system state object
 const ProtocolSystem = {
+    // Downgrade protocol and refund bytes for last upgrade step
+    downgradeProtocol: function(protocolName) {
+      if (!PROTOCOLS[protocolName]) return { success: false, reason: "invalid" };
+      const state = this.protocolBoard[protocolName];
+      if (!state || !state.discovered) return { success: false, reason: "locked" };
+
+      const currentIdx = this.getUpgradeTierIndex(state.upgradeTier || this.getDefaultUpgradeTier());
+      if (currentIdx <= 0) {
+        return { success: false, reason: "min-tier" };
+      }
+
+      // Refund the cost of the current tier (the last upgrade made)
+      // To do this, temporarily set the tier to the previous one and get the cost for the next upgrade (which is the one just downgraded)
+      const prevTier = this.upgradeTiers[currentIdx - 1];
+      const originalTier = state.upgradeTier;
+      state.upgradeTier = prevTier;
+      const refund = this.getNextUpgradeCost(protocolName);
+      state.upgradeTier = prevTier; // keep downgraded
+      this.savePersistentData();
+      return {
+        success: true,
+        refund,
+        newTier: state.upgradeTier,
+        previousTier: originalTier
+      };
+    },
   storageKey: "sentinel.protocolSystem.v1",
   upgradeTiers: ["Trivial", "Simple", "Moderate", "Complex", "Very Complex", "Dangerous"],
   upgradeStepCostMultipliers: [1.0, 1.75, 2.8, 4.1, 5.8],
@@ -501,6 +524,20 @@ const ProtocolSystem = {
     return mods;
   },
 
+  // Reset all protocol discovery (permanent and run)
+  resetDiscovery: function() {
+    Object.keys(this.protocolBoard).forEach(name => {
+      this.protocolBoard[name].discovered = false;
+      this.protocolBoard[name].isNew = false;
+      this.protocolBoard[name].upgradeTier = this.getDefaultUpgradeTier();
+    });
+    this.starterProtocols = [];
+    this.favoriteProtocols = [];
+    this.runDiscoveredProtocols = [];
+    this.activeProtocols = [];
+    this.savePersistentData();
+    console.log("✓ All protocol discovery reset");
+  },
   // Get all protocols by family and rarity
   getByFamilyAndRarity: function() {
     const families = ["Targeting", "Overdrive", "Utility"];
