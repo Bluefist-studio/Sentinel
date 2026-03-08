@@ -687,6 +687,13 @@ window.onload = function () {
       selectionCount.style.marginBottom = "10px";
       panel.appendChild(selectionCount);
 
+      // Add total stat change display
+      const totalStatDiv = document.createElement("div");
+      totalStatDiv.style.color = "#aaf6ff";
+      totalStatDiv.style.textAlign = "center";
+      totalStatDiv.style.marginBottom = "10px";
+      panel.appendChild(totalStatDiv);
+
       const content = document.createElement("div");
       content.style.flex = "1";
       content.style.overflowY = "auto";
@@ -700,6 +707,25 @@ window.onload = function () {
         : [];
       const refreshCount = () => {
         selectionCount.textContent = `Selected: ${selected.length}/2`;
+        // Calculate and display total stat change for selected starters, with color
+        const statTotals = { Range: 0, Power: 0, Intensity: 0, Movement: 0, Health: 0, Pickup: 0 };
+        selected.forEach(protocolName => {
+          const mods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+            ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+            : (PROTOCOLS[protocolName]?.statMods || {});
+          Object.entries(mods).forEach(([stat, value]) => {
+            if (statTotals.hasOwnProperty(stat)) statTotals[stat] += value;
+          });
+        });
+        // Format the stat totals for display with color
+        const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+        const statStrings = statOrder.map(stat => {
+          const v = statTotals[stat];
+          let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
+          let sign = v > 0 ? "+" : (v < 0 ? "" : "");
+          return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
+        });
+        totalStatDiv.innerHTML = `${statStrings.join(", ")}`;
       };
 
       if (discoveredProtocols.length === 0) {
@@ -739,6 +765,7 @@ window.onload = function () {
           content.appendChild(grid);
 
           protocols.forEach(protocolName => {
+
             const proto = PROTOCOLS[protocolName];
             const rawUpgradeTier = ProtocolSystem.protocolBoard[protocolName]?.upgradeTier;
             const upgradeTier = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
@@ -768,6 +795,104 @@ window.onload = function () {
                               <div style="font-size:0.8rem; color:#c8ffff; margin-top:3px;">${upgradeTier}</div>            
                               <div style="font-size:0.85rem; color:#aaf6ff; margin-top:3px;">${proto.rarity} • ${proto.tier}</div>
                               <div style="font-size:0.8rem; color:#aaf6ff; margin-top:4px;">${mods || "No mods"}</div>`;
+
+            // Tooltip: compare stat change if selected vs unselected
+            card.addEventListener("mouseenter", () => {
+              // Show stat difference using: (x - a) + y and (x - b) + y
+              const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+              const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
+              const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+                : (PROTOCOLS[protocolName]?.statMods || {});
+              let html = `<div style='min-width:220px; max-width:340px; font-family:sans-serif; font-size:1em; background:rgba(0,20,30,0.98); border-radius:10px; border:2px solid #00ffdd; box-shadow:0 0 18px #00ffdd44; padding:12px 14px;'>`;
+              if (selected.length === 0) {
+                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:4px;'>No protocol selected</div>`;
+              } else if (selected.length === 1) {
+                // Only one selected: show (x - a) + y, where x = a
+                const aName = selected[0];
+                const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                  ? ProtocolSystem.getProtocolEffectiveMods(aName)
+                  : (PROTOCOLS[aName]?.statMods || {});
+                // x = a
+                // (x - a) + y = y
+                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:2px;'>If replacing: ${aName}</div>`;
+                html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
+                html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+                html += statOrder.map(stat => {
+                  const x = Number(aMods[stat]) || 0;
+                  const c = Number(hoveredMods[stat]) || 0;
+                  let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
+                  let cStr = c < 0 ? c.toString() : c.toString();
+                  return `<div style='display:flex; align-items:center;'><span style='width:70px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:18px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 4px;'>→</span> <span style='color:${color}; min-width:18px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
+                }).join("");
+                html += `</div>`;
+                html += `</div>`;
+              } else if (selected.length === 2) {
+                // Two selected: show (x - a) + y and (x - b) + y
+                const aName = selected[0];
+                const bName = selected[1];
+                const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                  ? ProtocolSystem.getProtocolEffectiveMods(aName)
+                  : (PROTOCOLS[aName]?.statMods || {});
+                const bMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                  ? ProtocolSystem.getProtocolEffectiveMods(bName)
+                  : (PROTOCOLS[bName]?.statMods || {});
+                // x = a + b
+                // (x - a) + y = c
+                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:2px;'>If replaced: ${aName}</div>`;
+                html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
+                html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+                html += statOrder.map(stat => {
+                  const a = Number(aMods[stat]) || 0;
+                  const b = Number(bMods[stat]) || 0;
+                  const y = Number(hoveredMods[stat]) || 0;
+                  const x = a + b;
+                  const c = b + y;
+                  let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
+                  let cStr = c < 0 ? c.toString() : c.toString();
+                  return `<div style='display:flex; align-items:center;'><span style='width:70px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:18px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 4px;'>→</span> <span style='color:${color}; min-width:18px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
+                }).join("");
+                html += `</div>`;
+                html += `</div>`;
+                // (x - b) + y = d
+                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:2px;'>If replaced: ${bName}</div>`;
+                html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
+                html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+                html += statOrder.map(stat => {
+                  const a = Number(aMods[stat]) || 0;
+                  const b = Number(bMods[stat]) || 0;
+                  const y = Number(hoveredMods[stat]) || 0;
+                  const x = a + b;
+                  const d = a + y;
+                  let color = d > x ? "#00ff88" : d < x ? "#ff4444" : "#bbbbbb";
+                  let dStr = d < 0 ? d.toString() : d.toString();
+                  return `<div style='display:flex; align-items:center;'><span style='width:70px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:18px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 4px;'>→</span> <span style='color:${color}; min-width:18px; display:inline-block; text-align:right;'>${dStr}</span></div>`;
+                }).join("");
+                html += `</div>`;
+                html += `</div>`;
+              }
+              html += `</div>`;
+              let tooltip = document.createElement("div");
+              tooltip.innerHTML = html;
+              tooltip.style.position = "fixed";
+              tooltip.style.zIndex = 9999;
+              tooltip.style.pointerEvents = "none";
+              document.body.appendChild(tooltip);
+              function moveTooltip(e) {
+                tooltip.style.left = (e.clientX + 18) + "px";
+                tooltip.style.top = (e.clientY + 8) + "px";
+              }
+              moveTooltip(window.event || {});
+              card._tooltip = tooltip;
+              card.addEventListener("mousemove", moveTooltip);
+            });
+            card.addEventListener("mouseleave", () => {
+              if (card._tooltip) {
+                document.body.removeChild(card._tooltip);
+                card._tooltip = null;
+              }
+              card.removeEventListener("mousemove", () => {});
+            });
 
             const favoriteBadge = document.createElement("div");
             favoriteBadge.textContent = "✶";
@@ -840,17 +965,160 @@ window.onload = function () {
             renderCardState();
 
             card.addEventListener("click", () => {
+
               const idx = selected.indexOf(protocolName);
               if (idx >= 0) {
+                // Deselect if already selected
                 selected.splice(idx, 1);
-              } else {
-                if (selected.length >= 2) return;
-                selected.push(protocolName);
+                if (typeof ProtocolSystem.setStarters === "function") {
+                  ProtocolSystem.setStarters([...selected]);
+                } else {
+                  ProtocolSystem.starterProtocols = [...selected];
+                }
+                renderCardState();
+                refreshCount();
+                return;
               }
-              renderCardState();
-              refreshCount();
+              if (selected.length < 2) {
+                // Add if under limit
+                selected.push(protocolName);
+                if (typeof ProtocolSystem.setStarters === "function") {
+                  ProtocolSystem.setStarters([...selected]);
+                } else {
+                  ProtocolSystem.starterProtocols = [...selected];
+                }
+                renderCardState();
+                refreshCount();
+                return;
+              }
+              // If already 2 selected, prompt to replace
+              const modal = document.createElement("div");
+              modal.style.position = "fixed";
+              modal.style.left = 0;
+              modal.style.top = 0;
+              modal.style.width = "100vw";
+              modal.style.height = "100vh";
+              modal.style.background = "rgba(0,0,0,0.7)";
+              modal.style.display = "flex";
+              modal.style.alignItems = "center";
+              modal.style.justifyContent = "center";
+              modal.style.zIndex = 2000;
+              const box = document.createElement("div");
+              box.style.background = "#01222b";
+              box.style.border = "2px solid #00ffdd";
+              box.style.borderRadius = "10px";
+              box.style.padding = "28px 32px";
+              box.style.display = "flex";
+              box.style.flexDirection = "column";
+              box.style.alignItems = "center";
+              box.style.boxShadow = "0 0 18px #00ffdd55";
+              const msg = document.createElement("div");
+              msg.textContent = "Starter limit reached. Replace which starter?";
+              msg.style.color = "#00ffdd";
+              msg.style.fontWeight = "bold";
+              msg.style.fontSize = "1.1rem";
+              msg.style.marginBottom = "18px";
+              box.appendChild(msg);
+              const btnRow = document.createElement("div");
+              btnRow.style.display = "flex";
+              btnRow.style.gap = "18px";
+              btnRow.style.marginBottom = "10px";
+              selected.forEach(selName => {
+                // Button container for name and stat change
+                const btnContainer = document.createElement("div");
+                btnContainer.style.display = "flex";
+                btnContainer.style.flexDirection = "column";
+                btnContainer.style.alignItems = "center";
+                btnContainer.style.minWidth = "160px";
+                btnContainer.style.maxWidth = "220px";
+                btnContainer.style.margin = "0 2px";
+
+                // Protocol name button
+                const btn = document.createElement("button");
+                btn.textContent = selName;
+                btn.style.padding = "0.6rem 1.2rem";
+                btn.style.background = "rgba(0,0,0,0.7)";
+                btn.style.color = "#00ffdd";
+                btn.style.border = "2px solid #00ffdd";
+                btn.style.borderRadius = "8px";
+                btn.style.fontSize = "1rem";
+                btn.style.cursor = "pointer";
+                btn.style.marginBottom = "6px";
+                btn.addEventListener("click", () => {
+                  // Replace selected starter in-place and update UI
+                  const idxToReplace = selected.indexOf(selName);
+                  if (idxToReplace !== -1) {
+                    selected.splice(idxToReplace, 1, protocolName);
+                    if (typeof ProtocolSystem.setStarters === "function") {
+                      ProtocolSystem.setStarters([...selected]);
+                    } else {
+                      ProtocolSystem.starterProtocols = [...selected];
+                    }
+                    document.body.removeChild(modal);
+                    // Re-render all protocol cards' state and selection count
+                    const allCards = content.querySelectorAll('button');
+                    allCards.forEach(cardBtn => {
+                      if (typeof cardBtn.renderCardState === 'function') cardBtn.renderCardState();
+                    });
+                    refreshCount();
+                  }
+                });
+
+                // --- Stat comparison below protocol name, 2-column layout ---
+                const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+                const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
+                const aName = selName;
+                const bName = selected.find(n => n !== selName);
+                const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                  ? ProtocolSystem.getProtocolEffectiveMods(aName)
+                  : (PROTOCOLS[aName]?.statMods || {});
+                const bMods = bName && ((typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                  ? ProtocolSystem.getProtocolEffectiveMods(bName)
+                  : (PROTOCOLS[bName]?.statMods || {}));
+                const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                  ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+                  : (PROTOCOLS[protocolName]?.statMods || {});
+                // x = a + b
+                // (x - a) + y = c
+                let statHtml = `<div style='margin-bottom:2px; font-size:0.97em; background:rgba(0,20,30,0.92); border-radius:8px; border:1.5px solid #00ffdd; box-shadow:0 0 8px #00ffdd33; padding:7px 10px; width:100%;'>`;
+                statHtml += `<div style='color:#00ffdd; font-weight:bold; margin-bottom:2px; text-align:center;'>Result if replaced:</div>`;
+                statHtml += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+                statOrder.forEach((stat, i) => {
+                  const a = Number(aMods[stat]) || 0;
+                  const b = bMods ? (Number(bMods[stat]) || 0) : 0;
+                  const y = Number(hoveredMods[stat]) || 0;
+                  const x = a + b;
+                  const c = b + y;
+                  let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
+                  let cStr = c < 0 ? c.toString() : c.toString();
+                  statHtml += `<div style='display:flex; align-items:center;'><span style='width:54px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:16px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 3px;'>→</span> <span style='color:${color}; min-width:16px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
+                });
+                statHtml += `</div></div>`;
+                btnContainer.appendChild(btn);
+                btnContainer.insertAdjacentHTML('beforeend', statHtml);
+                btnRow.appendChild(btnContainer);
+              });
+              box.appendChild(btnRow);
+              const cancelBtn = document.createElement("button");
+              cancelBtn.textContent = "Cancel";
+              cancelBtn.style.padding = "0.5rem 1.1rem";
+              cancelBtn.style.background = "rgba(0,0,0,0.5)";
+              cancelBtn.style.color = "#fff";
+              cancelBtn.style.border = "1.5px solid #aaa";
+              cancelBtn.style.borderRadius = "8px";
+              cancelBtn.style.fontSize = "1rem";
+              cancelBtn.style.marginTop = "8px";
+              cancelBtn.style.cursor = "pointer";
+              cancelBtn.addEventListener("click", () => {
+                document.body.removeChild(modal);
+              });
+              box.appendChild(cancelBtn);
+              modal.appendChild(box);
+              document.body.appendChild(modal);
             });
 
+            // Attach renderCardState to card for external refresh
+            card.renderCardState = renderCardState;
             grid.appendChild(card);
           });
         });
@@ -860,9 +1128,10 @@ window.onload = function () {
 
       const actions = document.createElement("div");
       actions.style.display = "flex";
-      actions.style.justifyContent = "space-between";
-      actions.style.gap = "12px";
-      actions.style.marginTop = "14px";
+      actions.style.justifyContent = "center";
+      actions.style.alignItems = "center";
+      actions.style.gap = "18px";
+      actions.style.marginTop = "18px";
       panel.appendChild(actions);
 
       const backBtn2 = document.createElement("button");
@@ -875,6 +1144,19 @@ window.onload = function () {
       backBtn2.style.borderRadius = "8px";
       backBtn2.style.cursor = "pointer";
       actions.appendChild(backBtn2);
+
+      // Protocol Database button
+      const dbBtn = document.createElement("button");
+      dbBtn.textContent = "Protocol Database";
+      dbBtn.style.fontSize = "1rem";
+      dbBtn.style.padding = "0.7rem 1.2rem";
+      dbBtn.style.background = "rgba(0,0,0,0.7)";
+      dbBtn.style.color = "#00ffdd";
+      dbBtn.style.border = "2px solid #00ffdd";
+      dbBtn.style.borderRadius = "8px";
+      dbBtn.style.cursor = "pointer";
+      dbBtn.style.margin = "0 18px";
+      actions.appendChild(dbBtn);
 
       const startBtn = document.createElement("button");
       startBtn.textContent = "Start Run";
@@ -890,6 +1172,11 @@ window.onload = function () {
       backBtn2.addEventListener("click", () => {
         starterOverlay.remove();
         showDifficultyMenu();
+      });
+
+      dbBtn.addEventListener("click", () => {
+        starterOverlay.remove();
+        showProtocolMenu();
       });
 
       startBtn.addEventListener("click", () => {
@@ -1016,9 +1303,11 @@ window.onload = function () {
       confirmPanel.style.fontFamily = "sans-serif";
       confirmOverlay.appendChild(confirmPanel);
 
+      // Allow customizing modal for downgrade
+      const isDowngrade = arguments.length > 2 && arguments[2] === true;
       const confirmTitle = document.createElement("div");
-      confirmTitle.textContent = "CONFIRM UPGRADE";
-      confirmTitle.style.color = "#00ffdd";
+      confirmTitle.textContent = isDowngrade ? "CONFIRM DOWNGRADE" : "CONFIRM UPGRADE";
+      confirmTitle.style.color = isDowngrade ? "#ff6666" : "#00ffdd";
       confirmTitle.style.fontWeight = "bold";
       confirmTitle.style.fontSize = "1.05rem";
       confirmTitle.style.marginBottom = "10px";
@@ -1026,7 +1315,7 @@ window.onload = function () {
 
       const confirmMessage = document.createElement("div");
       confirmMessage.textContent = message;
-      confirmMessage.style.color = "#aaf6ff";
+      confirmMessage.style.color = isDowngrade ? "#ffb3b3" : "#aaf6ff";
       confirmMessage.style.fontSize = "0.95rem";
       confirmMessage.style.lineHeight = "1.4";
       confirmMessage.style.marginBottom = "14px";
@@ -1051,12 +1340,12 @@ window.onload = function () {
 
       const confirmBtn = document.createElement("button");
       confirmBtn.type = "button";
-      confirmBtn.textContent = "Upgrade";
+      confirmBtn.textContent = isDowngrade ? "Downgrade" : "Upgrade";
       confirmBtn.style.padding = "0.5rem 0.85rem";
       confirmBtn.style.borderRadius = "6px";
-      confirmBtn.style.border = "1px solid #00ffdd";
+      confirmBtn.style.border = isDowngrade ? "1px solid #ff6666" : "1px solid #00ffdd";
       confirmBtn.style.background = "rgba(0,0,0,0.55)";
-      confirmBtn.style.color = "#00ffdd";
+      confirmBtn.style.color = isDowngrade ? "#ff6666" : "#00ffdd";
       confirmBtn.style.cursor = "pointer";
       actionRow.appendChild(confirmBtn);
 
@@ -1380,25 +1669,149 @@ window.onload = function () {
 
             if (existingIndex >= 0) {
               nextStarters = currentStarters.filter(name => name !== protocolName);
-            } else {
-              if (currentStarters.length >= 2) {
-                showUpgradeInfoModal(
-                  "STARTER LIMIT",
-                  "You can select up to 2 starter protocols."
-                );
-                return;
-              }
-              nextStarters = [...currentStarters, protocolName];
+              const applied = (typeof ProtocolSystem.setStarters === "function")
+                ? ProtocolSystem.setStarters(nextStarters)
+                : false;
+              if (!applied) return;
+              const restoreScrollTop = scrollContent.scrollTop;
+              menuOverlay.remove();
+              showProtocolMenu(restoreScrollTop);
+              return;
             }
+            if (currentStarters.length < 2) {
+              nextStarters = [...currentStarters, protocolName];
+              const applied = (typeof ProtocolSystem.setStarters === "function")
+                ? ProtocolSystem.setStarters(nextStarters)
+                : false;
+              if (!applied) return;
+              const restoreScrollTop = scrollContent.scrollTop;
+              menuOverlay.remove();
+              showProtocolMenu(restoreScrollTop);
+              return;
+            }
+            // If already 2 selected, prompt to replace
+            const modal = document.createElement("div");
+            modal.style.position = "fixed";
+            modal.style.left = 0;
+            modal.style.top = 0;
+            modal.style.width = "100vw";
+            modal.style.height = "100vh";
+            modal.style.background = "rgba(0,0,0,0.7)";
+            modal.style.display = "flex";
+            modal.style.alignItems = "center";
+            modal.style.justifyContent = "center";
+            modal.style.zIndex = 2000;
+            const box = document.createElement("div");
+            box.style.background = "#01222b";
+            box.style.border = "2px solid #00ffdd";
+            box.style.borderRadius = "10px";
+            box.style.padding = "28px 32px";
+            box.style.display = "flex";
+            box.style.flexDirection = "column";
+            box.style.alignItems = "center";
+            box.style.boxShadow = "0 0 18px #00ffdd55";
+            const msg = document.createElement("div");
+            msg.textContent = "Starter limit reached. Replace which starter?";
+            msg.style.color = "#00ffdd";
+            msg.style.fontWeight = "bold";
+            msg.style.fontSize = "1.1rem";
+            msg.style.marginBottom = "18px";
+            box.appendChild(msg);
+            const btnRow = document.createElement("div");
+            btnRow.style.display = "flex";
+            btnRow.style.gap = "18px";
+            btnRow.style.marginBottom = "10px";
+            currentStarters.forEach(selName => {
+              // Button container for name and stat change
+              const btnContainer = document.createElement("div");
+              btnContainer.style.display = "flex";
+              btnContainer.style.flexDirection = "column";
+              btnContainer.style.alignItems = "center";
+              btnContainer.style.minWidth = "160px";
+              btnContainer.style.maxWidth = "220px";
+              btnContainer.style.margin = "0 2px";
 
-            const applied = (typeof ProtocolSystem.setStarters === "function")
-              ? ProtocolSystem.setStarters(nextStarters)
-              : false;
-            if (!applied) return;
+              // Protocol name button
+              const btn = document.createElement("button");
+              btn.textContent = selName;
+              btn.style.padding = "0.6rem 1.2rem";
+              btn.style.background = "rgba(0,0,0,0.7)";
+              btn.style.color = "#00ffdd";
+              btn.style.border = "2px solid #00ffdd";
+              btn.style.borderRadius = "8px";
+              btn.style.fontSize = "1rem";
+              btn.style.cursor = "pointer";
+              btn.style.marginBottom = "6px";
+              btn.addEventListener("click", () => {
+                // Replace selected starter
+                const idxToReplace = currentStarters.indexOf(selName);
+                if (idxToReplace !== -1) {
+                  nextStarters = [...currentStarters];
+                  const replacedName = nextStarters[idxToReplace];
+                  nextStarters.splice(idxToReplace, 1, protocolName);
+                  const applied = (typeof ProtocolSystem.setStarters === "function")
+                    ? ProtocolSystem.setStarters(nextStarters)
+                    : false;
+                  if (!applied) return;
+                  document.body.removeChild(modal);
+                  // Re-render the protocol menu to reflect new selection state
+                  const restoreScrollTop = scrollContent.scrollTop;
+                  menuOverlay.remove();
+                  showProtocolMenu(restoreScrollTop);
+                }
+              });
 
-            const restoreScrollTop = scrollContent.scrollTop;
-            menuOverlay.remove();
-            showProtocolMenu(restoreScrollTop);
+              // --- Stat comparison below protocol name, single column layout ---
+              const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+              const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
+              const aName = selName;
+              const bName = currentStarters.find(n => n !== selName);
+              const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(aName)
+                : (PROTOCOLS[aName]?.statMods || {});
+              const bMods = bName && ((typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(bName)
+                : (PROTOCOLS[bName]?.statMods || {}));
+              const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+                : (PROTOCOLS[protocolName]?.statMods || {});
+              // x = a + b
+              // (x - a) + y = c
+              let statHtml = `<div style='margin-bottom:2px; font-size:0.97em; background:rgba(0,20,30,0.92); border-radius:8px; border:1.5px solid #00ffdd; box-shadow:0 0 8px #00ffdd33; padding:7px 10px; width:100%;'>`;
+              statHtml += `<div style='color:#00ffdd; font-weight:bold; margin-bottom:2px; text-align:center;'>Result if replaced:</div>`;
+              statHtml += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+              statOrder.forEach((stat, i) => {
+                const a = Number(aMods[stat]) || 0;
+                const b = bMods ? (Number(bMods[stat]) || 0) : 0;
+                const y = Number(hoveredMods[stat]) || 0;
+                const x = a + b;
+                const c = b + y;
+                let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
+                let cStr = c < 0 ? c.toString() : c.toString();
+                statHtml += `<div style='display:flex; align-items:center;'><span style='width:54px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:16px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 3px;'>→</span> <span style='color:${color}; min-width:16px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
+              });
+              statHtml += `</div></div>`;
+              btnContainer.appendChild(btn);
+              btnContainer.insertAdjacentHTML('beforeend', statHtml);
+              btnRow.appendChild(btnContainer);
+            });
+            box.appendChild(btnRow);
+            const cancelBtn = document.createElement("button");
+            cancelBtn.textContent = "Cancel";
+            cancelBtn.style.padding = "0.5rem 1.1rem";
+            cancelBtn.style.background = "rgba(0,0,0,0.5)";
+            cancelBtn.style.color = "#fff";
+            cancelBtn.style.border = "1.5px solid #aaa";
+            cancelBtn.style.borderRadius = "8px";
+            cancelBtn.style.fontSize = "1rem";
+            cancelBtn.style.marginTop = "8px";
+            cancelBtn.style.cursor = "pointer";
+            cancelBtn.addEventListener("click", () => {
+              document.body.removeChild(modal);
+            });
+            box.appendChild(cancelBtn);
+            modal.appendChild(box);
+            document.body.appendChild(modal);
           });
         }
 
@@ -1478,10 +1891,16 @@ window.onload = function () {
         card.appendChild(powerModifierListEl);
 
         if (discovered) {
+          // Button container
+          const btnContainer = document.createElement("div");
+          btnContainer.style.display = "flex";
+          btnContainer.style.gap = "8px";
+          btnContainer.style.marginTop = "8px";
+
+          // Upgrade button
           const upgradeBtn = document.createElement("button");
           upgradeBtn.type = "button";
           upgradeBtn.textContent = nextUpgradeCost === null ? "MAX" : "Upgrade";
-          upgradeBtn.style.marginTop = "8px";
           upgradeBtn.style.padding = "0.35rem 0.6rem";
           upgradeBtn.style.borderRadius = "6px";
           upgradeBtn.style.border = "1px solid #00ffdd";
@@ -1493,11 +1912,9 @@ window.onload = function () {
             upgradeBtn.disabled = true;
             upgradeBtn.style.opacity = "0.65";
           }
-
           upgradeBtn.addEventListener("click", (evt) => {
             evt.stopPropagation();
             if (nextUpgradeCost === null) return;
-
             if (totalCollectedBytes < nextUpgradeCost) {
               showUpgradeInfoModal(
                 "INSUFFICIENT BYTES",
@@ -1505,7 +1922,6 @@ window.onload = function () {
               );
               return;
             }
-
             const nextTierName = (typeof ProtocolSystem.getNextUpgradeTierName === "function")
               ? ProtocolSystem.getNextUpgradeTierName(protocolName)
               : "Next";
@@ -1515,7 +1931,6 @@ window.onload = function () {
                 const result = (typeof ProtocolSystem.upgradeProtocol === "function")
                   ? ProtocolSystem.upgradeProtocol(protocolName, totalCollectedBytes)
                   : { success: false };
-
                 if (!result.success) {
                   if (result.reason === "insufficient") {
                     showUpgradeInfoModal(
@@ -1525,7 +1940,6 @@ window.onload = function () {
                   }
                   return;
                 }
-
                 totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
                 saveCollectedBytes();
                 const restoreScrollTop = scrollContent.scrollTop;
@@ -1534,8 +1948,55 @@ window.onload = function () {
               }
             );
           });
+          btnContainer.appendChild(upgradeBtn);
 
-          card.appendChild(upgradeBtn);
+          // Downgrade button
+          const canDowngrade = currentTierIndex > 0;
+          const downgradeBtn = document.createElement("button");
+          downgradeBtn.type = "button";
+          downgradeBtn.textContent = "Downgrade";
+          downgradeBtn.style.padding = "0.35rem 0.6rem";
+          downgradeBtn.style.borderRadius = "6px";
+          downgradeBtn.style.border = "1px solid #ff6666";
+          downgradeBtn.style.background = "rgba(0,0,0,0.4)";
+          downgradeBtn.style.color = canDowngrade ? "#ff6666" : "#555";
+          downgradeBtn.style.fontSize = "0.78rem";
+          downgradeBtn.style.cursor = canDowngrade ? "pointer" : "default";
+          if (!canDowngrade) {
+            downgradeBtn.disabled = true;
+            downgradeBtn.style.opacity = "0.65";
+          }
+          downgradeBtn.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            if (!canDowngrade) return;
+            // Confirm downgrade
+            showUpgradeConfirmModal(
+              `Downgrade ${protocolName} to ${ProtocolSystem.upgradeTiers[currentTierIndex - 1]} and refund last upgrade cost?`,
+              () => {
+                const result = (typeof ProtocolSystem.downgradeProtocol === "function")
+                  ? ProtocolSystem.downgradeProtocol(protocolName)
+                  : { success: false };
+                if (!result.success) {
+                  showUpgradeInfoModal(
+                    "CANNOT DOWNGRADE",
+                    result.reason === "min-tier"
+                      ? "Already at minimum tier."
+                      : "Unable to downgrade."
+                  );
+                  return;
+                }
+                totalCollectedBytes += result.refund || 0;
+                saveCollectedBytes();
+                const restoreScrollTop = scrollContent.scrollTop;
+                menuOverlay.remove();
+                showProtocolMenu(restoreScrollTop);
+              },
+              true // isDowngrade
+            );
+          });
+          btnContainer.appendChild(downgradeBtn);
+
+          card.appendChild(btnContainer);
         }
 
         // Lock badge
