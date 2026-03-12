@@ -1,8 +1,54 @@
 (function () {
 	const WAVE_CODE_PREFIX_V1 = "SWC1:";
 	const WAVE_CODE_PREFIX_V2 = "SWC2:";
+	const WAVE_CODE_PREFIX_V3 = "SWC3:";
 	const INTERVAL_UNITS_PER_SECOND = 120;
-	const waveEditorOverrides = {};
+	
+	// Timeline mob type compression mapping
+	const TIMELINE_MOB_COMPRESS_MAP = {
+		grunts: "g",
+		brutes: "b",
+		slingers: "s",
+		shielders: "sh",
+		beamers: "be",
+		kamikazes: "k",
+		stalkers: "st",
+		gruntbossminor: "gbm",
+		gruntboss: "gb",
+		slingerboss: "sb",
+		bruteboss: "bb"
+	};
+	
+	const TIMELINE_MOB_DECOMPRESS_MAP = {
+		g: "grunts",
+		b: "brutes",
+		s: "slingers",
+		sh: "shielders",
+		be: "beamers",
+		k: "kamikazes",
+		st: "stalkers",
+		gbm: "gruntbossminor",
+		gb: "gruntboss",
+		sb: "slingerboss",
+		bb: "bruteboss"
+	};
+	
+	// Load wave overrides from localStorage
+	let waveEditorOverrides = {};
+	try {
+		const saved = localStorage.getItem("sentinel.waveEditorOverrides");
+		if (saved) {
+			waveEditorOverrides = JSON.parse(saved);
+			console.log("[Editor] Loaded wave overrides from localStorage:", waveEditorOverrides);
+		}
+	} catch (err) {
+		console.error("[Editor] Failed to load overrides from localStorage:", err);
+		waveEditorOverrides = {};
+	}
+	
+	// Make globally accessible
+	window.waveEditorOverrides = waveEditorOverrides;
+	
 	let waveEditorOverlay = null;
 	let waveEditorWasPaused = false;
 	let autoScalePlayerToLoadedWave = true;
@@ -18,7 +64,8 @@
 		customGruntBossMinors: "bm",
 		customGruntBosses: "bo",
 		customSlingerBosses: "sb",
-		customBruteBosses: "bb"
+		customBruteBosses: "bb",
+		customStalkerBosses: "stb"
 	};
 	const SWC2_INTERVAL_FIELD_MAP = {
 		grunts: "g",
@@ -35,7 +82,7 @@
 	};
 
 	function hasSupportedWaveCodePrefix(raw) {
-		return raw.startsWith(WAVE_CODE_PREFIX_V1) || raw.startsWith(WAVE_CODE_PREFIX_V2);
+		return raw.startsWith(WAVE_CODE_PREFIX_V1) || raw.startsWith(WAVE_CODE_PREFIX_V2) || raw.startsWith(WAVE_CODE_PREFIX_V3);
 	}
 
 	function clampPositiveNumber(value, fallback) {
@@ -78,7 +125,8 @@
 			const resolvedKey = aliases[inputKey];
 			if (!resolvedKey) return;
 			const raw = Number(inputValue);
-			if (Number.isFinite(raw) && raw > 0) out[resolvedKey] = Math.round(raw);
+			// Allow explicit 0 to mean 'use wave burst interval' (pass through 0)
+			if (Number.isFinite(raw) && raw >= 0) out[resolvedKey] = Math.round(raw);
 		});
 		return Object.keys(out).length ? out : undefined;
 	}
@@ -88,6 +136,18 @@
 		Object.keys(overrides || {}).forEach((waveKey) => {
 			const entry = overrides[waveKey];
 			if (!entry) return;
+			
+			// Handle timeline-based waves
+			if (entry.timelineMode && entry.timeline) {
+				console.log(`[Editor] Cloning timeline wave ${waveKey}:`, entry.timeline);
+				out[waveKey] = {
+					timelineMode: true,
+					timeline: entry.timeline
+				};
+				return;
+			}
+			
+			// Handle burst-based waves
 			out[waveKey] = {
 				burstCount: entry.burstCount,
 				burstInterval: entry.burstInterval,
@@ -102,6 +162,7 @@
 				customBosses: Array.isArray(entry.customBosses) ? entry.customBosses.slice() : undefined,
 				customSlingerBosses: Array.isArray(entry.customSlingerBosses) ? entry.customSlingerBosses.slice() : undefined,
 				customBruteBosses: Array.isArray(entry.customBruteBosses) ? entry.customBruteBosses.slice() : undefined,
+				customStalkerBosses: Array.isArray(entry.customStalkerBosses) ? entry.customStalkerBosses.slice() : undefined,
 				mobIntervals: normalizeMobIntervals(entry.mobIntervals)
 			};
 		});
@@ -113,6 +174,16 @@
 		Object.keys(overrides || {}).forEach((waveKey) => {
 			const src = overrides[waveKey];
 			if (!src) return;
+			
+			// Handle timeline-based waves
+			if (src.timelineMode && src.timeline) {
+				normalized[waveKey] = {
+					timelineMode: true,
+					timeline: src.timeline
+				};
+				return;
+			}
+
 			normalized[waveKey] = {
 				burstCount: src.burstCount === Infinity ? "INF" : src.burstCount,
 				burstIntervalSeconds: Number(intervalUnitsToSeconds(src.burstInterval).toFixed(3)),
@@ -131,6 +202,7 @@
 					: (Array.isArray(src.customBosses) ? src.customBosses.slice() : undefined),
 				customSlingerBosses: Array.isArray(src.customSlingerBosses) ? src.customSlingerBosses.slice() : undefined,
 				customBruteBosses: Array.isArray(src.customBruteBosses) ? src.customBruteBosses.slice() : undefined,
+				customStalkerBosses: Array.isArray(src.customStalkerBosses) ? src.customStalkerBosses.slice() : undefined,
 				mobIntervalsSeconds: src.mobIntervals
 					? {
 						grunts: src.mobIntervals.grunts ? Number(intervalUnitsToSeconds(src.mobIntervals.grunts).toFixed(3)) : undefined,
@@ -158,6 +230,16 @@
 			if (!src) return;
 			const waveNumber = parseInt(waveKey, 10);
 			if (!Number.isFinite(waveNumber) || waveNumber < 1) return;
+			
+			// Handle timeline-based waves
+			if (src.timelineMode && src.timeline) {
+				restored[waveNumber] = {
+					timelineMode: true,
+					timeline: src.timeline
+				};
+				return;
+			}
+
 			const burstCount = src.burstCount === "INF" ? Infinity : parseInt(src.burstCount, 10);
 			if (!(burstCount === Infinity || (Number.isFinite(burstCount) && burstCount >= 0))) return;
 
@@ -193,6 +275,7 @@
 					: (Array.isArray(src.customBosses) ? src.customBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined),
 				customSlingerBosses: Array.isArray(src.customSlingerBosses) ? src.customSlingerBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				customBruteBosses: Array.isArray(src.customBruteBosses) ? src.customBruteBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
+				customStalkerBosses: Array.isArray(src.customStalkerBosses) ? src.customStalkerBosses.map(n => parseInt(n, 10)).filter(n => Number.isFinite(n) && n >= 0) : undefined,
 				mobIntervals: normalizeMobIntervals(
 					src.mobIntervalsSeconds
 						? {
@@ -223,6 +306,83 @@
 	function decodeJsonPayload(encoded) {
 		const json = decodeURIComponent(escape(atob(encoded)));
 		return JSON.parse(json);
+	}
+
+	// Compress timeline data for SWC3 format
+	function compressTimelineData(timeline) {
+		if (!timeline || typeof timeline !== "object") return null;
+		
+		const compressed = {
+			d: timeline.duration || 30,
+			e: timeline.endCondition || "duration"
+		};
+		
+		// Compress mobs - only include non-empty mob types, use short keys, store as [time, amount] arrays
+		const compressedMobs = {};
+		if (timeline.mobs && typeof timeline.mobs === "object") {
+			for (const [mobType, events] of Object.entries(timeline.mobs)) {
+				if (!Array.isArray(events) || events.length === 0) continue;
+				const shortKey = TIMELINE_MOB_COMPRESS_MAP[mobType];
+				if (!shortKey) continue;
+				
+				// Convert {time, amount, mode} objects to [time, amount] arrays
+				const compressedEvents = events.map(evt => [evt.time, evt.amount]);
+				compressedMobs[shortKey] = compressedEvents;
+			}
+		}
+		
+		if (Object.keys(compressedMobs).length > 0) {
+			compressed.m = compressedMobs;
+		}
+		
+		return compressed;
+	}
+	
+	// Decompress timeline data from SWC3 format
+	function decompressTimelineData(compressed) {
+		if (!compressed || typeof compressed !== "object") {
+			console.warn("[Editor] Invalid compressed data:", compressed);
+			return null;
+		}
+		
+		console.log("[Editor] Decompressing timeline:", compressed);
+		
+		const timeline = {
+			duration: compressed.d || 30,
+			endCondition: compressed.e || "duration",
+			mobs: {}
+		};
+		
+		// Initialize all mob types as empty arrays
+		for (const fullName of Object.values(TIMELINE_MOB_DECOMPRESS_MAP)) {
+			timeline.mobs[fullName] = [];
+		}
+		
+		// Decompress mobs - convert [time, amount] arrays back to {time, amount, mode} objects
+		if (compressed.m && typeof compressed.m === "object") {
+			console.log("[Editor] Decompressing mobs:", compressed.m);
+			for (const [shortKey, compressedEvents] of Object.entries(compressed.m)) {
+				const fullName = TIMELINE_MOB_DECOMPRESS_MAP[shortKey];
+				console.log(`[Editor] Short key '${shortKey}' → '${fullName}'`);
+				
+				if (!fullName) {
+					console.warn(`[Editor] Unknown mob key: ${shortKey}`);
+					continue;
+				}
+				
+				if (Array.isArray(compressedEvents)) {
+					timeline.mobs[fullName] = compressedEvents.map(([time, amount]) => ({
+						time,
+						amount,
+						mode: "event"
+					}));
+					console.log(`[Editor] Decompressed ${fullName}: ${timeline.mobs[fullName].length} events`);
+				}
+			}
+		}
+		
+		console.log("[Editor] Final decompressed timeline:", timeline);
+		return timeline;
 	}
 
 	function toNonNegativeIntList(list) {
@@ -285,6 +445,17 @@
 		Object.keys(serialized || {}).forEach((waveKey) => {
 			const src = serialized[waveKey];
 			if (!src || typeof src !== "object") return;
+			
+			// Handle timeline-based waves
+			if (src.timelineMode && src.timeline) {
+				const entry = {
+					tlm: true,  // timeline mode flag
+					tl: src.timeline  // timeline data
+				};
+				compact[waveKey] = entry;
+				return;
+			}
+
 			const entry = {};
 
 			if (src.burstCount !== undefined) {
@@ -329,6 +500,15 @@
 			if (!src || typeof src !== "object") return;
 			const waveNumber = parseInt(waveKey, 10);
 			if (!Number.isFinite(waveNumber) || waveNumber < 1) return;
+
+			// Handle timeline-based waves
+			if (src.tlm && src.tl) {
+				serialized[waveNumber] = {
+					timelineMode: true,
+					timeline: src.tl
+				};
+				return;
+			}
 
 			const entry = {};
 			if (src.bc === "I" || src.bc === "INF") {
@@ -380,33 +560,126 @@
 		return `${WAVE_CODE_PREFIX_V2}${encodeJsonPayload(payload)}`;
 	}
 
+	// Encode a single wave - automatically chooses SWC3 for timeline or SWC2 for burst
+	function encodeSingleWaveCode(waveNumber) {
+		const waveNum = parseInt(waveNumber, 10);
+		if (!Number.isFinite(waveNum) || waveNum < 1) {
+			throw new Error("Valid wave number required.");
+		}
+		const override = waveEditorOverrides[waveNum];
+		if (!override) {
+			throw new Error(`No override data for wave ${waveNum}.`);
+		}
+		
+		// Use SWC3 for timeline waves (60-70% shorter)
+		if (override.timelineMode && override.timeline) {
+			return encodeSingleTimelineWaveCode(waveNum);
+		}
+		
+		// Use SWC2 for burst waves
+		const singleWaveOverrides = { [waveNum]: override };
+		const payload = { v: 1, o: serializeOverridesForSWC2(singleWaveOverrides) };
+		return `${WAVE_CODE_PREFIX_V2}${encodeJsonPayload(payload)}`;
+	}
+
+	// Encode a single timeline-based wave into compact SWC3 format
+	function encodeSingleTimelineWaveCode(waveNumber) {
+		const waveNum = parseInt(waveNumber, 10);
+		if (!Number.isFinite(waveNum) || waveNum < 1) {
+			throw new Error("Valid wave number required.");
+		}
+		const override = waveEditorOverrides[waveNum];
+		if (!override) {
+			throw new Error(`No override data for wave ${waveNum}.`);
+		}
+		if (!override.timelineMode || !override.timeline) {
+			throw new Error(`Wave ${waveNum} is not timeline-based.`);
+		}
+		
+		// Compress the timeline
+		const compressed = compressTimelineData(override.timeline);
+		
+		// Create SWC3 payload with single wave
+		const payload = {
+			v: 3,
+			o: {
+				[waveNum]: {
+					t: true,  // timeline mode flag (compressed from "tlm")
+					l: compressed  // timeline data (compressed from "tl")
+				}
+			}
+		};
+		
+		return `${WAVE_CODE_PREFIX_V3}${encodeJsonPayload(payload)}`;
+	}
+
 	function decodeWaveCode(code) {
 		const raw = (code || "").trim();
-		if (!hasSupportedWaveCodePrefix(raw)) {
-			throw new Error("Invalid wave code prefix. Use SWC1 or SWC2.");
-		}
-
-		if (raw.startsWith(WAVE_CODE_PREFIX_V2)) {
-			const encoded = raw.slice(WAVE_CODE_PREFIX_V2.length);
-			const payload = decodeJsonPayload(encoded);
-			if (!payload || typeof payload.o !== "object") {
-				throw new Error("Invalid SWC2 wave code payload.");
+		
+		try {
+			// Support SWC3 format
+			if (raw.startsWith(WAVE_CODE_PREFIX_V3)) {
+				console.log("[Editor] Decoding SWC3 code");
+				const encoded = raw.slice(WAVE_CODE_PREFIX_V3.length);
+				const payload = decodeJsonPayload(encoded);
+				
+				if (!payload || typeof payload.o !== "object") {
+					throw new Error("Invalid SWC3 payload - no wave data.");
+				}
+				if (payload.v !== 3) {
+					throw new Error(`Invalid SWC3 version - expected v:3, got v:${payload.v}`);
+				}
+				
+				console.log("[Editor] Decoding SWC3 payload:", payload);
+				
+				// Decompress SWC3 waves
+				const decompressed = {};
+				Object.keys(payload.o).forEach((waveKey) => {
+					const compressed = payload.o[waveKey];
+					console.log(`[Editor] Processing SWC3 wave ${waveKey}:`, compressed);
+					
+					if (compressed && compressed.t && compressed.l) {
+						const timeline = decompressTimelineData(compressed.l);
+						console.log(`[Editor] Decompressed SWC3 timeline for wave ${waveKey}:`, timeline);
+						
+						decompressed[waveKey] = {
+							timelineMode: true,
+							timeline
+						};
+					}
+				});
+				
+				console.log("[Editor] Final SWC3 decompressed waves:", decompressed);
+				return decompressed;
 			}
-			if (payload.v !== 1) {
-				throw new Error("Unsupported SWC2 wave code version.");
+			
+			// Support SWC2 format (backward compatibility)
+			if (raw.startsWith(WAVE_CODE_PREFIX_V2)) {
+				console.log("[Editor] Decoding SWC2 code");
+				const encoded = raw.slice(WAVE_CODE_PREFIX_V2.length);
+				const payload = decodeJsonPayload(encoded);
+				
+				if (!payload || typeof payload.o !== "object") {
+					throw new Error("Invalid SWC2 payload - no wave data.");
+				}
+				if (payload.v !== 1) {
+					throw new Error(`Invalid SWC2 version - expected v:1, got v:${payload.v}`);
+				}
+				
+				console.log("[Editor] Decoding SWC2 payload:", payload);
+				
+				// Use deserializeOverridesFromSWC2 to decode SWC2 format
+				const decoded = deserializeOverridesFromSWC2(payload.o);
+				console.log("[Editor] Final SWC2 decoded waves:", decoded);
+				return decoded;
 			}
-			return deserializeOverridesFromSWC2(payload.o);
+			
+			throw new Error("Unknown wave code format. Expected SWC2 or SWC3.");
+			
+		} catch (err) {
+			console.error("[Editor] Decode error:", err);
+			throw err;
 		}
-
-		const encoded = raw.slice(WAVE_CODE_PREFIX_V1.length);
-		const payload = decodeJsonPayload(encoded);
-		if (!payload || typeof payload.overrides !== "object") {
-			throw new Error("Invalid SWC1 wave code payload.");
-		}
-		if (payload.version !== 1 && payload.version !== 2) {
-			throw new Error("Unsupported SWC1 wave code version.");
-		}
-		return deserializeOverrides(payload.overrides);
 	}
 
 	function getWaveConfigFromCode(code, waveNumber) {
@@ -437,11 +710,15 @@
 
 	function parseWaveEditorList(rawText) {
 		const text = (rawText || "").trim();
-		if (!text) return undefined;
+		if (!text) return [0]; // Treat empty field as [0]
 		return text
 			.split(",")
-			.map(part => parseInt(part.trim(), 10))
-			.filter(value => Number.isFinite(value) && value >= 0);
+			.map(part => {
+				const trimmed = part.trim();
+				if (trimmed === "") return 0;
+				const parsed = parseInt(trimmed, 10);
+				return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+			});
 	}
 
 	function formatWaveEditorList(list) {
@@ -483,6 +760,7 @@
 				customBosses: override.customBosses,
 				customSlingerBosses: override.customSlingerBosses,
 				customBruteBosses: override.customBruteBosses,
+				customStalkerBosses: override.customStalkerBosses,
 				mobIntervals: normalizeMobIntervals(override.mobIntervals)
 			};
 		}
@@ -501,6 +779,7 @@
 				customBosses: currentState.customBosses,
 				customSlingerBosses: currentState.customSlingerBosses,
 				customBruteBosses: currentState.customBruteBosses,
+				customStalkerBosses: currentState.customStalkerBosses,
 				mobIntervals: undefined
 			};
 		}
@@ -539,6 +818,7 @@
 			customBosses: undefined,
 			customSlingerBosses: undefined,
 			customBruteBosses: undefined,
+			customStalkerBosses: undefined,
 			mobIntervals: undefined
 		};
 	}
@@ -689,106 +969,54 @@
 			return section;
 		};
 
-		const waveSection = makeSection("Wave Controls");
-		const rowA = document.createElement("div");
-		rowA.style.display = "grid";
-		rowA.style.gridTemplateColumns = "repeat(3, minmax(0, 1fr))";
-		rowA.style.gap = "0";
-		rowA.style.border = "1px solid rgba(0,255,221,0.28)";
-		rowA.style.borderRadius = "8px";
-		rowA.style.overflow = "hidden";
-		waveSection.appendChild(rowA);
-
+		// Timeline-based wave editor section
+		const waveSection = makeSection("Wave Timeline Editor");
 		const waveInputWrap = document.createElement("div");
-		waveInputWrap.style.padding = "8px";
+		waveInputWrap.style.marginBottom = "10px";
 		waveInputWrap.appendChild(makeLabel("Target Wave"));
-		const waveInput = makeInput();
+		const waveInput = document.createElement("input");
+		waveInput.type = "number";
 		waveInput.value = String(selectedWaveState.value);
+		waveInput.min = "1";
+		waveInput.max = "50";
+		waveInput.step = "1";
+		waveInput.style.width = "80px";
+		waveInput.style.padding = "6px";
+		waveInput.style.borderRadius = "4px";
+		waveInput.style.border = "1px solid rgba(0,255,221,0.4)";
+		waveInput.style.background = "rgba(0,0,0,0.45)";
+		waveInput.style.color = "#d8ffff";
+		waveInputWrap.style.display = "flex";
+		waveInputWrap.style.gap = "8px";
+		waveInputWrap.style.alignItems = "center";
 		waveInputWrap.appendChild(waveInput);
-		rowA.appendChild(waveInputWrap);
+		waveSection.appendChild(waveInputWrap);
 
-		const burstCountWrap = document.createElement("div");
-		burstCountWrap.style.padding = "8px";
-		burstCountWrap.style.borderLeft = "1px solid rgba(0,255,221,0.28)";
-		burstCountWrap.appendChild(makeLabel("Burst Count (use Infinity)"));
-		const burstCountInput = makeInput();
-		burstCountWrap.appendChild(burstCountInput);
-		rowA.appendChild(burstCountWrap);
+		// Initialize timeline editor helper
+		let timelineHelper = null;
+		if (typeof window.SentinelTimelineEditorHelper !== "undefined" && typeof window.SentinelTimelineEditorHelper.createNewTimelineWaveEditor === "function") {
+			timelineHelper = window.SentinelTimelineEditorHelper.createNewTimelineWaveEditor(waveSection, selectedWaveState);
+		}
 
-		const burstIntervalWrap = document.createElement("div");
-		burstIntervalWrap.style.padding = "8px";
-		burstIntervalWrap.style.borderLeft = "1px solid rgba(0,255,221,0.28)";
-		burstIntervalWrap.appendChild(makeLabel("Burst Interval (seconds)"));
-		const burstIntervalInput = makeInput();
-		burstIntervalWrap.appendChild(burstIntervalInput);
-		rowA.appendChild(burstIntervalWrap);
+		// Create button row for wave-specific controls (positioned before the scale)
+		const waveButtonRow = document.createElement("div");
+		waveButtonRow.style.display = "grid";
+		waveButtonRow.style.gridTemplateColumns = "repeat(2, minmax(auto, 140px))";
+		waveButtonRow.style.gap = "6px";
+		waveButtonRow.style.marginTop = "8px";
+		waveButtonRow.style.marginBottom = "12px";
+		waveButtonRow.style.justifyContent = "start";
 
-		const rowB = document.createElement("div");
-		rowB.style.display = "grid";
-		rowB.style.gridTemplateColumns = "repeat(auto-fit, minmax(210px, 1fr))";
-		rowB.style.gap = "10px";
-		rowB.style.marginTop = "10px";
-		waveSection.appendChild(rowB);
+		// Insert before the timeline editor container
+		const timelineEditorContainer = waveSection.querySelector(".timeline-scale-div")?.parentElement;
+		if (timelineEditorContainer) {
+			waveSection.insertBefore(waveButtonRow, timelineEditorContainer);
+		} else {
+			waveSection.appendChild(waveButtonRow);
+		}
 
-		const createMobEntry = (parent, mobName) => {
-			const wrap = document.createElement("div");
-			const mobTitle = makeLabel(mobName);
-			mobTitle.style.color = "#00ffdd";
-			mobTitle.style.fontWeight = "bold";
-			wrap.appendChild(mobTitle);
-			wrap.appendChild(makeLabel("Per burst"));
-			const input = makeInput();
-			wrap.appendChild(input);
-			parent.appendChild(wrap);
-			return { wrap, input };
-		};
-
-		const { wrap: gruntWrap, input: gruntInput } = createMobEntry(rowB, "Grunts");
-		const { wrap: slingerWrap, input: slingerInput } = createMobEntry(rowB, "Slingers");
-		const { wrap: shielderWrap, input: shielderInput } = createMobEntry(rowB, "Shielders");
-		const { wrap: beamerWrap, input: beamerInput } = createMobEntry(rowB, "Beamers");
-		const { wrap: bruteWrap, input: bruteInput } = createMobEntry(rowB, "Brutes");
-		const { wrap: kamikazeWrap, input: kamikazeInput } = createMobEntry(rowB, "Kamikazes");
-		const { wrap: stalkerWrap, input: stalkerInput } = createMobEntry(rowB, "Stalkers");
-		const { wrap: bossMinorWrap, input: bossMinorInput } = createMobEntry(rowB, "Grunt Heavy");
-
-		const rowDivider = document.createElement("div");
-		rowDivider.style.height = "1px";
-		rowDivider.style.margin = "10px 0";
-		rowDivider.style.background = "rgba(0, 255, 221, 0.28)";
-		waveSection.appendChild(rowDivider);
-
-		const rowC = document.createElement("div");
-		rowC.style.display = "grid";
-		rowC.style.gridTemplateColumns = "repeat(auto-fit, minmax(210px, 1fr))";
-		rowC.style.gap = "10px";
-		rowC.style.marginTop = "10px";
-		waveSection.appendChild(rowC);
-
-		const { wrap: bossWrap, input: bossInput } = createMobEntry(rowC, "Grunt Boss");
-		const { wrap: slingerBossWrap, input: slingerBossInput } = createMobEntry(rowC, "Slinger Boss");
-		const { wrap: bruteBossWrap, input: bruteBossInput } = createMobEntry(rowC, "Brute Boss");
-
-		const addPairedIntervalInput = (wrap) => {
-			const label = makeLabel("Interval");
-			label.style.marginTop = "8px";
-			wrap.appendChild(label);
-			const input = makeInput();
-			wrap.appendChild(input);
-			return input;
-		};
-
-		const gruntIntervalInput = addPairedIntervalInput(gruntWrap);
-		const slingerIntervalInput = addPairedIntervalInput(slingerWrap);
-		const shielderIntervalInput = addPairedIntervalInput(shielderWrap);
-		const beamerIntervalInput = addPairedIntervalInput(beamerWrap);
-		const stalkerIntervalInput = addPairedIntervalInput(stalkerWrap);
-		const bruteIntervalInput = addPairedIntervalInput(bruteWrap);
-		const kamikazeIntervalInput = addPairedIntervalInput(kamikazeWrap);
-		const bossMinorIntervalInput = addPairedIntervalInput(bossMinorWrap);
-		const bossIntervalInput = addPairedIntervalInput(bossWrap);
-		const slingerBossIntervalInput = addPairedIntervalInput(slingerBossWrap);
-		const bruteBossIntervalInput = addPairedIntervalInput(bruteBossWrap);
+		// Track which wave is currently being edited (distinct from Target Wave)
+		let currentlyEditedWave = selectedWaveState.value;
 
 		const waveStatus = document.createElement("div");
 		waveStatus.style.marginTop = "10px";
@@ -846,6 +1074,34 @@
 		autoScaleWrap.appendChild(autoScaleText);
 		playerSection.appendChild(autoScaleWrap);
 
+		// Placeholder for player button row (will add after buttons are created)
+		const playerButtonRow = document.createElement("div");
+		playerButtonRow.style.display = "flex";
+		playerButtonRow.style.flexWrap = "wrap";
+		playerButtonRow.style.gap = "6px";
+		playerButtonRow.style.marginTop = "12px";
+		playerButtonRow.style.justifyContent = "flex-start";
+		playerSection.appendChild(playerButtonRow);
+
+		// Move makeActionBtn definition above all uses (and only define it once)
+		const makeActionBtn = (label, color) => {
+			const btn = document.createElement("button");
+			btn.textContent = label;
+			btn.type = "button";
+			btn.style.flex = "1 1 180px";
+			btn.style.maxWidth = "100%";
+			btn.style.minWidth = "0";
+			btn.style.whiteSpace = "normal";
+			btn.style.boxSizing = "border-box";
+			btn.style.padding = "0.55rem 0.9rem";
+			btn.style.borderRadius = "6px";
+			btn.style.border = `1px solid ${color}`;
+			btn.style.background = "rgba(0,0,0,0.65)";
+			btn.style.color = color;
+			btn.style.cursor = "pointer";
+			return btn;
+		};
+
 		const actionRow = document.createElement("div");
 		actionRow.style.display = "flex";
 		actionRow.style.flexWrap = "wrap";
@@ -884,36 +1140,20 @@
 		codeStatus.style.color = "#9de8ff";
 		codeSection.appendChild(codeStatus);
 
-		const makeActionBtn = (label, color) => {
-			const btn = document.createElement("button");
-			btn.textContent = label;
-			btn.type = "button";
-			btn.style.flex = "1 1 180px";
-			btn.style.maxWidth = "100%";
-			btn.style.minWidth = "0";
-			btn.style.whiteSpace = "normal";
-			btn.style.boxSizing = "border-box";
-			btn.style.padding = "0.55rem 0.9rem";
-			btn.style.borderRadius = "6px";
-			btn.style.border = `1px solid ${color}`;
-			btn.style.background = "rgba(0,0,0,0.65)";
-			btn.style.color = color;
-			btn.style.cursor = "pointer";
-			return btn;
-		};
 
 		const loadBtn = makeActionBtn("Load Wave", "#00ffdd");
-		const applyWaveBtn = makeActionBtn("Apply Wave Override", "#a8ff6c");
-		const spawnNowBtn = makeActionBtn("Apply + Spawn Now", "#ffe26c");
+		const applyWaveBtn = makeActionBtn("Save Wave", "#a8ff6c");
+		const spawnNowBtn = makeActionBtn("Spawn Now", "#ffe26c");
 		const clearInputsBtn = makeActionBtn("Clear Inputs", "#ffd27f");
-		const clearWaveBtn = makeActionBtn("Clear Wave Override", "#ff9a9a");
+		const clearWaveBtn = makeActionBtn("Wave Default", "#ff9a9a");
 		const clearLootsBtn = makeActionBtn("Clear Loots", "#ffb3de");
 		const applyPlayerBtn = makeActionBtn("Apply Player Stats", "#9fd2ff");
-		const clearAllBtn = makeActionBtn("Clear All Overrides", "#ff7b7b");
+		const clearAllBtn = makeActionBtn("All Wave Default", "#ff7b7b");
 		const backToMenuBtn = makeActionBtn("Back to Menu", "#ffffff");
 		const closeBtn = makeActionBtn("Test", "#ffffff");
-		const generateCodeBtn = makeActionBtn("Generate Code", "#9de8ff");
-		const loadCodeBtn = makeActionBtn("Load Code", "#9de8ff");
+		const generateCodeBtn = makeActionBtn("Export Code", "#9de8ff");
+		const exportSingleWaveBtn = makeActionBtn("Export Wave", "#7dd3fc");
+		const loadCodeBtn = makeActionBtn("Import Wave", "#9de8ff");
 		const copyCodeBtn = makeActionBtn("Copy Code", "#ffffff");
 
 		const editorHeaderSection = document.createElement("div");
@@ -944,50 +1184,48 @@
 		editorHeaderSection.appendChild(backToMenuBtn);
 		panel.insertBefore(editorHeaderSection, panel.firstChild);
 
-		actionRow.appendChild(loadBtn);
-		actionRow.appendChild(applyWaveBtn);
-		actionRow.appendChild(spawnNowBtn);
-		actionRow.appendChild(clearInputsBtn);
-		actionRow.appendChild(clearWaveBtn);
-		actionRow.appendChild(clearLootsBtn);
-		actionRow.appendChild(applyPlayerBtn);
-		actionRow.appendChild(clearAllBtn);
-		actionRow.appendChild(closeBtn);
+		waveButtonRow.appendChild(loadBtn);
+		waveButtonRow.appendChild(applyWaveBtn);
+		waveButtonRow.appendChild(spawnNowBtn);
+		waveButtonRow.appendChild(clearInputsBtn);
+		waveButtonRow.appendChild(clearWaveBtn);
+		waveButtonRow.appendChild(clearAllBtn);
+		waveButtonRow.appendChild(clearLootsBtn);
+		waveButtonRow.appendChild(closeBtn);
+
+		// Style wave buttons in grid layout
+		[loadBtn, applyWaveBtn, spawnNowBtn, clearInputsBtn, clearWaveBtn, clearAllBtn, clearLootsBtn, closeBtn].forEach(btn => {
+			btn.style.flex = "none";
+			btn.style.maxWidth = "140px";
+			btn.style.padding = "0.4rem 0.7rem";
+			btn.style.fontSize = "0.85rem";
+		});
+
+		// Add Apply Player Stats button to player section
+		playerButtonRow.appendChild(applyPlayerBtn);
+		applyPlayerBtn.style.flex = "none";
+		applyPlayerBtn.style.maxWidth = "140px";
+		applyPlayerBtn.style.padding = "0.4rem 0.7rem";
+		applyPlayerBtn.style.fontSize = "0.85rem";
 
 		codeActionRow.appendChild(generateCodeBtn);
+		codeActionRow.appendChild(exportSingleWaveBtn);
 		codeActionRow.appendChild(loadCodeBtn);
 		codeActionRow.appendChild(copyCodeBtn);
 
 		const loadWaveIntoForm = () => {
 			const parsedWave = parseInt(waveInput.value, 10);
 			selectedWaveState.value = Number.isFinite(parsedWave) && parsedWave > 0 ? parsedWave : 1;
+			currentlyEditedWave = selectedWaveState.value;  // Track which wave is being edited
 			waveInput.value = String(selectedWaveState.value);
-			const source = getWaveEditorSourceConfig(selectedWaveState.value, bridge.getWaveEditorState());
-			burstCountInput.value = source.burstCount === Infinity ? "Infinity" : String(source.burstCount ?? "");
-			burstIntervalInput.value = String(Number(intervalUnitsToSeconds(source.burstInterval).toFixed(2)));
-			gruntInput.value = formatWaveEditorList(source.customBursts);
-			bruteInput.value = formatWaveEditorList(source.customBrutes);
-			slingerInput.value = formatWaveEditorList(source.customSlingers);
-			shielderInput.value = formatWaveEditorList(source.customShielders);
-			beamerInput.value = formatWaveEditorList(source.customBeamers);
-			kamikazeInput.value = formatWaveEditorList(source.customKamikazes);
-			stalkerInput.value = formatWaveEditorList(source.customStalkers);
-			bossMinorInput.value = formatWaveEditorList(source.customBossMinors);
-			bossInput.value = formatWaveEditorList(source.customBosses);
-			slingerBossInput.value = formatWaveEditorList(source.customSlingerBosses);
-			bruteBossInput.value = formatWaveEditorList(source.customBruteBosses);
-			const mobIntervals = source.mobIntervals || {};
-			gruntIntervalInput.value = mobIntervals.grunts ? String(Number(intervalUnitsToSeconds(mobIntervals.grunts).toFixed(2))) : "";
-			slingerIntervalInput.value = mobIntervals.slingers ? String(Number(intervalUnitsToSeconds(mobIntervals.slingers).toFixed(2))) : "";
-			shielderIntervalInput.value = mobIntervals.shielders ? String(Number(intervalUnitsToSeconds(mobIntervals.shielders).toFixed(2))) : "";
-			beamerIntervalInput.value = mobIntervals.beamers ? String(Number(intervalUnitsToSeconds(mobIntervals.beamers).toFixed(2))) : "";
-			stalkerIntervalInput.value = mobIntervals.stalkers ? String(Number(intervalUnitsToSeconds(mobIntervals.stalkers).toFixed(2))) : "";
-			bruteIntervalInput.value = mobIntervals.brutes ? String(Number(intervalUnitsToSeconds(mobIntervals.brutes).toFixed(2))) : "";
-			kamikazeIntervalInput.value = mobIntervals.kamikazes ? String(Number(intervalUnitsToSeconds(mobIntervals.kamikazes).toFixed(2))) : "";
-			bossMinorIntervalInput.value = (mobIntervals.gruntBossMinor || mobIntervals.bossMinors) ? String(Number(intervalUnitsToSeconds(mobIntervals.gruntBossMinor || mobIntervals.bossMinors).toFixed(2))) : "";
-			bossIntervalInput.value = (mobIntervals.gruntBoss || mobIntervals.bosses) ? String(Number(intervalUnitsToSeconds(mobIntervals.gruntBoss || mobIntervals.bosses).toFixed(2))) : "";
-			slingerBossIntervalInput.value = (mobIntervals.slingerBoss || mobIntervals.slingerboss) ? String(Number(intervalUnitsToSeconds(mobIntervals.slingerBoss || mobIntervals.slingerboss).toFixed(2))) : "";
-			bruteBossIntervalInput.value = (mobIntervals.bruteBoss || mobIntervals.bruteboss) ? String(Number(intervalUnitsToSeconds(mobIntervals.bruteBoss || mobIntervals.bruteboss).toFixed(2))) : "";
+			// Reload the timeline editor display for the new wave
+			if (timelineHelper && typeof timelineHelper.renderTimeline === "function") {
+				// Discard any unsaved working copy before loading new wave
+				if (typeof timelineHelper.discardWorkingCopy === "function") {
+					timelineHelper.discardWorkingCopy();
+				}
+				timelineHelper.renderTimeline(selectedWaveState.value);
+			}
 			waveStatus.textContent = `Editing wave ${selectedWaveState.value}.`;
 		};
 
@@ -998,84 +1236,43 @@
 				return;
 			}
 
-			const burstCountRaw = (burstCountInput.value || "").trim();
-			let parsedBurstCount;
-			if (burstCountRaw.toLowerCase() === "infinity") {
-				parsedBurstCount = Infinity;
-			} else {
-				const numericBurstCount = parseInt(burstCountRaw, 10);
-				if (!Number.isFinite(numericBurstCount) || numericBurstCount < 0) {
-					waveStatus.textContent = "Burst count must be a number or Infinity.";
-					return;
-				}
-				parsedBurstCount = numericBurstCount;
-			}
-
-			const parsedBurstIntervalSeconds = parseFloat((burstIntervalInput.value || "").trim());
-			if (!Number.isFinite(parsedBurstIntervalSeconds) || parsedBurstIntervalSeconds <= 0) {
-				waveStatus.textContent = "Burst interval must be a positive number of seconds.";
+			// Get timeline data from the CURRENTLY EDITED wave, not the target wave
+			if (!timelineHelper || typeof timelineHelper.getTimelineData !== "function") {
+				waveStatus.textContent = "Timeline editor not available.";
 				return;
 			}
 
-			const parseMobIntervalField = (rawValue) => {
-				const trimmed = (rawValue || "").trim();
-				if (!trimmed) return undefined;
-				const parsed = parseFloat(trimmed);
-				if (!Number.isFinite(parsed) || parsed <= 0) return null;
-				return secondsToIntervalUnits(parsed);
-			};
-
-			const parsedMobIntervalsRaw = {
-				grunts: parseMobIntervalField(gruntIntervalInput.value),
-				slingers: parseMobIntervalField(slingerIntervalInput.value),
-				shielders: parseMobIntervalField(shielderIntervalInput.value),
-				beamers: parseMobIntervalField(beamerIntervalInput.value),
-				stalkers: parseMobIntervalField(stalkerIntervalInput.value),
-				brutes: parseMobIntervalField(bruteIntervalInput.value),
-				kamikazes: parseMobIntervalField(kamikazeIntervalInput.value),
-				gruntBossMinor: parseMobIntervalField(bossMinorIntervalInput.value),
-				gruntBoss: parseMobIntervalField(bossIntervalInput.value),
-				slingerBoss: parseMobIntervalField(slingerBossIntervalInput.value),
-				bruteBoss: parseMobIntervalField(bruteBossIntervalInput.value)
-			};
-
-			if (Object.values(parsedMobIntervalsRaw).some(v => v === null)) {
-				waveStatus.textContent = "Mob intervals must be positive seconds (or blank).";
+			// Get the current working copy WITHOUT saving to persistent storage
+			// This keeps the original wave data intact
+			const timelineData = timelineHelper.getTimelineData(currentlyEditedWave);
+			if (!timelineData || !timelineData.mobs) {
+				waveStatus.textContent = "No timeline data found for currently edited wave.";
 				return;
 			}
-			const parsedMobIntervals = normalizeMobIntervals(parsedMobIntervalsRaw);
-			const parsedCustomBursts = parseWaveEditorList(gruntInput.value);
-			const parsedCustomBrutes = parseWaveEditorList(bruteInput.value);
-			const parsedCustomSlingers = parseWaveEditorList(slingerInput.value);
-			const parsedCustomShielders = parseWaveEditorList(shielderInput.value);
-			const parsedCustomBeamers = parseWaveEditorList(beamerInput.value);
-			const parsedCustomKamikazes = parseWaveEditorList(kamikazeInput.value);
-			const parsedCustomStalkers = parseWaveEditorList(stalkerInput.value);
-			const parsedCustomBossMinors = parseWaveEditorList(bossMinorInput.value);
-			const parsedCustomBosses = parseWaveEditorList(bossInput.value);
-			const parsedCustomSlingerBosses = parseWaveEditorList(slingerBossInput.value);
-			const parsedCustomBruteBosses = parseWaveEditorList(bruteBossInput.value);
+			
+			console.log(`[Editor] Applying timeline from wave ${currentlyEditedWave} to wave ${targetWave}:`, JSON.stringify(timelineData));
 
+			// Convert timeline data to override format compatible with runtime
+			// Store the timeline object for the TARGET wave (without modifying source wave)
 			waveEditorOverrides[targetWave] = {
-				burstCount: parsedBurstCount,
-				burstInterval: secondsToIntervalUnits(parsedBurstIntervalSeconds),
-				customBursts: expandSingleValueList(parsedCustomBursts, parsedBurstCount),
-				customBrutes: expandSingleValueList(parsedCustomBrutes, parsedBurstCount),
-				customSlingers: expandSingleValueList(parsedCustomSlingers, parsedBurstCount),
-				customShielders: expandSingleValueList(parsedCustomShielders, parsedBurstCount),
-				customBeamers: expandSingleValueList(parsedCustomBeamers, parsedBurstCount),
-				customKamikazes: expandSingleValueList(parsedCustomKamikazes, parsedBurstCount),
-				customStalkers: expandSingleValueList(parsedCustomStalkers, parsedBurstCount),
-				customBossMinors: expandSingleValueList(parsedCustomBossMinors, parsedBurstCount),
-				customBosses: expandSingleValueList(parsedCustomBosses, parsedBurstCount),
-				customGruntBossMinors: expandSingleValueList(parsedCustomBossMinors, parsedBurstCount),
-				customGruntBosses: expandSingleValueList(parsedCustomBosses, parsedBurstCount),
-				customSlingerBosses: expandSingleValueList(parsedCustomSlingerBosses, parsedBurstCount),
-				customBruteBosses: expandSingleValueList(parsedCustomBruteBosses, parsedBurstCount),
-				mobIntervals: parsedMobIntervals
+				timelineMode: true,
+				timeline: JSON.parse(JSON.stringify(timelineData))  // Deep copy
 			};
 
-			waveStatus.textContent = `Wave ${targetWave} override applied.`;
+			// Save to localStorage
+			try {
+				localStorage.setItem("sentinel.waveEditorOverrides", JSON.stringify(waveEditorOverrides));
+				console.log(`[Editor] Saved wave override for wave ${targetWave} to localStorage`);
+			} catch (err) {
+				console.error("[Editor] Failed to save overrides to localStorage:", err);
+			}
+
+			waveStatus.textContent = `Wave ${currentlyEditedWave} timeline applied to wave ${targetWave}.`;
+
+			// Only update the game's wave data if spawning immediately, not on regular save
+			if (spawnImmediately && window.SentinelWaveControl && typeof window.SentinelWaveControl.setTimelineWaveData === "function") {
+				window.SentinelWaveControl.setTimelineWaveData(targetWave, timelineData);
+			}
 
 			const applyAutoScalePlayerForWave = (waveNumber) => {
 				if (!autoScalePlayerToLoadedWave) return;
@@ -1134,45 +1331,28 @@
 			};
 
 			if (spawnImmediately && typeof bridge.spawnWaveNow === "function") {
-				bridge.spawnWaveNow(targetWave, waveEditorOverrides[targetWave]);
-				if (window.SentinelWaveControl && typeof window.SentinelWaveControl.setMobBurstIntervals === "function") {
-					if (waveEditorOverrides[targetWave].mobIntervals) {
-						window.SentinelWaveControl.setMobBurstIntervals(waveEditorOverrides[targetWave].mobIntervals);
-					} else if (typeof window.SentinelWaveControl.clearMobBurstIntervals === "function") {
-						window.SentinelWaveControl.clearMobBurstIntervals();
-					}
+				// Set timeline data FIRST before spawning
+				if (window.SentinelWaveControl && typeof window.SentinelWaveControl.setTimelineWaveData === "function") {
+					window.SentinelWaveControl.setTimelineWaveData(targetWave, timelineData);
 				}
+				bridge.spawnWaveNow(targetWave, waveEditorOverrides[targetWave]);
 				applyAutoScalePlayerForWave(targetWave);
-				waveStatus.textContent = `Wave ${targetWave} override applied and spawned.`;
+				waveStatus.textContent = `Wave ${targetWave} timeline override applied and spawned.`;
 			}
 		};
 
 		const clearWaveInputs = () => {
-			burstCountInput.value = "";
-			burstIntervalInput.value = "";
-			gruntInput.value = "";
-			bruteInput.value = "";
-			slingerInput.value = "";
-			shielderInput.value = "";
-			beamerInput.value = "";
-			kamikazeInput.value = "";
-			stalkerInput.value = "";
-			bossMinorInput.value = "";
-			bossInput.value = "";
-			slingerBossInput.value = "";
-			bruteBossInput.value = "";
-			gruntIntervalInput.value = "";
-			slingerIntervalInput.value = "";
-			shielderIntervalInput.value = "";
-			beamerIntervalInput.value = "";
-			stalkerIntervalInput.value = "";
-			bruteIntervalInput.value = "";
-			kamikazeIntervalInput.value = "";
-			bossMinorIntervalInput.value = "";
-			bossIntervalInput.value = "";
-			slingerBossIntervalInput.value = "";
-			bruteBossIntervalInput.value = "";
-			waveStatus.textContent = `Wave ${selectedWaveState.value} inputs cleared.`;
+			if (timelineHelper && typeof timelineHelper.getTimelineData === "function") {
+				const timeline = timelineHelper.getTimelineData(currentlyEditedWave);
+				if (timeline && timeline.mobs) {
+					// Clear all mob spawn events
+					Object.keys(timeline.mobs).forEach(mob => timeline.mobs[mob] = []);
+					if (timelineHelper.renderTimeline) {
+						timelineHelper.renderTimeline(currentlyEditedWave);
+					}
+				}
+			}
+			waveStatus.textContent = `Wave ${currentlyEditedWave} timeline cleared.`;
 		};
 
 		const loadPlayerForm = () => {
@@ -1255,7 +1435,21 @@
 				return;
 			}
 			delete waveEditorOverrides[targetWave];
-			waveStatus.textContent = `Wave ${targetWave} override cleared.`;
+			
+			// Also clear any session override so it falls back to default code
+			if (window._editorWaveOverride && window._editorWaveOverride[targetWave]) {
+				delete window._editorWaveOverride[targetWave];
+			}
+			
+			// Save to localStorage
+			try {
+				localStorage.setItem("sentinel.waveEditorOverrides", JSON.stringify(waveEditorOverrides));
+				console.log(`[Editor] Cleared wave ${targetWave} override (both session and storage) and saved to localStorage`);
+			} catch (err) {
+				console.error("[Editor] Failed to save overrides to localStorage:", err);
+			}
+			
+			waveStatus.textContent = `Wave ${targetWave} override cleared. Reloading default...`;
 			loadWaveIntoForm();
 		});
 		clearLootsBtn.addEventListener("click", () => {
@@ -1268,7 +1462,21 @@
 		});
 		clearAllBtn.addEventListener("click", () => {
 			Object.keys(waveEditorOverrides).forEach(key => delete waveEditorOverrides[key]);
-			waveStatus.textContent = "All wave overrides cleared.";
+			
+			// Also clear all session overrides so they fall back to default codes
+			if (window._editorWaveOverride && typeof window._editorWaveOverride === "object") {
+				Object.keys(window._editorWaveOverride).forEach(key => delete window._editorWaveOverride[key]);
+			}
+			
+			// Save to localStorage
+			try {
+				localStorage.setItem("sentinel.waveEditorOverrides", JSON.stringify(waveEditorOverrides));
+				console.log("[Editor] Cleared all wave overrides (both session and storage) and saved to localStorage");
+			} catch (err) {
+				console.error("[Editor] Failed to save overrides to localStorage:", err);
+			}
+			
+			waveStatus.textContent = "All wave overrides cleared. Reloading defaults...";
 			loadWaveIntoForm();
 		});
 		backToMenuBtn.addEventListener("click", () => {
@@ -1286,13 +1494,69 @@
 				codeStatus.textContent = "Failed to generate wave code.";
 			}
 		});
+		exportSingleWaveBtn.addEventListener("click", () => {
+			const targetWave = parseInt(waveInput.value, 10);
+			if (!Number.isFinite(targetWave) || targetWave < 1) {
+				codeStatus.textContent = "Enter a valid wave number to export.";
+				return;
+			}
+			if (!waveEditorOverrides[targetWave]) {
+				codeStatus.textContent = `No data for wave ${targetWave} to export.`;
+				return;
+			}
+			try {
+				const override = waveEditorOverrides[targetWave];
+				waveCodeInput.value = window.SentinelEditor.encodeSingleWaveCode(targetWave);
+				const format = (override.timelineMode && override.timeline) ? "SWC3 (60-70% shorter)" : "SWC2";
+				codeStatus.textContent = `Wave ${targetWave} exported as ${format} code.`;
+			} catch (err) {
+				codeStatus.textContent = `Failed to export wave ${targetWave}: ${err.message}`;
+			}
+		});
 		loadCodeBtn.addEventListener("click", () => {
 			try {
-				activateWaveCode(waveCodeInput.value);
-				codeStatus.textContent = "Wave code loaded.";
+				const code = (waveCodeInput.value || "").trim();
+				if (!code) {
+					codeStatus.textContent = "Paste a wave code to import.";
+					return;
+				}
+				
+				// Decode to get the wave numbers
+				const decodedWaves = decodeWaveCode(code);
+				if (!decodedWaves || Object.keys(decodedWaves).length === 0) {
+					throw new Error("No waves found in code.");
+				}
+				
+				// Get the first imported wave number
+				const importedWaveNum = Math.min(...Object.keys(decodedWaves).map(Number));
+				console.log(`[Editor] Imported waves: ${Object.keys(decodedWaves).join(", ")}. Selecting wave ${importedWaveNum}.`);
+				
+				// Load into active overrides
+				activateWaveCode(code);
+				
+				// Save to localStorage so it persists
+				try {
+					localStorage.setItem("sentinel.waveEditorOverrides", JSON.stringify(waveEditorOverrides));
+					console.log("[Editor] Imported wave saved to localStorage");
+				} catch (err) {
+					console.error("[Editor] Failed to save imported wave to localStorage:", err);
+				}
+				
+				// Clear the timeline working copy so it reloads fresh
+				if (typeof window._timelineWorkingCopy !== "undefined") {
+					window._timelineWorkingCopy.waveNum = null;
+					window._timelineWorkingCopy.data = null;
+				}
+				
+				// Set the input to the imported wave and load it
+				waveInput.value = String(importedWaveNum);
+				console.log(`[Editor] waveEditorOverrides after import:`, waveEditorOverrides);
+				console.log(`[Editor] Checking wave ${importedWaveNum}:`, waveEditorOverrides[importedWaveNum]);
+				codeStatus.textContent = `Wave ${importedWaveNum} imported successfully!`;
 				loadWaveIntoForm();
 			} catch (err) {
 				codeStatus.textContent = err && err.message ? err.message : "Invalid wave code.";
+				console.error("[Editor] Import failed:", err);
 			}
 		});
 		copyCodeBtn.addEventListener("click", async () => {
@@ -1341,6 +1605,8 @@
 		getActiveWaveOverride,
 		getWaveEditorBurstValue,
 		generateWaveCode: () => encodeWaveCode(waveEditorOverrides),
+		encodeSingleWaveCode,
+		encodeSingleTimelineWaveCode,
 		decodeWaveCode,
 		getWaveConfigFromCode,
 		activateWaveCode,
