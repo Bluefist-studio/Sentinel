@@ -10,6 +10,30 @@
     localStorage.setItem('sentinel.collectedBytes.v1', '100');
     console.log('✓ 100 Bytes granted');
   };
+
+  // God mode - player takes no damage
+  window.godMode = false;
+  window.toggleGodMode = function() {
+    window.godMode = !window.godMode;
+    console.log('✓ God Mode ' + (window.godMode ? 'ENABLED' : 'DISABLED'));
+  };
+
+  // Wave unlock system console commands
+  window.showUnlockedWaves = function() {
+    const unlockedWaves = typeof getUnlockedWaves === 'function' ? getUnlockedWaves() : [1];
+    console.log('✓ Unlocked Waves:', unlockedWaves);
+  };
+
+  window.unlockAllWaves = function() {
+    localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify([1, 5, 10, 20]));
+    console.log('✓ All waves unlocked');
+  };
+
+  window.resetWaveProgress = function() {
+    localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify([1]));
+    console.log('✓ Wave progress reset (only Wave 1 unlocked)');
+  };
+
   // Fade out and stop menu ambience audio
   function fadeOutMenuAmbience(duration = 1000) {
     const ambience = window._menuAmbienceAudio;
@@ -218,7 +242,8 @@ window.onload = function () {
         { name: "Shard Heavy", role: "Mini-Boss", image: "grunt heavy.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
         { name: "Shard Major", role: "Boss", image: "grunt boss.png", description: "Elite grunt leader with shard-based attacks and advanced threat patterns." },
         { name: "Slinger Major", role: "Boss", image: "slinger boss.png", description: "Advanced ranged boss with burst projectile patterns and fragmentation fire." },
-        { name: "Brute Major", role: "Boss", image: "brute boss.png", description: "Heavy boss focused on area denial, nova pressure, and close-range punishment." }
+        { name: "Brute Major", role: "Boss", image: "brute boss.png", description: "Heavy boss focused on area denial, nova pressure, and close-range punishment." },
+        { name: "Stalker Major", role: "Boss", image: "stalker.png", description: "Elite mobile leader with enhanced blinking, burst projectiles, and aggressive tactical repositioning." }
       ]
     };
 
@@ -634,6 +659,18 @@ window.onload = function () {
       restartGame();
       statPoints = startStatPoints;
       player.health = player.maxHealth = startHealth;
+      
+      // Set starting wave and level based on player selection
+      if (window._selectedStartWave !== undefined) {
+        wave = window._selectedStartWave;
+        if (window._selectedStartLevel !== undefined) {
+          level = window._selectedStartLevel;
+          // Calculate xpToLevel based on current level using the game formula
+          xpToLevel = Math.floor(10 + Math.pow(level, 1.8));
+          statPoints = Math.max(0, startStatPoints + (level - 1) * 2);
+        }
+      }
+      
       spawnWave();
       gameStarted = true;
     }
@@ -1188,21 +1225,143 @@ window.onload = function () {
       document.body.appendChild(starterOverlay);
     }
 
+    function showWaveSelectionMenu(difficulty, startStatPoints, startHealth) {
+      const waveOverlay = document.createElement("div");
+      waveOverlay.id = "waveSelectionOverlay";
+      waveOverlay.style.position = "fixed";
+      waveOverlay.style.left = 0;
+      waveOverlay.style.top = 0;
+      waveOverlay.style.width = "100vw";
+      waveOverlay.style.height = "100vh";
+      waveOverlay.style.background = "#000";
+      waveOverlay.style.display = "flex";
+      waveOverlay.style.flexDirection = "column";
+      waveOverlay.style.justifyContent = "center";
+      waveOverlay.style.alignItems = "center";
+      waveOverlay.style.zIndex = 1000;
+
+      // Background image
+      const waveBg = document.createElement("img");
+      waveBg.src = "titlescreen.png";
+      waveBg.style.position = "absolute";
+      waveBg.style.left = "50%";
+      waveBg.style.top = "50%";
+      waveBg.style.transform = "translate(-50%, -50%)";
+      waveBg.style.width = "1024px";
+      waveBg.style.height = "768px";
+      waveBg.style.objectFit = "fill";
+
+      // Gradient overlay
+      const waveGradient = document.createElement("div");
+      waveGradient.style.position = "absolute";
+      waveGradient.style.left = "0";
+      waveGradient.style.bottom = "0";
+      waveGradient.style.width = "1024px";
+      waveGradient.style.height = "180px";
+      waveGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
+      waveGradient.style.pointerEvents = "none";
+      waveGradient.style.zIndex = 1;
+      waveOverlay.appendChild(waveGradient);
+      waveBg.style.zIndex = 0;
+      waveOverlay.appendChild(waveBg);
+
+      // Back button
+      const backBtn = document.createElement("button");
+      backBtn.textContent = "← Back";
+      backBtn.style.position = "absolute";
+      backBtn.style.top = "120px";
+      backBtn.style.left = "calc(50% - 512px + 16px)";
+      backBtn.style.fontSize = "1.2rem";
+      backBtn.style.padding = "0.5rem 1.5rem";
+      backBtn.style.background = "rgba(0,0,0,0.7)";
+      backBtn.style.color = "#fff";
+      backBtn.style.border = "2px solid #fff";
+      backBtn.style.borderRadius = "8px";
+      backBtn.style.cursor = "pointer";
+      backBtn.style.zIndex = 2;
+      backBtn.style.transition = "background 0.2s";
+      backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
+      backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
+      waveOverlay.appendChild(backBtn);
+
+      // Title
+      const title = document.createElement("h2");
+      title.textContent = "SELECT START WAVE";
+      title.style.color = "#fff";
+      title.style.fontSize = "3rem";
+      title.style.textShadow = "0 0 24px #00ffdd, 0 0 8px #000";
+      title.style.position = "relative";
+      title.style.zIndex = 1;
+      title.style.marginBottom = "2rem";
+      waveOverlay.appendChild(title);
+
+      // Wave buttons container
+      const buttonContainer = document.createElement("div");
+      buttonContainer.style.display = "flex";
+      buttonContainer.style.flexDirection = "column";
+      buttonContainer.style.gap = "1.2rem";
+      buttonContainer.style.position = "relative";
+      buttonContainer.style.zIndex = 1;
+
+      function makeWaveButton(waveNum, playerLevel, isUnlocked) {
+        const btn = document.createElement("button");
+        const label = `Wave ${waveNum}`;
+        btn.textContent = label;
+        btn.style.fontSize = "1.8rem";
+        btn.style.padding = "0.8rem 2rem";
+        btn.style.background = isUnlocked ? "rgba(0,0,0,0.8)" : "rgba(0,0,0,0.6)";
+        btn.style.color = isUnlocked ? "#fff" : "#666";
+        btn.style.border = `2px solid ${isUnlocked ? "#fff" : "#444"}`;
+        btn.style.borderRadius = "10px";
+        btn.style.cursor = isUnlocked ? "pointer" : "not-allowed";
+        btn.style.boxShadow = isUnlocked ? "0 0 24px #000" : "none";
+        btn.style.transition = "background 0.2s";
+        btn.style.opacity = isUnlocked ? 1 : 0.5;
+        
+        if (isUnlocked) {
+          btn.addEventListener("mouseover", () => btn.style.background = "rgba(0,0,0,0.9)");
+          btn.addEventListener("mouseout", () => btn.style.background = "rgba(0,0,0,0.7)");
+          btn.addEventListener("click", () => {
+            waveOverlay.remove();
+            window._selectedStartWave = waveNum;
+            window._selectedStartLevel = playerLevel;
+            showStarterProtocolModal(difficulty, startStatPoints, startHealth);
+          });
+        }
+        return btn;
+      }
+
+      const unlockedWaves = getUnlockedWaves();
+      AVAILABLE_WAVES.forEach(waveInfo => {
+        const isUnlocked = unlockedWaves.includes(waveInfo.wave);
+        const btn = makeWaveButton(waveInfo.wave, waveInfo.level, isUnlocked);
+        buttonContainer.appendChild(btn);
+      });
+
+      waveOverlay.appendChild(buttonContainer);
+      document.body.appendChild(waveOverlay);
+
+      backBtn.addEventListener("click", () => {
+        waveOverlay.remove();
+        showDifficultyMenu();
+      });
+    }
+
     normalBtn.addEventListener("click", () => {
       diffOverlay.remove();
-      showStarterProtocolModal("Normal", 5, 10);
+      showWaveSelectionMenu("Normal", 5, 10);
     });
     hardcoreBtn.addEventListener("click", () => {
       diffOverlay.remove();
-      showStarterProtocolModal("Hardcore", 0, 5);
+      showWaveSelectionMenu("Hardcore", 0, 5);
     });
     apocalypseBtn.addEventListener("click", () => {
       diffOverlay.remove();
-      showStarterProtocolModal("Apocalypse", 5, 5);
+      showWaveSelectionMenu("Apocalypse", 5, 5);
     });
 
-    // Back button
-    backBtn.addEventListener("click", () => {
+      // Back button
+      backBtn.addEventListener("click", () => {
       diffOverlay.remove();
       showMenu();
     });
@@ -2113,6 +2272,8 @@ window.onload = function () {
   kamikazeImg.src = "kamikaze.png";
   const stalkerImg = new window.Image();
   stalkerImg.src = "stalker.png";
+  const stalkerBossImg = new window.Image();
+  stalkerBossImg.src = "stalker boss.png";
   const beamerImg = new window.Image();
   beamerImg.src = "beamer.png";
   const shielderImg = new window.Image();
@@ -2126,10 +2287,41 @@ window.onload = function () {
   //========= GAME STATE =========//
   let wave = 1, xp = 0, xpToLevel = 10, level = 1, statPoints = 5; // Start at wave 1
   const COLLECTED_BYTES_STORAGE_KEY = "sentinel.collectedBytes.v1";
+  const UNLOCKED_WAVES_STORAGE_KEY = "sentinel.unlockedWaves.v1";
   let runCollectedBytes = 0;
   let totalCollectedBytes = 0;
   let runBytesFinalized = false;
   const bytePickupNotifications = [];
+
+  // Wave unlock system
+  const AVAILABLE_WAVES = [
+    { wave: 1, level: 1 },
+    { wave: 5, level: 5 },
+    { wave: 10, level: 9 },
+    { wave: 20, level: 16 }
+  ];
+
+  function getUnlockedWaves() {
+    try {
+      const raw = localStorage.getItem(UNLOCKED_WAVES_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [1]; // Wave 1 always unlocked
+    } catch (err) {
+      return [1];
+    }
+  }
+
+  function unlockWave(waveNum) {
+    const unlocked = getUnlockedWaves();
+    if (!unlocked.includes(waveNum)) {
+      unlocked.push(waveNum);
+      unlocked.sort((a, b) => a - b);
+      localStorage.setItem(UNLOCKED_WAVES_STORAGE_KEY, JSON.stringify(unlocked));
+    }
+  }
+
+  function isWaveUnlocked(waveNum) {
+    return getUnlockedWaves().includes(waveNum);
+  }
 
   function loadCollectedBytes() {
     try {
@@ -2315,7 +2507,10 @@ window.onload = function () {
     document.body.appendChild(confirmOverlay);
   }
 
-  let burstCount = 3, burstIndex = 0, burstTimer = 0;
+  window._sentinelWaveState = window._sentinelWaveState || { burstCount: 3, burstIndex: 0, burstTimer: 0 };
+  let burstCount = window._sentinelWaveState.burstCount;
+  let burstIndex = window._sentinelWaveState.burstIndex;
+  let burstTimer = window._sentinelWaveState.burstTimer;
   // Burst interval in frames (higher = longer pause between bursts)
   let burstInterval = 120; // Increased for bigger cooldown
   const INTER_WAVE_DELAY_SECONDS = 8;
@@ -2488,7 +2683,7 @@ window.onload = function () {
         const burnDamage = typeof m.damagePerTick === "number" ? m.damagePerTick : 1;
         const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
         if (distToPlayer < burnRadius + player.radius && m.tickTimer <= 0) {
-          player.health -= burnDamage;
+          if (!window.godMode) player.health -= burnDamage;
           m.tickTimer = tickInterval;
         }
         if (m.particleTimer <= 0) {
@@ -2524,7 +2719,7 @@ window.onload = function () {
       if (!m.exploded && distToPlayer < 52 + player.radius) {
         m.exploded = true;
         // Damage player
-        player.health -= 2;
+        if (!window.godMode) player.health -= 2;
         // Draw explosion ring
         ctx.save();
         ctx.beginPath();
@@ -2563,7 +2758,7 @@ window.onload = function () {
         // Mine explodes visually and damages player if in range
         const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
         if (distToPlayer < 52 + player.radius) {
-          player.health -= 2;
+          if (!window.godMode) player.health -= 2;
         }
         // Draw explosion ring
         ctx.save();
@@ -2763,12 +2958,11 @@ window.onload = function () {
   });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  // Game Over click handler
-  canvas.addEventListener("click", (e) => {
-    if (gameOver && window._gameOverTime !== undefined) {
+  // Game Over right-click handler (continue)
+  canvas.addEventListener("mousedown", (e) => {
+    if (e.button === 2 && gameOver && window._gameOverTime !== undefined) {
       const elapsedSeconds = (Date.now() - window._gameOverTime) / 1000;
-      
-      // Second death - always return to menu on click
+      // Second death - always return to menu on right click
       if (window._playerUsedContinue) {
         if (window._editorSessionActive) {
           return;
@@ -2783,7 +2977,7 @@ window.onload = function () {
         window._playerUsedContinue = false;
         followMouse = false;
       }
-      // First death - continue with full health if clicked before 5 seconds
+      // First death - continue with full health if right clicked before 5 seconds
       else if (elapsedSeconds < 5) {
         player.health = player.maxHealth;
         gameOver = false;
@@ -3023,7 +3217,6 @@ window.onload = function () {
       wave = targetWave;
       enemies.length = 0;
       mines.length = 0;
-      spawnWave();
 
       if (previewOverride && typeof previewOverride === "object") {
         window._editorSessionActive = true;
@@ -3046,6 +3239,8 @@ window.onload = function () {
         burstCount = previewOverride.burstCount;
         burstInterval = previewOverride.burstInterval;
       }
+
+      spawnWave();
     }
   };
 
@@ -3850,20 +4045,23 @@ const droplifelenght = 280;
   function getWaveControlContext() {
     return {
       getWave: () => wave,
-      getBurstCount: () => burstCount,
+      getBurstCount: () => window._sentinelWaveState.burstCount,
       setBurstCount: (value) => {
+        window._sentinelWaveState.burstCount = value;
         burstCount = value;
       },
       getBurstInterval: () => burstInterval,
       setBurstInterval: (value) => {
         burstInterval = value;
       },
-      getBurstIndex: () => burstIndex,
+      getBurstIndex: () => window._sentinelWaveState.burstIndex,
       setBurstIndex: (value) => {
+        window._sentinelWaveState.burstIndex = value;
         burstIndex = value;
       },
-      getBurstTimer: () => burstTimer,
+      getBurstTimer: () => window._sentinelWaveState.burstTimer,
       setBurstTimer: (value) => {
+        window._sentinelWaveState.burstTimer = value;
         burstTimer = value;
       },
       getEnemies: () => enemies,
@@ -3878,6 +4076,8 @@ const droplifelenght = 280;
       getGruntSprite: () => gruntImg,
       getSlingerSprite: () => slingerImg,
       resetBurstProgress: () => {
+        window._sentinelWaveState.burstIndex = 0;
+        window._sentinelWaveState.burstTimer = 0;
         burstIndex = 0;
         burstTimer = 0;
       }
@@ -4971,7 +5171,7 @@ const droplifelenght = 280;
                 if (dist < e.novaRadius + player.radius) {
                     const novaDamage = typeof e.novaDamage === "number" ? e.novaDamage : 1;
                     if (!e.novaPlayerInside || e.novaPlayerTick <= 0) {
-                      player.health -= novaDamage; // Nova damage per tick
+                      if (!window.godMode) player.health -= novaDamage; // Nova damage per tick
                       e.novaPlayerTick = 60; // 1 second cooldown
                     }
                   e.novaPlayerInside = true;
@@ -5026,6 +5226,7 @@ const droplifelenght = 280;
               }
               // Boss-gated waves use direct completion; other waves use standard burst progression
               if (e.type === "gruntBoss" && wave === 5) {
+                unlockWave(5);
                 wave++;
                 try {
                   let warnAudio = new Audio('warning.wav');
@@ -5035,6 +5236,7 @@ const droplifelenght = 280;
                 } catch (e) {}
                 spawnWave();
               } else if (e.type === "slingerBoss" && wave === 10) {
+                unlockWave(10);
                 wave++;
                 try {
                   let warnAudio = new Audio('warning.wav');
@@ -5068,15 +5270,7 @@ const droplifelenght = 280;
                 );
               }
               if (e.type === "bruteBoss" && wave === 20) {
-                wave++;
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
-              } else if (e.type === "slingerBoss" && wave === 10) {
+                unlockWave(20);
                 wave++;
                 try {
                   let warnAudio = new Audio('warning.wav');
@@ -5103,6 +5297,42 @@ const droplifelenght = 280;
                   2 + Math.random() * 2,
                   "enemyDeath"
                 );
+              }
+            } else if (e.type === "stalkerBoss") {
+              // Stalker boss death nova: emit cyan particles
+              const novaCount = 48;
+              const novaRadius = e.radius + 40;
+              const stalkerBossPalette = ["#66e8ff", "#57e7ff", "#7fdfff", "#a7f3ff"];
+              for (let j = 0; j < novaCount; j++) {
+                const angle = (Math.PI * 2 * j) / novaCount;
+                const speed = 3.5 + Math.random() * 2;
+                const color = stalkerBossPalette[Math.floor(Math.random() * stalkerBossPalette.length)];
+                const size = 8 + Math.random() * 4;
+                const life = 36 + Math.random() * 28;
+                const decay = 0.90 + Math.random() * 0.05;
+                spawnParticle(
+                  e.x + Math.cos(angle) * novaRadius,
+                  e.y + Math.sin(angle) * novaRadius,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
+                  life,
+                  color,
+                  decay,
+                  size,
+                  "enemyDeath"
+                );
+              }
+              // Wave 30 boss gate
+              if (wave === 30) {
+                unlockWave(30);
+                wave++;
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
               }
             } else {
               let palette;
@@ -5174,7 +5404,7 @@ const droplifelenght = 280;
         const dx = player.x - e.x, dy = player.y - e.y;
         const dist = Math.hypot(dx, dy);
         if (e.type === "stalker") {
-          if (typeof e.blinkCooldown !== "number") e.blinkCooldown = 120 + Math.floor(Math.random() * 80);
+          if (typeof e.blinkCooldown !== "number") e.blinkCooldown = 0;
           if (typeof e.blinkCastTimer !== "number") e.blinkCastTimer = 0;
           if (typeof e.blinkCastDuration !== "number") e.blinkCastDuration = 1;
           if (typeof e.blinkRecoverTimer !== "number") e.blinkRecoverTimer = 0;
@@ -5201,16 +5431,18 @@ const droplifelenght = 280;
           const edgePaddingY = Math.max(e.radius + 4, e.stalkerEdgePaddingY);
 
           const isStalkerInRange = dist < (e.attackRange || 320) + player.radius;
-          if (!e.stalkerRoutineActive) {
-            if (!isStalkerInRange) {
-              if (dist > 0) {
-                e.x += (dx / dist) * e.speed * delta * SPEED_MULTIPLIER;
-                e.y += (dy / dist) * e.speed * delta * SPEED_MULTIPLIER;
-              }
-              continue;
+          // Always update hasEnteredPaddedArea for stalkers as they move
+          if (!e.hasEnteredPaddedArea) {
+            if (
+              e.x >= edgePaddingX && e.x <= canvas.width - edgePaddingX &&
+              e.y >= edgePaddingY && e.y <= canvas.height - edgePaddingY
+            ) {
+              e.hasEnteredPaddedArea = true;
             }
-
-            if (!e.stalkerInitialBurstDone) {
+          }
+          if (!e.stalkerRoutineActive) {
+            // Allow stalkers to shoot as soon as in range, even before entering the padded area
+            if (isStalkerInRange && !e.stalkerInitialBurstDone) {
               const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
               const spread = 0.12;
               const shotSpeed = 2.25;
@@ -5229,11 +5461,18 @@ const droplifelenght = 280;
               }
               e.stalkerInitialBurstDone = true;
             }
-
-            e.stalkerRoutineActive = true;
-            e.x = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, e.x));
-            e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
-            continue;
+            // Always force stalkers to walk into the padded area before stopping
+            if (!e.hasEnteredPaddedArea) {
+              if (dist > 0) {
+                e.x += (dx / dist) * e.speed * delta * SPEED_MULTIPLIER;
+                e.y += (dy / dist) * e.speed * delta * SPEED_MULTIPLIER;
+              }
+              // Do NOT continue here; allow blink logic to run even before entering padded area
+            } else {
+              // Once in padded area, allow stalker to stop and start its routine
+              e.stalkerRoutineActive = true;
+              continue;
+            }
           }
 
           if (e.blinkCastTimer > 0) {
@@ -5291,6 +5530,7 @@ const droplifelenght = 280;
 
               e.pendingBursts = 1;
               e.burstShotsLeft = 0;
+              // Keep blink recovery at previous (slower) value
               e.blinkRecoverDuration = 22 + Math.floor(Math.random() * 8);
               e.blinkRecoverTimer = e.blinkRecoverDuration;
               e.blinkCastTimer = 0;
@@ -5300,7 +5540,7 @@ const droplifelenght = 280;
             if (e.blinkRecoverTimer <= 0) {
               e.burstsLeft = Math.max(e.burstsLeft, e.pendingBursts || 1);
               e.pendingBursts = 0;
-              e.blinkCooldown = 145 + Math.floor(Math.random() * 95);
+              e.blinkCooldown = 240; // 4 seconds at 60 FPS
             }
           } else if (e.burstsLeft > 0) {
             if (e.burstShotsLeft <= 0) {
@@ -5339,7 +5579,8 @@ const droplifelenght = 280;
             const playerBlinkRange = (typeof player.range === "number" ? player.range : player.radius) + 50;
             const shouldBlinkAway = e.blinkCooldown <= 0 && dist <= playerBlinkRange;
             if (shouldBlinkAway) {
-              e.blinkCastDuration = 18 + Math.floor(Math.random() * 7);
+              // Make blink cast much faster
+              e.blinkCastDuration = 7 + Math.floor(Math.random() * 4);
               e.blinkCastTimer = e.blinkCastDuration;
               e.castFxCooldown = 0;
             } else if (e.stalkerBurstCooldown <= 0) {
@@ -5372,8 +5613,11 @@ const droplifelenght = 280;
             e.x += (centerDx / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
             e.y += (centerDy / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
           }
-          e.x = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, e.x));
-          e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
+          // Only clamp after entering padded area at least once
+          if (e.hasEnteredPaddedArea) {
+            e.x = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, e.x));
+            e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
+          }
           continue;
         }
         if (e.type === "shielder") {
@@ -5393,8 +5637,14 @@ const droplifelenght = 280;
           if (typeof e.zoneLocked !== "boolean") e.zoneLocked = false;
           const centerX = canvas.width / 2;
           const centerY = canvas.height / 2;
-          const maxStopDistance = Math.max(130, Math.min(canvas.width, canvas.height) * 0.5);
-          const minStopDistance = Math.max(90, maxStopDistance * 0.68);
+          
+          // Constrain stop distance to stay within padded area
+          const maxXDistFromCenter = centerX - e.shielderEdgePaddingX;
+          const maxYDistFromCenter = centerY - e.shielderEdgePaddingY;
+          const maxPaddedDistance = Math.min(maxXDistFromCenter, maxYDistFromCenter);
+          
+          const maxStopDistance = Math.max(250, Math.min(maxPaddedDistance, Math.min(canvas.width, canvas.height) * 0.5));
+          const minStopDistance = Math.max(180, maxStopDistance * 0.68);
           if (typeof e.shielderStopDistance !== "number") {
             e.shielderStopDistance = minStopDistance + Math.random() * (maxStopDistance - minStopDistance);
           }
@@ -5507,7 +5757,7 @@ const droplifelenght = 280;
               }
 
               if (distanceToBeam <= player.radius + 9) {
-                player.health -= Math.max(1, e.damage);
+                if (!window.godMode) player.health -= Math.max(1, e.damage);
               }
               e.beamTickTimer = 10;
             }
@@ -5605,6 +5855,298 @@ const droplifelenght = 280;
               e.y += (centerDy / centerDist) * settleSpeed * delta * SPEED_MULTIPLIER;
             }
           }
+        }
+        if (e.type === "stalkerBoss") {
+          const centerX = canvas.width * 0.5;
+          const centerY = canvas.height * 0.5;
+          const centerDx = centerX - e.x;
+          const centerDy = centerY - e.y;
+          const centerDist = Math.hypot(centerDx, centerDy);
+          const healthPercent = e.health > 0 && e.maxHealth > 0 ? e.health / e.maxHealth : 1;
+          
+          // Entry animation
+          // Handle spawn fade-in
+          if (typeof e.spawnFadeTimer === "number" && e.spawnFadeTimer < (typeof e.spawnFadeDuration === "number" ? e.spawnFadeDuration : 120)) {
+            e.spawnFadeTimer += delta * SPEED_MULTIPLIER;
+            const fadeDuration = typeof e.spawnFadeDuration === "number" ? e.spawnFadeDuration : 120;
+            const fadeProgress = Math.min(1, e.spawnFadeTimer / fadeDuration);
+            e.stalkerAlpha = 0.9 * fadeProgress;
+          } else if (typeof e.stalkerAlpha !== "number" || e.stalkerAlpha < 0.9) {
+            e.stalkerAlpha = 0.9;
+          }
+          
+          if (e.stalkerBossEntering !== false) {
+            const paddingX = typeof e.stalkerBossEdgePaddingX === "number" ? e.stalkerBossEdgePaddingX : 120;
+            const paddingY = typeof e.stalkerBossEdgePaddingY === "number" ? e.stalkerBossEdgePaddingY : 160;
+            const minX = paddingX;
+            const maxX = canvas.width - paddingX;
+            const minY = paddingY;
+            const maxY = canvas.height - paddingY;
+            const insidePaddedArea = e.x >= minX && e.x <= maxX && e.y >= minY && e.y <= maxY;
+            if (typeof e.stalkerBossEntryStage !== "string") e.stalkerBossEntryStage = "padding";
+            
+            if (e.stalkerBossEntryStage === "padding") {
+              const entrySpeed = typeof e.stalkerBossEntrySpeed === "number" ? e.stalkerBossEntrySpeed : (e.speed * 2.1);
+              if (centerDist > 0) {
+                e.x += (centerDx / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+                e.y += (centerDy / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
+              }
+              if (insidePaddedArea) {
+                e.stalkerBossEntryStage = "center";
+              }
+            } else {
+              const arrivalThreshold = Math.max(10, e.radius * 0.7);
+              if (centerDist > arrivalThreshold && centerDist > 0) {
+                e.x += (centerDx / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+                e.y += (centerDy / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
+              }
+              if (centerDist <= arrivalThreshold) {
+                e.stalkerBossEntering = false;
+              }
+            }
+          } else {
+            // Health-based phase system
+            const phase1Threshold = 0.67;  // 67% health - Normal aggression
+            const phase2Threshold = 0.33;  // 33% health - High aggression
+            const phase3Threshold = 0;     // 0% health - Ultra aggression
+            
+            let phaseLevel = 1;
+            let blinkInterval = 240;
+            let blinkSequenceSize = 2;
+            let burstShots = 3;
+            let blinkCastSpeed = 24 + Math.floor(Math.random() * 12);
+            
+            if (healthPercent <= phase2Threshold) {
+              phaseLevel = 3;
+              blinkSequenceSize = 4;
+              burstShots = 3;
+              blinkCastSpeed = 20 + Math.floor(Math.random() * 8);
+            } else if (healthPercent <= phase1Threshold) {
+              phaseLevel = 2;
+              blinkSequenceSize = 3;
+              burstShots = 3;
+              blinkCastSpeed = 22 + Math.floor(Math.random() * 10);
+            }
+            
+            // Store phase for reference
+            e.stalkerBossPhase = phaseLevel;
+            
+            // Initialize blink sequence tracking
+            if (!e.blinkSequenceActive && typeof e.blinkSequenceCount === "undefined") {
+              e.blinkSequenceCount = 0;
+              e.blinkCount = 0;
+            }
+            
+            // Blink behavior
+            if (e.blinkCastTimer > 0) {
+              e.blinkCastTimer -= delta * SPEED_MULTIPLIER;
+              e.castFxCooldown = (e.castFxCooldown || 0) - delta * SPEED_MULTIPLIER;
+              if (e.castFxCooldown <= 0) {
+                e.castFxCooldown = 4;
+                for (let p = 0; p < 3; p++) {
+                  const angle = Math.random() * Math.PI * 2;
+                  const speed = 0.9 + Math.random() * 0.8;
+                  spawnParticle(
+                    e.x, e.y,
+                    Math.cos(angle) * speed,
+                    Math.sin(angle) * speed,
+                    16 + Math.random() * 10,
+                    "#7beeff", 0.93, 1.6 + Math.random() * 1.2,
+                    "enemyHit"
+                  );
+                }
+              }
+              
+              if (e.blinkCastTimer <= 0) {
+                for (let p = 0; p < 10; p++) {
+                  const angle = Math.random() * Math.PI * 2;
+                  const speed = 1.6 + Math.random() * 1.1;
+                  spawnParticle(e.x, e.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 24 + Math.random() * 10, "#66e8ff", 0.93, 2 + Math.random() * 1.6, "enemyHit");
+                }
+                
+                // Zone-based blinking (3x3 grid, zones 1-9, center is 5)
+                const paddingX = typeof e.stalkerBossEdgePaddingX === "number" ? e.stalkerBossEdgePaddingX : 120;
+                const paddingY = typeof e.stalkerBossEdgePaddingY === "number" ? e.stalkerBossEdgePaddingY : 160;
+                const playableWidth = canvas.width - (paddingX * 2);
+                const playableHeight = canvas.height - (paddingY * 2);
+                const zoneWidth = playableWidth / 3;
+                const zoneHeight = playableHeight / 3;
+                
+                // Get current zone
+                const getZone = (x, y) => {
+                  const relX = x - paddingX;
+                  const relY = y - paddingY;
+                  const col = Math.max(0, Math.min(2, Math.floor(relX / zoneWidth)));
+                  const row = Math.max(0, Math.min(2, Math.floor(relY / zoneHeight)));
+                  return row * 3 + col + 1;
+                };
+                
+                // Calculate Manhattan distance between zones
+                const getZoneDistance = (z1, z2) => {
+                  const toCoords = (z) => [Math.floor((z - 1) / 3), (z - 1) % 3];
+                  const [r1, c1] = toCoords(z1);
+                  const [r2, c2] = toCoords(z2);
+                  return Math.abs(r1 - r2) + Math.abs(c1 - c2);
+                };
+                
+                const currentZone = getZone(e.x, e.y);
+                
+                // Find valid blink zones (distance 2-3 away, not zone 5)
+                const validZones = [];
+                for (let z = 1; z <= 9; z++) {
+                  if (z === 5) continue;
+                  if (getZoneDistance(currentZone, z) >= 2 && getZoneDistance(currentZone, z) <= 3) {
+                    validZones.push(z);
+                  }
+                }
+                
+                // Pick random valid zone
+                const targetZone = validZones.length > 0 ? validZones[Math.floor(Math.random() * validZones.length)] : 5;
+                
+                // Get random position in target zone
+                const zoneIndex = targetZone - 1;
+                const zoneCol = zoneIndex % 3;
+                const zoneRow = Math.floor(zoneIndex / 3);
+                const zoneMinX = paddingX + zoneCol * zoneWidth;
+                const zoneMaxX = paddingX + (zoneCol + 1) * zoneWidth;
+                const zoneMinY = paddingY + zoneRow * zoneHeight;
+                const zoneMaxY = paddingY + (zoneRow + 1) * zoneHeight;
+                
+                // Add inner padding within zone to keep away from edges
+                const zonePaddingX = zoneWidth * 0.15;
+                const zonePaddingY = zoneHeight * 0.15;
+                const minX = Math.max(paddingX, zoneMinX + zonePaddingX);
+                const maxX = Math.min(canvas.width - paddingX, zoneMaxX - zonePaddingX);
+                const minY = Math.max(paddingY, zoneMinY + zonePaddingY);
+                const maxY = Math.min(canvas.height - paddingY, zoneMaxY - zonePaddingY);
+                
+                let blinkTargetX = minX + Math.random() * (maxX - minX);
+                let blinkTargetY = minY + Math.random() * (maxY - minY);
+                
+                e.x = blinkTargetX;
+                e.y = blinkTargetY;
+                
+                for (let p = 0; p < 10; p++) {
+                  const angle = Math.random() * Math.PI * 2;
+                  const speed = 1.6 + Math.random() * 1.1;
+                  spawnParticle(e.x, e.y, Math.cos(angle) * speed, Math.sin(angle) * speed, 24 + Math.random() * 10, "#66e8ff", 0.93, 2 + Math.random() * 1.6, "enemyHit");
+                }
+                
+                e.blinkCount += 1;
+                // Fire 3 round bursts after each blink
+                e.pendingBursts = 3;
+                e.burstShotsLeft = 0;
+                
+                e.blinkRecoverDuration = 18 + Math.floor(Math.random() * 6);
+                e.blinkRecoverTimer = e.blinkRecoverDuration;
+                e.blinkCastTimer = 0;
+              }
+            } else if (e.blinkRecoverTimer > 0) {
+              e.blinkRecoverTimer -= delta * SPEED_MULTIPLIER;
+              if (e.blinkRecoverTimer <= 0) {
+                e.burstsLeft = Math.max(e.burstsLeft, e.pendingBursts || 0);
+                e.pendingBursts = 0;
+                e.isCooldownBurst = false;
+              }
+            } else if (e.burstsLeft > 0) {
+              if (e.burstShotsLeft <= 0) {
+                const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+                const shotSpeed = 2.4;
+                
+                // Check if this is a cooldown burst (singular) or sequence burst (fan)
+                if (e.isCooldownBurst) {
+                  // Singular shot during cooldown
+                  spawnProjectile(
+                    e.x, e.y,
+                    Math.cos(angleToPlayer) * shotSpeed,
+                    Math.sin(angleToPlayer) * shotSpeed,
+                    e.damage,
+                    8,
+                    "#66e8ff",
+                    "stalkerBossProjectile"
+                  );
+                } else {
+                  // Fan pattern during sequence
+                  const spread = (Math.PI / 2) / (2 * burstShots);
+                  for (let s = -burstShots; s <= burstShots; s++) {
+                    if (s === 0) continue;
+                    const shotAngle = angleToPlayer + (s * spread);
+                    spawnProjectile(
+                      e.x, e.y,
+                      Math.cos(shotAngle) * shotSpeed,
+                      Math.sin(shotAngle) * shotSpeed,
+                      e.damage,
+                      8,
+                      "#66e8ff",
+                      "stalkerBossProjectile"
+                    );
+                  }
+                }
+                e.burstsLeft -= 1;
+                e.burstShotsLeft = 10 + Math.floor(Math.random() * 6);
+                if (e.burstsLeft <= 0) e.stalkerBurstCooldown = e.stalkerBurstInterval;
+              } else {
+                e.burstShotsLeft -= delta * SPEED_MULTIPLIER;
+              }
+            } else {
+              if (e.stalkerBurstCooldown > 0) {
+                e.stalkerBurstCooldown -= delta * SPEED_MULTIPLIER;
+                if (e.stalkerBurstCooldown < 0) e.stalkerBurstCooldown = 0;
+              }
+              
+              if (e.blinkCooldown > 0) {
+                e.blinkCooldown -= delta * SPEED_MULTIPLIER;
+                if (e.blinkCooldown < 0) e.blinkCooldown = 0;
+              }
+              
+              // Check if we're continuing a blink sequence
+              if (e.blinkSequenceActive && e.blinkCount < e.blinkSequenceCount) {
+                e.blinkCastDuration = blinkCastSpeed;
+                e.blinkCastTimer = e.blinkCastDuration;
+                e.castFxCooldown = 0;
+              } else if (e.blinkSequenceActive) {
+                // Sequence is complete
+                e.blinkSequenceActive = false;
+                e.blinkCooldown = blinkInterval;
+              } else {
+                const playerBlinkRange = (typeof player.range === "number" ? player.range : player.radius) + 60;
+                const shouldBlinkAway = e.blinkCooldown <= 0 && dist <= playerBlinkRange;
+                if (shouldBlinkAway) {
+                  // Start a multi-blink sequence
+                  e.blinkSequenceActive = true;
+                  e.blinkSequenceCount = blinkSequenceSize;
+                  e.blinkCount = 0;
+                  e.blinkCastDuration = blinkCastSpeed;
+                  e.blinkCastTimer = e.blinkCastDuration;
+                  e.castFxCooldown = 0;
+                } else if (e.stalkerBurstCooldown <= 0) {
+                  e.burstsLeft = Math.max(e.burstsLeft, 1);
+                  e.burstShotsLeft = 0;
+                  e.stalkerBurstCooldown = e.stalkerBurstInterval;
+                  e.isCooldownBurst = true;
+                }
+              }
+            }
+            
+            let targetStalkerAlpha = 0.9;
+            if (e.blinkCastTimer > 0) {
+              const castProgress = e.blinkCastDuration > 0 ? Math.max(0, Math.min(1, e.blinkCastTimer / e.blinkCastDuration)) : 0;
+              targetStalkerAlpha = 0.15 + (0.75 * castProgress);
+            } else if (e.blinkRecoverTimer > 0) {
+              const recoverProgress = e.blinkRecoverDuration > 0 ? Math.max(0, Math.min(1, 1 - (e.blinkRecoverTimer / e.blinkRecoverDuration))) : 1;
+              targetStalkerAlpha = 0.2 + (0.7 * recoverProgress);
+            }
+            const alphaBlend = Math.min(1, 0.22 * delta * SPEED_MULTIPLIER);
+            e.stalkerAlpha = (e.stalkerAlpha || 0.9) + (targetStalkerAlpha - (e.stalkerAlpha || 0.9)) * alphaBlend;
+            e.stalkerAlpha = Math.max(0.08, Math.min(0.95, e.stalkerAlpha));
+            
+            // Keep within bounds
+            const edgePaddingX = 120;
+            const edgePaddingY = 150;
+            e.x = Math.max(edgePaddingX, Math.min(canvas.width - edgePaddingX, e.x));
+            e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
+          }
+          continue;
         }
         if (e.type === "gruntBoss" && e.gruntBossEntering !== false) {
           const centerX = canvas.width * 0.5;
@@ -5739,7 +6281,7 @@ const droplifelenght = 280;
               } catch (e) {}
               e.attackCooldown = 60;
             } else {
-              player.health -= e.damage;
+              if (!window.godMode) player.health -= e.damage;
               e.attackCooldown = 60;
             }
           }
@@ -5873,7 +6415,7 @@ const droplifelenght = 280;
                 // Damage player if in range
                 const distToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
                 if (distToPlayer < e.radius + player.radius + 52) {
-                  player.health -= e.damage;
+                  if (!window.godMode) player.health -= e.damage;
                 }
                 // Explosion effect
                 for (let j = 0; j < 24; j++) {
@@ -6057,7 +6599,7 @@ const droplifelenght = 280;
       const projectileRadius = typeof p.radius === "number" ? p.radius : 4;
       const dist = Math.hypot(player.x - p.x, player.y - p.y);
       if (dist < player.radius + projectileRadius) {
-        player.health -= p.damage;
+        if (!window.godMode) player.health -= p.damage;
         if (p.type === "bruteBossFireball") {
           emitBruteFireballNova(p.x, p.y, p.burnRadius);
           spawnBurningArea(p.x, p.y, {
@@ -6145,6 +6687,7 @@ const droplifelenght = 280;
         p.type === "slingerBossFragShell" ||
         p.type === "slingerProjectile" ||
         p.type === "stalkerProjectile" ||
+        p.type === "stalkerBossProjectile" ||
         p.type === "gruntBossProjectile"
       ) {
         ctx.save();
@@ -6323,11 +6866,40 @@ const droplifelenght = 280;
         }
         autoAttack();
         handleWaveSpawning(delta);
-        const waveUsesBossGate = wave === 5 || wave === 10 || wave === 20;
-        const finalBurstReached = burstCount !== Infinity && burstIndex >= burstCount;
+        
+        // Always re-sync burstIndex and burstCount from global state before transition check
+        if (window._sentinelWaveState) {
+          if (typeof burstIndex !== 'undefined') burstIndex = window._sentinelWaveState.burstIndex;
+          if (typeof burstCount !== 'undefined') burstCount = window._sentinelWaveState.burstCount;
+        }
+        const ctxWave = getWaveControlContext();
+        const waveUsesBossGate = wave === 5 || wave === 10 || wave === 20 || wave === 30;
+        const finalBurstReached = window._sentinelWaveState && window._sentinelWaveState.burstCount !== Infinity && window._sentinelWaveState.burstIndex >= window._sentinelWaveState.burstCount;
+        
+        // CRITICAL: For timeline waves, check if wave completed by verifying state was cleared
+        const isUsingTimeline = window._editorWaveOverride && window._editorWaveOverride[wave] && window._editorWaveOverride[wave].timelineMode;
+        let timelineWaveJustCompleted = false;
+        if (isUsingTimeline && !window._timelineWaveState) {
+          // Timeline state was cleared - wave completed
+          timelineWaveJustCompleted = true;
+          console.log(`[MainLoop] Timeline wave ${wave} detected as complete (state cleared)`);
+        }
+        
         const allEnemiesCleared = enemies.length === 0;
-        const allowTimedOrClearAdvance = !waveUsesBossGate && finalBurstReached;
+        const allowTimedOrClearAdvance = !waveUsesBossGate && (finalBurstReached || timelineWaveJustCompleted);
         if (allowTimedOrClearAdvance) {
+          if (window.debugWaveTransition) {
+            console.log('[MainLoop] allowTimedOrClearAdvance triggered:', {
+              wave,
+              finalBurstReached,
+              timelineWaveJustCompleted,
+              burstIndex: ctxWave.getBurstIndex(),
+              burstCount: ctxWave.getBurstCount(),
+              enemiesLength: enemies.length,
+              interWavePending,
+              interWaveDelayTimer
+            });
+          }
           if (!interWavePending) {
             interWavePending = true;
             interWaveDelayTimer = INTER_WAVE_DELAY_SECONDS;
@@ -6337,6 +6909,19 @@ const droplifelenght = 280;
           const timerExpired = interWaveDelayTimer <= 0;
           const shouldAdvanceWave = allEnemiesCleared || timerExpired;
           if (shouldAdvanceWave) {
+            console.log(`[MainLoop] WAVE ADVANCEMENT: wave ${wave} -> ${wave + 1} (condition: ${timelineWaveJustCompleted ? 'timeline-complete' : (finalBurstReached ? 'burst-complete' : 'unknown')})`);
+            if (window.debugWaveTransition) {
+              console.log('[MainLoop] Advancing wave details:', {
+                currentWave: wave,
+                nextWave: wave + 1,
+                burstIndex: ctxWave.getBurstIndex(),
+                burstCount: ctxWave.getBurstCount(),
+                enemiesLength: enemies.length,
+                allEnemiesCleared,
+                timerExpired,
+                isUsingTimeline
+              });
+            }
             interWavePending = false;
             interWaveDelayTimer = 0;
             wave++;
@@ -6744,7 +7329,7 @@ const droplifelenght = 280;
 
       enemies.forEach(e => {
                 // Draw boss health bar above boss
-                if (e.type === "gruntBoss" || e.type === "bruteBoss" || e.type === "slingerBoss") {
+                if (e.type === "gruntBoss" || e.type === "bruteBoss" || e.type === "slingerBoss" || e.type === "stalkerBoss") {
                   const barWidth = 80;
                   const barHeight = 8;
                   const barX = e.x - barWidth / 2;
@@ -6767,16 +7352,16 @@ const droplifelenght = 280;
                   ctx.fillStyle = "#fff";
                   ctx.textAlign = "center";
                   ctx.textBaseline = "bottom";
-                  ctx.fillText(e.type === "bruteBoss" ? "Brute Major" : (e.type === "slingerBoss" ? "Slinger Major" : "Shard Major"), e.x, barY - 2);
+                  ctx.fillText(e.type === "bruteBoss" ? "Brute Major" : (e.type === "slingerBoss" ? "Slinger Major" : (e.type === "stalkerBoss" ? "Stalker Major" : "Shard Major")), e.x, barY - 2);
                   ctx.restore();
                 }
         // Hover effect (visual only) for slinger and stalker
         let hoverX = e.x;
         let hoverY = e.y;
-        if (e.type === "slinger" || e.type === "slingerBoss" || e.type === "stalker" || e.type === "beamer" || e.type === "shielder") {
+        if (e.type === "slinger" || e.type === "slingerBoss" || e.type === "stalker" || e.type === "stalkerBoss" || e.type === "beamer" || e.type === "shielder") {
           if (typeof e.hoverOffset === "undefined") e.hoverOffset = Math.random() * Math.PI * 2;
           e.hoverOffset += 0.04;
-          const hoverRadius = e.type === "stalker" ? 2.8 : (e.type === "beamer" ? 2.5 : (e.type === "shielder" ? 2.3 : 2.2));
+          const hoverRadius = (e.type === "stalker" || e.type === "stalkerBoss") ? 2.8 : (e.type === "beamer" ? 2.5 : (e.type === "shielder" ? 2.3 : 2.2));
           hoverX = e.x + Math.cos(e.hoverOffset) * hoverRadius;
           hoverY = e.y + Math.sin(e.hoverOffset * 0.93) * (hoverRadius * 0.58);
         }
@@ -6912,6 +7497,9 @@ const droplifelenght = 280;
           ctx.drawImage(kamikazeImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
         } else if (e.type === "stalker") {
+          // Reverted: No afterimages for blink, just normal stalker rendering
+
+          // Draw main stalker
           ctx.save();
           ctx.translate(hoverX, hoverY);
           const stalkerAlpha = typeof e.stalkerAlpha === "number" ? e.stalkerAlpha : 0.9;
@@ -6929,6 +7517,28 @@ const droplifelenght = 280;
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(0, 0, e.radius + 3, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else if (e.type === "stalkerBoss") {
+          // Draw stalker boss with alpha blinking
+          ctx.save();
+          ctx.translate(hoverX, hoverY);
+          const stalkerAlpha = typeof e.stalkerAlpha === "number" ? e.stalkerAlpha : 0.9;
+          ctx.globalAlpha = stalkerAlpha;
+          if (stalkerBossImg && stalkerBossImg.complete && stalkerBossImg.naturalWidth > 0) {
+            const drawScale = 4.3;
+            ctx.drawImage(stalkerBossImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
+          } else {
+            ctx.fillStyle = "#1a1a1a";
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * 0.85, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = Math.max(0.15, stalkerAlpha * 0.9);
+            ctx.strokeStyle = "#4a8aaa";
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius + 4, 0, Math.PI * 2);
             ctx.stroke();
           }
           ctx.restore();
