@@ -37,44 +37,79 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 	function loadTimelineData(waveNum) {
 		// If we're still editing the same wave, use the working copy
 		if (window._timelineWorkingCopy.waveNum === waveNum && window._timelineWorkingCopy.data) {
-			console.log(`[TimelineEditor] Using working copy for wave ${waveNum}`);
 			return window._timelineWorkingCopy.data;
 		}
-		
-		console.log(`[TimelineEditor] Loading fresh timeline for wave ${waveNum}`);
-		
-		// Different wave - discard old working copy and create new one
-		// Priority: localStorage overrides > session overrides (from code waves) > local storage
 		let sourceData = null;
 		
-		// Check for localStorage override first (applied edits from editor UI)
+		// PRIORITY 1: Check for localStorage override (edits saved by user)
+		// STRICT validation: must have timelineMode, timeline, AND actual mob data
 		if (typeof window.waveEditorOverrides !== "undefined" && window.waveEditorOverrides[waveNum]) {
 			const override = window.waveEditorOverrides[waveNum];
-			// Extract timeline data from override structure
-			sourceData = override.timeline || override;
-			console.log(`[TimelineEditor] Loading wave ${waveNum} from localStorage override:`, sourceData);
+			// Must be explicitly marked as timelineMode and have valid timeline data with mobs
+			if (override.timelineMode === true && override.timeline && typeof override.timeline === "object") {
+				const timeline = override.timeline;
+				const hasMobs = timeline.mobs && typeof timeline.mobs === "object";
+				const hasAnyMobs = hasMobs && Object.values(timeline.mobs).some(mobArray => Array.isArray(mobArray) && mobArray.length > 0);
+				
+				if (hasAnyMobs) {
+					sourceData = timeline;
+				} else {
+				}
+			} else {
+			}
 		}
-		// Fallback: Check session override (from detected code waves in waveControl.js)
-		else if (typeof window._editorWaveOverride !== "undefined" && window._editorWaveOverride[waveNum]) {
+		
+		// PRIORITY 2: Check session override (from spawnWave in game)
+		if (!sourceData && typeof window._editorWaveOverride !== "undefined" && window._editorWaveOverride[waveNum]) {
 			const override = window._editorWaveOverride[waveNum];
-			sourceData = override.timeline || override;
-			console.log(`[TimelineEditor] Loading wave ${waveNum} from session override (code wave):`, sourceData);
+			if (override.timelineMode === true && override.timeline && typeof override.timeline === "object") {
+				sourceData = override.timeline;
+			}
 		}
-		// Final fallback: Use local timeline storage
-		else {
-			console.log(`[TimelineEditor] No overrides found for wave ${waveNum}, using local storage`);
-			// Fall back to persistent storage
+		
+		// PRIORITY 3: Directly decode the DEFAULT wave code from waveControl.js
+		if (!sourceData) {
+			const code = window.SentinelWaveEditorCodes && window.SentinelWaveEditorCodes[waveNum];
+			if (code) {
+				try {
+					// Directly decode the SWC3 code
+					if (window.SentinelEditor && typeof window.SentinelEditor.decodeWaveCode === "function") {
+						const decoded = window.SentinelEditor.decodeWaveCode(code);
+						const waveCfg = decoded[waveNum];
+						if (waveCfg && waveCfg.timelineMode && waveCfg.timeline) {
+							sourceData = waveCfg.timeline;
+						} else {
+						}
+					} else {
+					}
+				} catch (err) {
+				}
+			} else {
+			}
+		}
+		
+		// FALLBACK: Use or create local timeline storage
+		if (!sourceData) {
 			if (!waveTimelines[waveNum]) {
 				waveTimelines[waveNum] = { duration: 30, endCondition: 'duration', mobs: {} };
 				MOB_TYPES.forEach(mob => waveTimelines[waveNum].mobs[mob] = []);
-				
-				// Try to auto-load from code wave if available
-				tryLoadCodeWaveAsTimeline(waveNum);
 			}
 			sourceData = waveTimelines[waveNum];
 		}
+		// Ensure all required properties are initialized with safe defaults
+		if (!sourceData || typeof sourceData !== "object") {
+			sourceData = {};
+		}
 		
-		console.log(`[TimelineEditor] Source data for wave ${waveNum}:`, sourceData);
+		// Ensure duration is a valid number
+		if (!Number.isFinite(sourceData.duration) || sourceData.duration < 1) {
+			sourceData.duration = 30;
+		}
+		
+		// Ensure endCondition is valid
+		if (!sourceData.endCondition || typeof sourceData.endCondition !== "string") {
+			sourceData.endCondition = "duration";
+		}
 		
 		// Ensure all required mob types are initialized
 		if (!sourceData.mobs || typeof sourceData.mobs !== "object") {
@@ -89,16 +124,10 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 		// Create a working copy for this wave
 		window._timelineWorkingCopy.waveNum = waveNum;
 		window._timelineWorkingCopy.data = deepCopyTimeline(sourceData);
-		console.log(`[TimelineEditor] Created working copy:`, window._timelineWorkingCopy.data);
 		return window._timelineWorkingCopy.data;
 	}
 
 	function tryLoadCodeWaveAsTimeline(waveNum) {
-		// Check if SentinelEditor has a code for this wave
-		if (!window.SentinelEditor || typeof window.SentinelEditor.getWaveConfigFromCode !== "function") {
-			return;
-		}
-
 		// Get the wave code
 		let code = null;
 		if (window.SentinelWaveEditorCodes && window.SentinelWaveEditorCodes[waveNum]) {
@@ -108,13 +137,30 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 		if (!code) return;
 
 		try {
-			// Decode the code wave
+			// FIRST: Try to decode as SWC3 timeline-based code
+			if (window.SentinelEditor && typeof window.SentinelEditor.decodeWaveCode === "function") {
+				const decoded = window.SentinelEditor.decodeWaveCode(code);
+				const waveCfg = decoded[waveNum];
+				
+				if (waveCfg && waveCfg.timelineMode && waveCfg.timeline) {
+					const timeline = waveTimelines[waveNum];
+					timeline.duration = waveCfg.timeline.duration || 30;
+					timeline.endCondition = waveCfg.timeline.endCondition || 'duration';
+					timeline.mobs = deepCopyTimeline(waveCfg.timeline).mobs;
+					return;
+				}
+			}
+
+			// FALLBACK: Try burst config approach (for legacy burst-mode codes)
+			if (!window.SentinelEditor || typeof window.SentinelEditor.getWaveConfigFromCode !== "function") {
+				return;
+			}
+
 			const config = window.SentinelEditor.getWaveConfigFromCode(code, waveNum);
 			if (!config) return;
 
 			// IMPORTANT: Check if code wave is ALREADY timeline-based (not a burst config)
 			if (config.timelineMode && config.timeline) {
-				console.log(`[TimelineEditor] Code wave ${waveNum} is already timeline-based. Loading directly from code.`);
 				const timeline = waveTimelines[waveNum];
 				timeline.duration = config.timeline.duration || 30;
 				timeline.endCondition = config.timeline.endCondition || 'duration';
@@ -123,8 +169,6 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 			}
 
 			// Otherwise, convert burst-based config to timeline format
-			console.log(`[TimelineEditor] Converting burst-based code wave ${waveNum} to timeline format...`, config);
-
 			// Map old burst interval (ms) to seconds
 			const burstIntervalSeconds = config.burstIntervalSeconds || (config.burstInterval ? config.burstInterval / 100 : 0.3);
 			const burstCount = config.burstCount || 30;
@@ -164,10 +208,7 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 					}
 				}
 			}
-
-			console.log(`[TimelineEditor] Wave ${waveNum} converted from code. Events:`, timeline.mobs);
 		} catch (err) {
-			console.error(`[TimelineEditor] Failed to convert code wave ${waveNum}:`, err);
 		}
 	}
 
@@ -228,6 +269,11 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 	allEliminatedOpt.textContent = "All Mobs Eliminated";
 	endConditionSelect.appendChild(allEliminatedOpt);
 
+	const bossOpt = document.createElement("option");
+	bossOpt.value = "boss";
+	bossOpt.textContent = "Boss Eliminated (No XP)";
+	endConditionSelect.appendChild(bossOpt);
+
 	endConditionDiv.appendChild(endConditionSelect);
 	waveSection.appendChild(endConditionDiv);
 	
@@ -252,15 +298,47 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 	timeScaleDiv.className = "timeline-scale-div";  // Add class for easy reference
 	timelineEditorContainer.appendChild(timeScaleDiv);
 
+	// Timeline viewport offset for long waves (> 60 seconds)
+	let timelineOffset = 0;  // Time offset in seconds for viewport
+	let isDraggingTimeline = false;
+	let dragStartX = 0;
+
 	function renderTimeScale(duration) {
 		timeScaleDiv.innerHTML = '';
 		timeScaleDiv.style.width = (112 + TRACK_WIDTH + 50) + "px";
 		
+		const isLongWave = duration > 60;
+		const viewportDuration = Math.min(duration, 60);  // Show max 60 seconds at a time
+		
+		// Clamp offset to valid range
+		if (isLongWave) {
+			timelineOffset = Math.max(0, Math.min(timelineOffset, duration - viewportDuration));
+		} else {
+			timelineOffset = 0;
+		}
+		
+		// Update cursor and styling based on whether draggable
+		if (isLongWave) {
+			timeScaleDiv.style.cursor = "grab";
+			timeScaleDiv.style.background = "rgba(0, 255, 221, 0.05)";
+		} else {
+			timeScaleDiv.style.cursor = "default";
+			timeScaleDiv.style.background = "transparent";
+		}
+		
 		// Render grid lines with marks at each 0.5 second
 		// Major marks every 5 seconds, medium marks every 1 second, minor marks every 0.5 second
-		for (let i = 0; i <= duration; i += 0.5) {
+		const startTime = isLongWave ? timelineOffset : 0;
+		const endTime = isLongWave ? timelineOffset + viewportDuration : duration;
+		
+		for (let i = Math.floor(startTime * 2) / 2; i <= endTime; i += 0.5) {
 			const time = i;
-			const pixelPos = (time / duration) * TRACK_WIDTH;
+			// For long waves, calculate position within viewport
+			const relativeTime = time - timelineOffset;
+			const pixelPos = (relativeTime / viewportDuration) * TRACK_WIDTH;
+			
+			// Skip if outside visible range
+			if (pixelPos < -5 || pixelPos > TRACK_WIDTH + 5) continue;
 			
 			// Determine mark size: 5s (biggest), 1s (medium), 0.5s (smallest)
 			let markHeight;
@@ -285,11 +363,6 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 			mark.style.marginTop = "0px";
 			timeScaleDiv.appendChild(mark);
 			
-			// DEBUG: Log scale positions for first few marks
-			if (i <= 10) {
-				console.log(`[Scale] Time ${i}s: pixelPos=${pixelPos}, absolute left=${106 + pixelPos}px`);
-			}
-			
 			// Add labels at 5-second intervals
 			if (is5SecMark) {
 				const label = document.createElement("span");
@@ -303,7 +376,59 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 				timeScaleDiv.appendChild(label);
 			}
 		}
+
+		// Add drag-to-scroll hint for long waves
+		if (isLongWave) {
+			const hint = document.createElement("div");
+			hint.style.position = "absolute";
+			hint.style.right = "8px";
+			hint.style.top = "2px";
+			hint.style.fontSize = "0.6rem";
+			hint.style.color = "rgba(0, 255, 221, 0.5)";
+			hint.style.pointerEvents = "none";
+			hint.textContent = "← Drag to scroll →";
+			timeScaleDiv.appendChild(hint);
+		}
 	}
+
+	// Add drag handler to timeScaleDiv for horizontal scrolling on long waves
+	timeScaleDiv.addEventListener("mousedown", (e) => {
+		const timeline = loadTimelineData(Math.max(1, selectedWaveState.value || 1));
+		if (timeline.duration <= 60) return;  // Only allow drag on long waves
+		
+		isDraggingTimeline = true;
+		dragStartX = e.clientX;
+		const startOffset = timelineOffset;
+		timeScaleDiv.style.cursor = "grabbing";
+		
+		const handleDragScale = (moveEvent) => {
+			if (!isDraggingTimeline) return;
+			
+			const deltaX = moveEvent.clientX - dragStartX;
+			const viewportDuration = 60;  // Max visible at once
+			const deltaTime = -(deltaX / TRACK_WIDTH) * viewportDuration;
+			
+			timelineOffset = startOffset + deltaTime;
+			timelineOffset = Math.max(0, Math.min(timelineOffset, timeline.duration - viewportDuration));
+			
+			renderTimeScale(timeline.duration);
+			
+			// Update all track dots to reflect new scroll position
+			MOB_TYPES.forEach(mob => {
+				if (renderAllDots[mob]) renderAllDots[mob]();
+			});
+		};
+		
+		const handleDragEnd = () => {
+			isDraggingTimeline = false;
+			timeScaleDiv.style.cursor = "grab";
+			document.removeEventListener("mousemove", handleDragScale);
+			document.removeEventListener("mouseup", handleDragEnd);
+		};
+		
+		document.addEventListener("mousemove", handleDragScale);
+		document.addEventListener("mouseup", handleDragEnd);
+	});
 
 	// Timeline tracks container (inside editor container)
 	const timelineTracksDiv = document.createElement("div");
@@ -313,16 +438,20 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 	timelineTracksDiv.style.padding = "0";
 	timelineEditorContainer.appendChild(timelineTracksDiv);
 
+	// Selection system: track which events are selected per mob type (persistent across re-renders)
+	const selectedEvents = {};  // { mobType: Set of event indices }
+	MOB_TYPES.forEach(mob => selectedEvents[mob] = new Set());
+
+	// Store render functions so we can update all tracks (persistent across re-renders)
+	const renderAllDots = {};
+
 	function renderTimelineTrack(waveNum) {
 		timelineTracksDiv.innerHTML = '';
+		timelineOffset = 0;  // Reset viewport scroll when switching waves
 		const timeline = loadTimelineData(waveNum);
 		durationInput.value = timeline.duration;
 		endConditionSelect.value = timeline.endCondition || 'duration';
 		renderTimeScale(timeline.duration);
-
-		let isDragging = false;  // Track if currently dragging a dot
-		let dragStartX = 0;
-		let dragStartY = 0;
 
 		MOB_TYPES.forEach(mob => {
 			const track = document.createElement("div");
@@ -347,181 +476,367 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 			eventsDiv.style.marginLeft = "6px";
 			eventsDiv.style.border = "1px solid rgba(0, 255, 221, 0.2)";
 			eventsDiv.style.overflow = "visible";
+			eventsDiv.style.cursor = "default";
 
-			timeline.mobs[mob].forEach((evt, idx) => {
-				const pixelX = (evt.time / timeline.duration) * TRACK_WIDTH;
-				const dot = document.createElement("div");
-					dot.style.position = "absolute";
-					dot.style.left = (pixelX - 14) + "px";  // Dot is 24px wide, center at pixelX
-				dot.style.top = "4px";
-				dot.style.width = "24px";
-				dot.style.height = "24px";
-				dot.style.background = "#00ffdd";
-				dot.style.color = "#0a1a22";
-				dot.style.borderRadius = "50%";
-				dot.style.textAlign = "center";
-				dot.style.lineHeight = "24px";
-			dot.style.cursor = "grab";
-				dot.style.fontSize = "0.8rem";
-				dot.style.fontWeight = "bold";
-				dot.style.userSelect = "none";
-				dot.style.zIndex = "5";
-				dot.textContent = evt.amount;
-				const eventMode = evt.mode || 'event';
-				dot.title = `Time: ${evt.time.toFixed(2)}s, Amount: ${evt.amount}, Mode: ${eventMode}\nDrag left/right to move\nDrag up/down to adjust amount\nRight-click to delete`;
+			// Drag-select box
+			const selectionBox = document.createElement("div");
+			selectionBox.style.position = "absolute";
+			selectionBox.style.background = "rgba(0, 255, 221, 0.15)";
+			selectionBox.style.border = "2px dashed rgba(0, 255, 221, 0.5)";
+			selectionBox.style.display = "none";
+			selectionBox.style.zIndex = "2";
+			eventsDiv.appendChild(selectionBox);
+
+			// Track drag state for this track
+			let selectStartX = null;
+			let isSelectDragging = false;
+			let isDotDragging = false;
+			let dragDistance = 0;
+
+			// Create dots for all events
+			const dotsMap = new Map();  // event index -> dot element
 			
-				// DEBUG: Log exact positioning
-				console.log(`[Dot Position] Wave ${waveNum}, ${mob}: time=${evt.time}s, duration=${timeline.duration}s, pixelX=${pixelX}`);
-				
-				let startTime = evt.time;
-				let startAmount = evt.amount;
-				let dragMode = null;  // 'horizontal' or 'vertical'
+			const renderDots = () => {
+				// Clear existing dots
+				const existingDots = eventsDiv.querySelectorAll('div[data-event-dot="true"]');
+				existingDots.forEach(dot => dot.remove());
+				dotsMap.clear();
+				const isLongWave = timeline.duration > 60;
+				const viewportDuration = isLongWave ? 60 : timeline.duration;
 
-				dot.addEventListener("mousedown", (e) => {
-					if (e.button !== 0) return;  // Only left mouse button
-					e.preventDefault();
+				timeline.mobs[mob].forEach((evt, idx) => {
+					// For long waves, calculate position relative to viewport
+					const relativeTime = evt.time - timelineOffset;
+					const pixelX = (relativeTime / viewportDuration) * TRACK_WIDTH;
 					
-					isDragging = true;
-					dragStartX = e.clientX;
-					dragStartY = e.clientY;
-					startTime = evt.time;  // Always track the base event time
-					startAmount = evt.amount;
-					dragMode = null;
-					dot.style.cursor = "grabbing";
-					dot.style.zIndex = "20";
-
-				// Create tooltip for time display during drag (but don't add to DOM yet)
-				const tooltip = document.createElement("div");
-				tooltip.style.position = "absolute";
-				tooltip.style.background = "rgba(0, 0, 0, 0.9)";
-				tooltip.style.color = "#00ffdd";
-				tooltip.style.padding = "4px 8px";
-				tooltip.style.borderRadius = "3px";
-				tooltip.style.fontSize = "0.7rem";
-				tooltip.style.whiteSpace = "nowrap";
-				tooltip.style.pointerEvents = "none";
-				tooltip.style.zIndex = "30";
-				tooltip.style.border = "1px solid #00ffdd";
-				tooltip.textContent = `${(Math.round(startTime * 2) / 2).toFixed(1)}s`;
-				let tooltipAdded = false;
-
-				const handleMouseMove = (moveEvent) => {
-					if (!isDragging) return;
-					
-					const deltaX = moveEvent.clientX - dragStartX;
-					const deltaY = moveEvent.clientY - dragStartY;
-					const absDeltaX = Math.abs(deltaX);
-					const absDeltaY = Math.abs(deltaY);
-					
-					// Determine drag mode based on initial movement direction
-					if (dragMode === null) {
-						if (absDeltaX > absDeltaY && absDeltaX > 5) {
-							dragMode = 'horizontal';
-						} else if (absDeltaY > absDeltaX && absDeltaY > 5) {
-							dragMode = 'vertical';
-						}
+					// Skip rendering if outside viewport
+					if (isLongWave && (evt.time < timelineOffset || evt.time > timelineOffset + viewportDuration)) {
+						return;  // Don't render dots outside viewport
 					}
-					
-					if (dragMode === 'horizontal') {
-						// Add tooltip on first horizontal drag
-						if (!tooltipAdded) {
-							eventsDiv.appendChild(tooltip);
-							tooltipAdded = true;
-						}
-						
-						// Move dot horizontally
-						const deltaTime = (deltaX / TRACK_WIDTH) * timeline.duration;
-						let newTime = startTime + deltaTime;
-						newTime = Math.max(0, Math.min(timeline.duration - 0.01, newTime));
-						const newPixelX = (newTime / timeline.duration) * TRACK_WIDTH;
-						dot.style.left = (newPixelX - 12) + "px";
-						
-						// Update tooltip with current time
-					tooltip.textContent = `${(Math.round(newTime * 2) / 2).toFixed(1)}s`;
-						tooltip.style.left = (newPixelX - 20) + "px";
-						tooltip.style.top = "-28px";
-					} else if (dragMode === 'vertical') {
-						// Adjust amount vertically (every 20px = 1 mob)
-						const amountDelta = Math.round(deltaY / -20);
-						let newAmount = startAmount + amountDelta;
-						newAmount = Math.max(1, Math.min(100, newAmount));
-						evt.amount = newAmount;
-						dot.textContent = newAmount;
-						dot.title = `Time: ${evt.time.toFixed(2)}s, Amount: ${evt.amount}\nDrag right/left to move\nDrag up/down to adjust amount\nRight-click to delete`;
-					}
-				};
-
-				const handleMouseUp = (upEvent) => {
-					if (!isDragging) return;
-					isDragging = false;
+					const dot = document.createElement("div");
+					dot.setAttribute("data-event-dot", "true");
+					dot.style.position = "absolute";
+					dot.style.left = (pixelX - 12) + "px";
+					dot.style.top = "4px";
+					dot.style.width = "24px";
+					dot.style.height = "24px";
+					dot.style.borderRadius = "50%";
+					dot.style.textAlign = "center";
+					dot.style.lineHeight = "24px";
 					dot.style.cursor = "grab";
+					dot.style.fontSize = "0.8rem";
+					dot.style.fontWeight = "bold";
+					dot.style.userSelect = "none";
 					dot.style.zIndex = "5";
+					dot.style.transition = "all 0.1s";
+					dot.textContent = evt.amount;
 
-					// Remove tooltip
-					if (tooltip.parentNode) {
-						tooltip.parentNode.removeChild(tooltip);
+					// Highlight if selected
+					const isSelected = selectedEvents[mob].has(idx);
+					if (isSelected) {
+						dot.style.background = "#ffff00";
+						dot.style.color = "#000";
+						dot.style.boxShadow = "0 0 8px rgba(255, 255, 0, 0.8)";
+					} else {
+						dot.style.background = "#00ffdd";
+						dot.style.color = "#0a1a22";
 					}
 
-					if (dragMode === 'horizontal') {
-						// Finalize horizontal drag (snap to grid, re-render)
-						const deltaX = upEvent.clientX - dragStartX;
-						const deltaTime = (deltaX / TRACK_WIDTH) * timeline.duration;
-						let newTime = startTime + deltaTime;
-						newTime = Math.max(0, Math.min(timeline.duration - 0.01, newTime));
-						newTime = snapToGrid(newTime);
-						evt.time = newTime;
-						dot.title = `Time: ${evt.time.toFixed(2)}s, Amount: ${evt.amount}\nDrag right/left to move\nDrag up/down to adjust amount\nRight-click to delete`;
-						renderTimelineTrack(waveNum);
-					}
-					// Vertical drag changes are already applied during move
-					
-					dragMode = null;
-					document.removeEventListener("mousemove", handleMouseMove);
-					document.removeEventListener("mouseup", handleMouseUp);
-				};
+					const eventMode = evt.mode || 'event';
+					dot.title = `Time: ${evt.time.toFixed(2)}s, Amount: ${evt.amount}, Mode: ${eventMode}\nClick: select | Shift+Click: toggle | Drag: move\nRight-click to delete`;
 
-				document.addEventListener("mousemove", handleMouseMove);
-				document.addEventListener("mouseup", handleMouseUp);
-			});
+					// Individual dot drag handling
+					dot.addEventListener("mousedown", (e) => {
+						if (e.button !== 0) return;
+						e.preventDefault();
+						e.stopPropagation();
 
-				// Right-click to remove
-				dot.addEventListener("contextmenu", (e) => {
-					e.preventDefault();
-					timeline.mobs[mob].splice(idx, 1);
-					renderTimelineTrack(waveNum);
-				});
+						// If clicking unselected, select just this one
+						if (!selectedEvents[mob].has(idx)) {
+							selectedEvents[mob].clear();
+							selectedEvents[mob].add(idx);
+							renderDots();
+							return;
+						}
+
+						isDotDragging = true;
+						dragDistance = 0;
+						let dragStartX = e.clientX;
+						let dragStartY = e.clientY;
+						let dragMode = null;
+
+						// Store initial state for all selected events
+						const startStates = Array.from(selectedEvents[mob]).map(eventIdx => ({
+							idx: eventIdx,
+							time: timeline.mobs[mob][eventIdx].time,
+							amount: timeline.mobs[mob][eventIdx].amount
+						}));
+
+						const tooltip = document.createElement("div");
+						tooltip.style.position = "fixed";
+						tooltip.style.background = "rgba(0, 0, 0, 0.9)";
+						tooltip.style.color = "#00ffdd";
+						tooltip.style.padding = "4px 8px";
+						tooltip.style.borderRadius = "3px";
+						tooltip.style.fontSize = "0.7rem";
+						tooltip.style.whiteSpace = "nowrap";
+						tooltip.style.pointerEvents = "none";
+						tooltip.style.zIndex = "9999";
+						tooltip.style.border = "1px solid #00ffdd";
+						tooltip.style.display = "none";
+						document.body.appendChild(tooltip);
+
+						const handleMouseMove = (moveEvent) => {
+							if (!isDotDragging) return;
+
+							const deltaX = moveEvent.clientX - dragStartX;
+							const deltaY = moveEvent.clientY - dragStartY;
+							const absDeltaX = Math.abs(deltaX);
+							const absDeltaY = Math.abs(deltaY);
+							dragDistance = Math.max(dragDistance, Math.sqrt(absDeltaX * absDeltaX + absDeltaY * absDeltaY));
+
+							// Determine drag mode
+							if (dragMode === null) {
+								if (absDeltaX > absDeltaY && absDeltaX > 5) {
+									dragMode = 'horizontal';
+								} else if (absDeltaY > absDeltaX && absDeltaY > 5) {
+									dragMode = 'vertical';
+								}
+							}
+
+							if (dragMode === 'horizontal') {
+								// Move all selected events
+								const isLongWave = timeline.duration > 60;
+								const viewportDuration = isLongWave ? 60 : timeline.duration;
+								const deltaTime = (deltaX / TRACK_WIDTH) * viewportDuration;
+
+								startStates.forEach(({idx: eventIdx, time: origTime}) => {
+									let newTime = origTime + deltaTime;
+									newTime = Math.max(0, Math.min(timeline.duration - 0.01, newTime));
+									timeline.mobs[mob][eventIdx].time = newTime;
+								});
+
+								// Show tooltip
+								const firstTime = timeline.mobs[mob][startStates[0].idx].time;
+								tooltip.textContent = `${startStates.length} event(s): ${(Math.round(firstTime * 2) / 2).toFixed(1)}s`;
+								tooltip.style.display = "block";
+								tooltip.style.left = (moveEvent.clientX + 10) + "px";
+								tooltip.style.top = (moveEvent.clientY + 10) + "px";
+
+								renderDots();
+							} else if (dragMode === 'vertical' && selectedEvents[mob].size === 1) {
+								// Adjust single event amount
+								const amountDelta = Math.round(deltaY / -20);
+								let newAmount = startStates[0].amount + amountDelta;
+								newAmount = Math.max(1, Math.min(100, newAmount));
+								timeline.mobs[mob][startStates[0].idx].amount = newAmount;
+								renderDots();
+							}
+						};
+
+					const handleMouseUp = (upEvent) => {
+						if (!isDotDragging) return;
+						isDotDragging = false;
+						tooltip.remove();
+
+						if (dragMode === 'horizontal') {
+							// Snap to grid
+							selectedEvents[mob].forEach(eventIdx => {
+								timeline.mobs[mob][eventIdx].time = snapToGrid(timeline.mobs[mob][eventIdx].time);
+							});
+						}
+
+						dragMode = null;
+						document.removeEventListener("mousemove", handleMouseMove);
+						document.removeEventListener("mouseup", handleMouseUp);
+						renderDots();
+					};
+
+					document.addEventListener("mousemove", handleMouseMove);
+					document.addEventListener("mouseup", handleMouseUp);
+					});
+
+					// Selection handling
+					dot.addEventListener("click", (e) => {
+						if (isDotDragging) return;
+						e.stopPropagation();
+						// ALWAYS clear selections in OTHER mobs (even with Ctrl)
+						let hasOtherSelections = false;
+						MOB_TYPES.forEach(m => {
+							if (m !== mob && selectedEvents[m].size > 0) {
+								hasOtherSelections = true;
+								selectedEvents[m].clear();
+							}
+						});
+						
+						// If we cleared other mobs, render them
+						if (hasOtherSelections) {
+							MOB_TYPES.forEach(m => {
+								if (m !== mob && renderAllDots[m]) renderAllDots[m]();
+							});
+						}
+
+						if (e.shiftKey) {
+							// Shift+click: toggle
+							if (selectedEvents[mob].has(idx)) {
+								selectedEvents[mob].delete(idx);
+							} else {
+								selectedEvents[mob].add(idx);
+							}
+							renderDots();
+						} else if (e.ctrlKey || e.metaKey) {
+							// Ctrl/Cmd+click: add to selection in SAME slider
+							selectedEvents[mob].add(idx);
+							renderDots();
+						} else {
+							// Single select - clear this slider, select just this one
+							selectedEvents[mob].clear();
+							selectedEvents[mob].add(idx);
+							renderDots();
+						}
+					});
+
+					// Right-click to delete
+					dot.addEventListener("contextmenu", (e) => {
+						e.preventDefault();
+						e.stopPropagation();
+
+						// Delete all selected events
+						const indicesToDelete = Array.from(selectedEvents[mob]).sort((a, b) => b - a);
+						indicesToDelete.forEach(idxToDelete => {
+							timeline.mobs[mob].splice(idxToDelete, 1);
+						});
+						selectedEvents[mob].clear();
+						renderDots();
+					});
 
 				eventsDiv.appendChild(dot);
+				dotsMap.set(idx, dot);
+			});
+		};
+
+		// Store render function for global updates
+		renderAllDots[mob] = renderDots;
+			// Initial dot render
+			renderDots();
+
+			// Drag-select on background
+			eventsDiv.addEventListener("mousedown", (e) => {
+				if (e.button !== 0) return;
+				
+				// Don't start drag-select if clicking on a dot
+				if (e.target.getAttribute("data-event-dot") === "true") return;
+				if (isDotDragging) return;
+
+				isSelectDragging = true;
+				dragDistance = 0;  // Reset distance tracker for this drag-select
+				selectStartX = e.clientX - eventsDiv.getBoundingClientRect().left;
+				const isCtrlHeld = e.ctrlKey || e.metaKey;  // Remember if Ctrl is held
+				selectionBox.style.left = selectStartX + "px";
+				selectionBox.style.top = "0px";
+				selectionBox.style.width = "0px";
+				selectionBox.style.height = "32px";
+				selectionBox.style.display = "block";
+
+				const handleSelectMove = (moveEvent) => {
+					if (!isSelectDragging) return;
+
+					const currentX = moveEvent.clientX - eventsDiv.getBoundingClientRect().left;
+					const startX = Math.min(selectStartX, currentX);
+					const endX = Math.max(selectStartX, currentX);
+					const width = endX - startX;
+
+					selectionBox.style.left = startX + "px";
+					selectionBox.style.width = width + "px";
+				};
+
+				const handleSelectEnd = (upEvent) => {
+					if (!isSelectDragging) return;
+					isSelectDragging = false;
+					selectionBox.style.display = "none";
+
+					const currentX = upEvent.clientX - eventsDiv.getBoundingClientRect().left;
+					const startX = Math.min(selectStartX, currentX);
+					const endX = Math.max(selectStartX, currentX);
+					dragDistance = Math.abs(endX - startX);  // Track the drag distance
+					
+					// Calculate time accounting for viewport offset on long waves
+					const isLongWave = timeline.duration > 60;
+					const viewportDuration = isLongWave ? 60 : timeline.duration;
+					const startTime = (startX / TRACK_WIDTH) * viewportDuration + timelineOffset;
+					const endTime = (endX / TRACK_WIDTH) * viewportDuration + timelineOffset;
+
+					// If NOT Ctrl+drag: clear ALL selections first
+					if (!isCtrlHeld) {
+						MOB_TYPES.forEach(m => selectedEvents[m].clear());
+					}
+
+					// Select ONLY events in the drag range
+					timeline.mobs[mob].forEach((evt, eventIdx) => {
+						if (evt.time >= startTime && evt.time <= endTime) {
+							selectedEvents[mob].add(eventIdx);
+						}
+					});
+
+					// Render all tracks to show updated selections
+					MOB_TYPES.forEach(m => {
+						if (renderAllDots[m]) renderAllDots[m]();
+					});
+
+					document.removeEventListener("mousemove", handleSelectMove);
+					document.removeEventListener("mouseup", handleSelectEnd);
+				};
+
+				document.addEventListener("mousemove", handleSelectMove);
+				document.addEventListener("mouseup", handleSelectEnd);
+			});
+
+			// Click on empty track to create event or deselect
+			eventsDiv.addEventListener("click", (e) => {
+				// Don't react if we just had significant drag
+				if (isDotDragging || isSelectDragging) return;
+				if (dragDistance > 3) return;  // Simple drag threshold
+				if (e.target.getAttribute("data-event-dot") === "true") return;
+
+				e.stopPropagation();  // Stop propagation to prevent global deselect handler
+
+				const rect = eventsDiv.getBoundingClientRect();
+				const clickX = e.clientX - rect.left;
+				
+				// Calculate clicked time accounting for viewport offset
+				const isLongWave = timeline.duration > 60;
+				const viewportDuration = isLongWave ? 60 : timeline.duration;
+				let clickedTime = (clickX / TRACK_WIDTH) * viewportDuration + timelineOffset;
+				clickedTime = snapToGrid(clickedTime);
+				clickedTime = Math.max(0, Math.min(timeline.duration - 0.01, clickedTime));
+
+				// Check collision
+				const collision = timeline.mobs[mob].some(evt => Math.abs(evt.time - clickedTime) < 0.5);
+				if (collision) {
+					return;
+				}
+
+				// Deselect all events in all mobs
+				MOB_TYPES.forEach(m => selectedEvents[m].clear());
+
+				// Add new event and select it
+				timeline.mobs[mob].push({ time: clickedTime, amount: 1, mode: 'event' });
+				const newEventIndex = timeline.mobs[mob].length - 1;  // Index of newly created event
+				selectedEvents[mob].add(newEventIndex);  // Select the new event
+				// Render all tracks to deselect others and show new event selected
+				MOB_TYPES.forEach(m => {
+					if (renderAllDots[m]) renderAllDots[m]();
+				});
+			});
+
+			// Suppress context menu on empty track, only allow on events
+			eventsDiv.addEventListener("contextmenu", (e) => {
+				if (e.target.getAttribute("data-event-dot") !== "true") {
+					e.preventDefault();
+				}
 			});
 
 			track.appendChild(eventsDiv);
-
-			// Click on slider to add dot at clicked position
-			eventsDiv.addEventListener("click", (clickEvent) => {
-				// Only create event if not dragging (left button released click)
-				if (isDragging) return;
-				
-				const rect = eventsDiv.getBoundingClientRect();
-				const clickX = clickEvent.clientX - rect.left;
-				
-				// Calculate time from click position
-				let clickedTime = (clickX / TRACK_WIDTH) * timeline.duration;
-				clickedTime = snapToGrid(clickedTime);
-				clickedTime = Math.max(0, Math.min(timeline.duration - 0.01, clickedTime));
-				
-				// Check for collision with existing events (within 0.5s tolerance)
-				const collision = timeline.mobs[mob].some(evt => Math.abs(evt.time - clickedTime) < 0.5);
-				if (collision) {
-					console.log(`[TimelineEditor] Cannot add: dot already exists near ${clickedTime}s`);
-					return;
-				}
-				
-				// Add new event with default amount of 1 and event mode
-				timeline.mobs[mob].push({ time: clickedTime, amount: 1, mode: 'event' });
-				console.log(`[TimelineEditor] Added event by click: wave ${waveNum}, mob ${mob}, time=${clickedTime}s, amount=1, mode=event`);
-				
-				renderTimelineTrack(waveNum);
-			});
 
 			// Input controls for adding new events
 			const inputWrap = document.createElement("div");
@@ -610,28 +925,29 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 				// Check for collision with existing events at this time (within 0.5s tolerance)
 				const collision = timeline.mobs[mob].some(evt => Math.abs(evt.time - newTime) < 0.5);
 				if (collision) {
-					console.log(`[TimelineEditor] Cannot add: dot already exists near ${newTime}s`);
 					return;
 				}
 				
+				// Deselect all events in all mobs
+				MOB_TYPES.forEach(m => selectedEvents[m].clear());
+
 				// Add events - if interval mode, create individual events for each spawn time
 				const eventMode = modeSelect.value || 'event';
 				if (eventMode === 'interval') {
 					// Expand interval into individual events
 					let currentTime = newTime;
 					let addedCount = 0;
+					const startIndex = timeline.mobs[mob].length;
 					while (currentTime <= timeline.duration) {
 						timeline.mobs[mob].push({ time: currentTime, amount: newAmount, mode: 'event' });
+						selectedEvents[mob].add(timeline.mobs[mob].length - 1);  // Select each new event
 						addedCount++;
 						currentTime += newTime;  // newTime is the interval duration
 					}
-					console.log(`[TimelineEditor] Added ${addedCount} dots from interval: wave ${currentWaveNum}, mob ${mob}, start=${newTime}s, interval=${newTime}s, amount=${newAmount}`);
 				} else {
 					timeline.mobs[mob].push({ time: newTime, amount: newAmount, mode: 'event' });
-					console.log(`[TimelineEditor] Added event: wave ${currentWaveNum}, mob ${mob}, time=${newTime}s, amount=${newAmount}, mode=event`);
+					selectedEvents[mob].add(timeline.mobs[mob].length - 1);  // Select the new event
 				}
-				console.log(`[TimelineEditor] Timeline data now:`, JSON.stringify(timeline));
-				
 				// Clear inputs
 				timeInput.value = '';
 				amountInput.value = '';
@@ -657,7 +973,6 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 				const currentWaveNum = Math.max(1, selectedWaveState.value || 1);
 				const timeline = loadTimelineData(currentWaveNum);
 				timeline.mobs[mob] = [];
-				console.log(`[TimelineEditor] Cleared all events for ${mob} on wave ${currentWaveNum}`);
 				renderTimelineTrack(currentWaveNum);
 			};
 			inputWrap.appendChild(clearBtn);
@@ -668,6 +983,21 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 		});
 	}
 
+	// Global click handler to deselect when clicking outside tracks
+	document.addEventListener("click", (e) => {
+		// Only deselect if not clicking on an event dot
+		if (e.target.getAttribute("data-event-dot") === "true") return;
+		// Only deselect if not inside any track
+		if (timelineTracksDiv.contains(e.target)) return;
+		
+		// Clear selection on all mobs
+		MOB_TYPES.forEach(m => selectedEvents[m].clear());
+		// Render all tracks to deselect
+		MOB_TYPES.forEach(m => {
+			if (renderAllDots[m]) renderAllDots[m]();
+		});
+	});
+
 	const waveNumValue = Math.max(1, selectedWaveState.value || 1);
 	renderTimelineTrack(waveNumValue);
 
@@ -675,6 +1005,7 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 		const currentWaveNum = Math.max(1, selectedWaveState.value || 1);
 		const timeline = loadTimelineData(currentWaveNum);
 		timeline.duration = Math.max(1, Number(durationInput.value) || 30);
+		timelineOffset = 0;  // Reset viewport scroll when duration changes
 		renderTimelineTrack(currentWaveNum);
 	});
 
@@ -682,7 +1013,6 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 		const currentWaveNum = Math.max(1, selectedWaveState.value || 1);
 		const timeline = loadTimelineData(currentWaveNum);
 		timeline.endCondition = endConditionSelect.value || 'duration';
-		console.log(`[TimelineEditor] Wave ${currentWaveNum} end condition set to: ${timeline.endCondition}`);
 	});
 
 	return {
@@ -698,7 +1028,6 @@ function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 		saveWorkingCopy: (targetWaveNum) => {
 			if (window._timelineWorkingCopy.data) {
 				waveTimelines[targetWaveNum] = deepCopyTimeline(window._timelineWorkingCopy.data);
-				console.log(`[TimelineEditor] Working copy saved to wave ${targetWaveNum}`);
 			}
 		},
 		// Discard working copy (called when user loads a different wave or clears)
