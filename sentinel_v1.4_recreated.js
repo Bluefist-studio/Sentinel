@@ -2,36 +2,72 @@
   window.resetBytes = function() {
     window.totalCollectedBytes = 0;
     localStorage.setItem('sentinel.collectedBytes.v1', '0');
-    console.log('✓ Bytes reset to 0');
   };
 
   window.giveBytes100 = function() {
     window.totalCollectedBytes = 100;
     localStorage.setItem('sentinel.collectedBytes.v1', '100');
-    console.log('✓ 100 Bytes granted');
   };
 
   // God mode - player takes no damage
   window.godMode = false;
   window.toggleGodMode = function() {
     window.godMode = !window.godMode;
-    console.log('✓ God Mode ' + (window.godMode ? 'ENABLED' : 'DISABLED'));
   };
 
   // Wave unlock system console commands
   window.showUnlockedWaves = function() {
     const unlockedWaves = typeof getUnlockedWaves === 'function' ? getUnlockedWaves() : [1];
-    console.log('✓ Unlocked Waves:', unlockedWaves);
   };
 
   window.unlockAllWaves = function() {
-    localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify([1, 5, 10, 20]));
-    console.log('✓ All waves unlocked');
+    localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify(Array.from({length: 30}, (_, i) => i + 1)));
   };
 
   window.resetWaveProgress = function() {
     localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify([1]));
-    console.log('✓ Wave progress reset (only Wave 1 unlocked)');
+  };
+
+  // Milestone wave controls (independent of difficulty)
+  const MILESTONE_WAVES = [1, 5, 10, 20, 30, 40];
+
+  window.unlockAllMilestones = function() {
+    MILESTONE_WAVES.forEach(wave => {
+      const unlocked = JSON.parse(localStorage.getItem('sentinel.unlockedWaves.v1') || '[1]');
+      if (!unlocked.includes(wave)) {
+        unlocked.push(wave);
+      }
+      localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify(unlocked.sort((a,b) => a-b)));
+    });
+  };
+
+  window.lockAllMilestones = function() {
+    let unlocked = JSON.parse(localStorage.getItem('sentinel.unlockedWaves.v1') || '[1]');
+    unlocked = unlocked.filter(wave => !MILESTONE_WAVES.includes(wave) || wave === 1);
+    localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify(unlocked));
+  };
+
+  window.unlockMilestone = function(wave) {
+    if (!MILESTONE_WAVES.includes(wave)) {
+      return;
+    }
+    const unlocked = JSON.parse(localStorage.getItem('sentinel.unlockedWaves.v1') || '[1]');
+    if (!unlocked.includes(wave)) {
+      unlocked.push(wave);
+      localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify(unlocked.sort((a,b) => a-b)));
+    }
+  };
+
+  window.lockMilestone = function(wave) {
+    if (!MILESTONE_WAVES.includes(wave)) {
+      return;
+    }
+    if (wave === 1) {
+      return;
+    }
+    let unlocked = JSON.parse(localStorage.getItem('sentinel.unlockedWaves.v1') || '[1]');
+    unlocked = unlocked.filter(w => w !== wave);
+    localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify(unlocked));
   };
 
   // Fade out and stop menu ambience audio
@@ -68,7 +104,6 @@
       let playPromise = ambience.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
-          console.log('Audio play failed:', error);
         });
       }
       window._menuAmbienceAudio = ambience;
@@ -98,8 +133,6 @@ window.resetAllProtocolDiscovery = function() {
     window.ProtocolSystem.resetDiscovery();
   } else if (typeof ProtocolSystem !== 'undefined' && typeof ProtocolSystem.resetDiscovery === 'function') {
     ProtocolSystem.resetDiscovery();
-  } else {
-    console.warn('ProtocolSystem.resetDiscovery not found');
   }
 };
 
@@ -110,11 +143,6 @@ window.addEventListener('keydown', function(e) {
   if ((e.key === 'p' || e.key === 'P') && !window._debugKeyDown) {
     window.debugFramerateEnabled = !window.debugFramerateEnabled;
     window._debugKeyDown = true;
-    if (window.debugFramerateEnabled) {
-      console.log('[DEBUG] Framerate debug ENABLED');
-    } else {
-      console.log('[DEBUG] Framerate debug DISABLED');
-    }
     e.preventDefault();
   }
 });
@@ -227,6 +255,993 @@ window.onload = function () {
     showMenu();
   });
   // Menu screen
+  function startGame(difficulty, startStatPoints, startHealth) {
+    window.sentinelDifficulty = difficulty;
+    ProtocolSystem.setStarters(window._pendingStarterProtocols || []);
+    showMenuScreen = false;
+    fadeOutMenuAmbience();
+    restartGame();
+    statPoints = startStatPoints;
+    player.health = player.maxHealth = startHealth;
+    
+    // Initialize timeline codes for waves 1-15 from default codes
+    if (window.SentinelWaveControl && typeof window.SentinelWaveControl.getWaveEditorCodes === "function") {
+      const allCodes = window.SentinelWaveControl.getWaveEditorCodes();
+      if (window.SentinelEditor && typeof window.SentinelEditor.decodeWaveCode === "function") {
+        for (let w = 1; w <= 15; w++) {
+          const code = allCodes[w];
+          if (code && !window._editorWaveOverride?.[w]) {
+            try {
+              const decoded = window.SentinelEditor.decodeWaveCode(code);
+              const waveCfg = decoded[w];
+              if (waveCfg && waveCfg.timelineMode && waveCfg.timeline) {
+                window._editorWaveOverride = window._editorWaveOverride || {};
+                window._editorWaveOverride[w] = {
+                  timelineMode: true,
+                  timeline: waveCfg.timeline,
+                  _source: 'gameStartup'
+                };
+              }
+            } catch (err) {
+            }
+          }
+        }
+      }
+    }
+    
+    // Set starting wave and level based on player selection
+    if (window._selectedStartWave !== undefined) {
+      wave = window._selectedStartWave;
+      if (window._selectedStartLevel !== undefined) {
+        level = window._selectedStartLevel;
+        // Calculate xpToLevel based on current level using the game formula
+        xpToLevel = Math.floor(10 + Math.pow(level, 1.8));
+        statPoints = Math.max(0, startStatPoints + (level - 1) * 2);
+      }
+    }
+    
+    spawnWave();
+    gameStarted = true;
+  }
+  function showStarterProtocolModal(difficulty, startStatPoints, startHealth, source = "wave") {
+    const discoveredProtocols = ProtocolSystem.getDiscovered();
+    const starterOverlay = document.createElement("div");
+    starterOverlay.id = "starterProtocolOverlay";
+    starterOverlay.style.position = "fixed";
+    starterOverlay.style.left = 0;
+    starterOverlay.style.top = 0;
+    starterOverlay.style.width = "100vw";
+    starterOverlay.style.height = "100vh";
+    starterOverlay.style.background = "rgba(0,0,0,0.95)";
+    starterOverlay.style.display = "flex";
+    starterOverlay.style.flexDirection = "column";
+    starterOverlay.style.justifyContent = "center";
+    starterOverlay.style.alignItems = "center";
+    starterOverlay.style.zIndex = 1002;
+
+    const panel = document.createElement("div");
+    panel.style.width = "90vw";
+    panel.style.maxWidth = "1100px";
+    panel.style.maxHeight = "85vh";
+    panel.style.background = "rgba(0, 20, 30, 0.98)";
+    panel.style.border = "2px solid #00ffdd";
+    panel.style.borderRadius = "10px";
+    panel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+    panel.style.display = "flex";
+    panel.style.flexDirection = "column";
+    panel.style.padding = "20px";
+    starterOverlay.appendChild(panel);
+
+    const title = document.createElement("h2");
+    title.textContent = "PROTOCOLS DATABASE";
+    title.style.color = "#00ffdd";
+    title.style.margin = "0 0 8px 0";
+    title.style.textAlign = "center";
+    panel.appendChild(title);
+
+    const subtitle = document.createElement("div");
+    subtitle.textContent = "Choose up to 2 discovered protocols to start your run with.";
+    subtitle.style.color = "#aaf6ff";
+    subtitle.style.fontSize = "0.95rem";
+    subtitle.style.textAlign = "center";
+    subtitle.style.marginBottom = "14px";
+    panel.appendChild(subtitle);
+
+    // Add bytes display
+    const bytesDisplay = document.createElement("div");
+    bytesDisplay.style.color = "#00ffdd";
+    bytesDisplay.style.textAlign = "center";
+    bytesDisplay.style.marginBottom = "12px";
+    bytesDisplay.style.fontSize = "1rem";
+    bytesDisplay.style.fontWeight = "bold";
+    const playerBytes = totalCollectedBytes || 0;
+    bytesDisplay.textContent = `Bytes: ${playerBytes}`;
+    panel.appendChild(bytesDisplay);
+
+    const selectionCount = document.createElement("div");
+    selectionCount.style.color = "#00ffdd";
+    selectionCount.style.textAlign = "center";
+    selectionCount.style.marginBottom = "10px";
+    panel.appendChild(selectionCount);
+
+    // Add total stat change display
+    const totalStatDiv = document.createElement("div");
+    totalStatDiv.style.color = "#aaf6ff";
+    totalStatDiv.style.textAlign = "center";
+    totalStatDiv.style.marginBottom = "10px";
+    totalStatDiv.setAttribute('data-stat-total', 'true');
+    panel.appendChild(totalStatDiv);
+
+    const content = document.createElement("div");
+    content.style.flex = "1";
+    content.style.overflowY = "auto";
+    content.style.border = "1px solid rgba(0,255,221,0.25)";
+    content.style.borderRadius = "8px";
+    content.style.padding = "12px";
+    panel.appendChild(content);
+
+    // Modal helper functions
+    function showUpgradeConfirmModal(message, onConfirm, isDowngrade = false) {
+      const confirmOverlay = document.createElement("div");
+      confirmOverlay.style.position = "fixed";
+      confirmOverlay.style.left = "0";
+      confirmOverlay.style.top = "0";
+      confirmOverlay.style.width = "100vw";
+      confirmOverlay.style.height = "100vh";
+      confirmOverlay.style.background = "rgba(0, 0, 0, 0.74)";
+      confirmOverlay.style.display = "flex";
+      confirmOverlay.style.alignItems = "center";
+      confirmOverlay.style.justifyContent = "center";
+      confirmOverlay.style.zIndex = "1105";
+
+      const confirmPanel = document.createElement("div");
+      confirmPanel.style.width = "min(460px, 90vw)";
+      confirmPanel.style.background = "rgba(0, 20, 30, 0.98)";
+      confirmPanel.style.border = "2px solid #00ffdd";
+      confirmPanel.style.borderRadius = "10px";
+      confirmPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      confirmPanel.style.padding = "16px";
+      confirmPanel.style.color = "#c8ffff";
+      confirmPanel.style.fontFamily = "sans-serif";
+      confirmOverlay.appendChild(confirmPanel);
+
+      const confirmMsg = document.createElement("div");
+      confirmMsg.textContent = message;
+      confirmMsg.style.color = "#aaf6ff";
+      confirmMsg.style.fontSize = "0.95rem";
+      confirmMsg.style.lineHeight = "1.4";
+      confirmMsg.style.marginBottom = "14px";
+      confirmPanel.appendChild(confirmMsg);
+
+      const actionRow = document.createElement("div");
+      actionRow.style.display = "flex";
+      actionRow.style.justifyContent = "flex-end";
+      actionRow.style.gap = "8px";
+      confirmPanel.appendChild(actionRow);
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.style.padding = "0.5rem 0.85rem";
+      cancelBtn.style.borderRadius = "6px";
+      cancelBtn.style.border = "1px solid #ffffff";
+      cancelBtn.style.background = "rgba(0,0,0,0.55)";
+      cancelBtn.style.color = "#ffffff";
+      cancelBtn.style.cursor = "pointer";
+      actionRow.appendChild(cancelBtn);
+
+      const confirmBtn = document.createElement("button");
+      confirmBtn.type = "button";
+      confirmBtn.textContent = isDowngrade ? "Downgrade" : "Upgrade";
+      confirmBtn.style.padding = "0.5rem 0.85rem";
+      confirmBtn.style.borderRadius = "6px";
+      confirmBtn.style.border = isDowngrade ? "1px solid #ff6666" : "1px solid #00ffdd";
+      confirmBtn.style.background = "rgba(0,0,0,0.55)";
+      confirmBtn.style.color = isDowngrade ? "#ff6666" : "#00ffdd";
+      confirmBtn.style.cursor = "pointer";
+      actionRow.appendChild(confirmBtn);
+
+      let resolved = false;
+      const closeModal = (confirmed) => {
+        if (resolved) return;
+        resolved = true;
+        document.removeEventListener("keydown", onKeyDown);
+        confirmOverlay.remove();
+        if (confirmed && typeof onConfirm === "function") {
+          onConfirm();
+        }
+      };
+
+      const onKeyDown = (evt) => {
+        if (evt.key === "Escape") {
+          closeModal(false);
+        }
+      };
+
+      cancelBtn.addEventListener("click", () => closeModal(false));
+      confirmBtn.addEventListener("click", () => closeModal(true));
+      confirmOverlay.addEventListener("click", (evt) => {
+        if (evt.target === confirmOverlay) {
+          closeModal(false);
+        }
+      });
+      document.addEventListener("keydown", onKeyDown);
+      document.body.appendChild(confirmOverlay);
+    }
+
+    function showUpgradeInfoModal(titleText, message) {
+      const infoOverlay = document.createElement("div");
+      infoOverlay.style.position = "fixed";
+      infoOverlay.style.left = "0";
+      infoOverlay.style.top = "0";
+      infoOverlay.style.width = "100vw";
+      infoOverlay.style.height = "100vh";
+      infoOverlay.style.background = "rgba(0, 0, 0, 0.74)";
+      infoOverlay.style.display = "flex";
+      infoOverlay.style.alignItems = "center";
+      infoOverlay.style.justifyContent = "center";
+      infoOverlay.style.zIndex = "1105";
+
+      const infoPanel = document.createElement("div");
+      infoPanel.style.width = "min(460px, 90vw)";
+      infoPanel.style.background = "rgba(0, 20, 30, 0.98)";
+      infoPanel.style.border = "2px solid #00ffdd";
+      infoPanel.style.borderRadius = "10px";
+      infoPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      infoPanel.style.padding = "16px";
+      infoPanel.style.color = "#c8ffff";
+      infoPanel.style.fontFamily = "sans-serif";
+      infoOverlay.appendChild(infoPanel);
+
+      const infoTitle = document.createElement("div");
+      infoTitle.textContent = titleText;
+      infoTitle.style.color = "#00ffdd";
+      infoTitle.style.fontWeight = "bold";
+      infoTitle.style.fontSize = "1.05rem";
+      infoTitle.style.marginBottom = "10px";
+      infoPanel.appendChild(infoTitle);
+
+      const infoMessage = document.createElement("div");
+      infoMessage.textContent = message;
+      infoMessage.style.color = "#aaf6ff";
+      infoMessage.style.fontSize = "0.95rem";
+      infoMessage.style.lineHeight = "1.4";
+      infoMessage.style.marginBottom = "14px";
+      infoPanel.appendChild(infoMessage);
+
+      const actionRow = document.createElement("div");
+      actionRow.style.display = "flex";
+      actionRow.style.justifyContent = "flex-end";
+      actionRow.style.gap = "8px";
+      infoPanel.appendChild(actionRow);
+
+      const okBtn = document.createElement("button");
+      okBtn.type = "button";
+      okBtn.textContent = "OK";
+      okBtn.style.padding = "0.5rem 0.85rem";
+      okBtn.style.borderRadius = "6px";
+      okBtn.style.border = "1px solid #00ffdd";
+      okBtn.style.background = "rgba(0,0,0,0.55)";
+      okBtn.style.color = "#00ffdd";
+      okBtn.style.cursor = "pointer";
+      actionRow.appendChild(okBtn);
+
+      let resolved = false;
+      const closeModal = () => {
+        if (resolved) return;
+        resolved = true;
+        document.removeEventListener("keydown", onKeyDown);
+        infoOverlay.remove();
+      };
+
+      const onKeyDown = (evt) => {
+        if (evt.key === "Escape" || evt.key === "Enter") {
+          closeModal();
+        }
+      };
+
+      okBtn.addEventListener("click", closeModal);
+      infoOverlay.addEventListener("click", (evt) => {
+        if (evt.target === infoOverlay) {
+          closeModal();
+        }
+      });
+      document.addEventListener("keydown", onKeyDown);
+      document.body.appendChild(infoOverlay);
+    }
+
+    let selected = Array.isArray(ProtocolSystem.starterProtocols)
+      ? ProtocolSystem.starterProtocols.filter(name => discoveredProtocols.includes(name)).slice(0, 2)
+      : [];
+    const refreshCount = () => {
+      selectionCount.textContent = `Selected: ${selected.length}/2`;
+      // Calculate and display total stat change for selected starters, with color
+      const statTotals = { Range: 0, Power: 0, Intensity: 0, Movement: 0, Health: 0, Pickup: 0 };
+      selected.forEach(protocolName => {
+        const mods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+          ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+          : (PROTOCOLS[protocolName]?.statMods || {});
+        Object.entries(mods).forEach(([stat, value]) => {
+          if (statTotals.hasOwnProperty(stat)) statTotals[stat] += value;
+        });
+      });
+      // Format the stat totals for display with color
+      const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+      const statStrings = statOrder.map(stat => {
+        const v = statTotals[stat];
+        let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
+        let sign = v > 0 ? "+" : (v < 0 ? "" : "");
+        return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
+      });
+      totalStatDiv.innerHTML = `${statStrings.join(", ")}`;
+    };
+
+    if (discoveredProtocols.length === 0) {
+      const noneMsg = document.createElement("div");
+      noneMsg.textContent = "No protocols discovered yet. You will start your run with 0 starter protocols.";
+      noneMsg.style.color = "#ffcc88";
+      noneMsg.style.textAlign = "center";
+      noneMsg.style.padding = "24px";
+      content.appendChild(noneMsg);
+    } else {
+      const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
+      discoveredProtocols.forEach(protocolName => {
+        const family = PROTOCOLS[protocolName]?.family;
+        if (familyGroups[family]) {
+          familyGroups[family].push(protocolName);
+        }
+      });
+
+      Object.entries(familyGroups).forEach(([familyName, protocols]) => {
+        if (protocols.length === 0) return;
+
+        const familyHeader = document.createElement("div");
+        familyHeader.textContent = familyName;
+        familyHeader.style.color = "#00ffdd";
+        familyHeader.style.fontSize = "1.3rem";
+        familyHeader.style.fontWeight = "bold";
+        familyHeader.style.margin = "12px 4px 8px 4px";
+        familyHeader.style.borderBottom = "1px solid rgba(0,255,221,0.45)";
+        familyHeader.style.paddingBottom = "6px";
+        content.appendChild(familyHeader);
+
+        const grid = document.createElement("div");
+        grid.style.display = "grid";
+        grid.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
+        grid.style.gap = "32px";
+        grid.style.marginBottom = "24px";
+        grid.style.paddingLeft = "24px";
+        grid.style.paddingRight = "24px";
+        content.appendChild(grid);
+
+        protocols.forEach(protocolName => {
+
+          const proto = PROTOCOLS[protocolName];
+          const rawUpgradeTier = ProtocolSystem.protocolBoard[protocolName]?.upgradeTier;
+          const upgradeTier = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
+            ? ProtocolSystem.normalizeUpgradeTier(rawUpgradeTier)
+            : (rawUpgradeTier || (ProtocolSystem.upgradeTiers?.[0] || "Trivial"));
+          const effectiveStarterMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+            ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+            : proto.statMods;
+          const card = document.createElement("button");
+          card.type = "button";
+          card.style.position = "relative";
+          card.style.textAlign = "left";
+          card.style.padding = "8px";
+          card.style.borderRadius = "8px";
+          card.style.border = "2px solid #00ffdd";
+          card.style.background = "rgba(0, 77, 92, 0.7)";
+          card.style.color = "#00ffdd";
+          card.style.cursor = "pointer";
+          card.style.transition = "all 0.15s";
+          card.style.minHeight = "200px";
+          card.style.display = "flex";
+          card.style.flexDirection = "column";
+
+          const currentTierIndex = (typeof ProtocolSystem.getUpgradeTierIndex === "function")
+            ? ProtocolSystem.getUpgradeTierIndex(upgradeTier)
+            : 0;
+          const totalTierCount = (Array.isArray(ProtocolSystem.upgradeTiers) && ProtocolSystem.upgradeTiers.length > 0)
+            ? ProtocolSystem.upgradeTiers.length
+            : 6;
+          const nextUpgradeCost = (typeof ProtocolSystem.getNextUpgradeCost === "function")
+            ? ProtocolSystem.getNextUpgradeCost(protocolName)
+            : null;
+          
+          // Calculate downgrade refund: it's the cost to upgrade from previous tier to current
+          let downgradeRefund = null;
+          if (currentTierIndex > 0 && typeof ProtocolSystem.getNextUpgradeCost === "function") {
+            const protocolState = ProtocolSystem.protocolBoard[protocolName];
+            if (protocolState) {
+              const currentTier = protocolState.upgradeTier;
+              const prevTier = ProtocolSystem.upgradeTiers[currentTierIndex - 1];
+              // Temporarily set to previous tier, get cost to upgrade from it
+              protocolState.upgradeTier = prevTier;
+              downgradeRefund = ProtocolSystem.getNextUpgradeCost(protocolName);
+              // Restore original tier
+              protocolState.upgradeTier = currentTier;
+            }
+          }
+
+          const mods = Object.entries(effectiveStarterMods)
+            .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k}`)
+            .join(", ");
+
+          card.innerHTML = `<div style="font-weight:bold; margin-bottom:8px; color:#00ffdd; font-size:1rem;">${protocolName}</div>
+                            <div style="color:#aaf6ff; font-size:0.85rem; margin-bottom:8px;">${proto.rarity} ${proto.tier}</div>
+                            <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:8px;">${proto.intent || "Unknown"}</div>
+                            <div style="color:#00ff88; font-size:0.8rem; margin-bottom:8px; line-height:1; min-height:2.1em; overflow:hidden;" data-mods>${mods || "No mods"}</div>
+                            <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:0px;" data-tier-info>${upgradeTier} (${currentTierIndex + 1}/${totalTierCount})</div>
+                            <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px; margin-bottom:0px;">
+                              <button class="upgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; background:rgba(0,0,0,0.4); color:${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; font-size:0.78rem; cursor:${nextUpgradeCost === null ? "default" : "pointer"}; opacity:${nextUpgradeCost === null ? "0.65" : "1"};">Upgrade (${nextUpgradeCost === null ? "MAX" : `-${nextUpgradeCost}B`})</button>
+                              <button class="downgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${currentTierIndex > 0 ? "#ff6666" : "#550000"}; background:rgba(0,0,0,0.4); color:${currentTierIndex > 0 ? "#ff6666" : "#555"}; font-size:0.78rem; cursor:${currentTierIndex > 0 ? "pointer" : "default"}; opacity:${currentTierIndex > 0 ? "1" : "0.65"};">Downgrade${currentTierIndex > 0 && downgradeRefund ? ` (+${downgradeRefund}B)` : ""}</button>
+                            </div>`;
+
+          // Add button event listeners after setting innerHTML
+          const upgradeBtn = card.querySelector(".upgrade-btn");
+          const downgradeBtn = card.querySelector(".downgrade-btn");
+
+          if (upgradeBtn) {
+            upgradeBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              if (nextUpgradeCost === null) return;
+              if (totalCollectedBytes < nextUpgradeCost) {
+                showUpgradeInfoModal(
+                  "INSUFFICIENT BYTES",
+                  `Not enough Bytes. You need ${nextUpgradeCost}, you have ${totalCollectedBytes}.`
+                );
+                return;
+              }
+              const nextTierName = ProtocolSystem.getNextUpgradeTierName(protocolName);
+              showUpgradeConfirmModal(
+                `Upgrade ${protocolName} to ${nextTierName} for ${nextUpgradeCost} Bytes?`,
+                () => {
+                  const result = ProtocolSystem.upgradeProtocol(protocolName, totalCollectedBytes);
+                  if (result.success) {
+                    totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
+                    saveCollectedBytes();
+                    bytesDisplay.textContent = `Bytes: ${totalCollectedBytes}`;
+                    // Update the card with new tier info
+                    const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
+                    const totalTierCount = ProtocolSystem.upgradeTiers.length;
+                    const newNextUpgradeCost = ProtocolSystem.getNextUpgradeCost(protocolName);
+                    card.querySelector('[data-tier-info]').textContent = `${result.newTier} (${newTierIndex + 1}/${totalTierCount})`;
+                    // Update mods based on new tier
+                    const newEffectiveMods = ProtocolSystem.getProtocolEffectiveMods(protocolName);
+                    const newModsText = Object.entries(newEffectiveMods)
+                      .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k}`)
+                      .join(", ");
+                    card.querySelector('[data-mods]').textContent = newModsText || "No mods";
+                    const upgradeBtnEl = card.querySelector('.upgrade-btn');
+                    if (upgradeBtnEl) {
+                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${newNextUpgradeCost}B)`;
+                      upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#005500' : '#00ffdd';
+                      upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#005500' : '#00ffdd'}`;
+                      upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
+                      upgradeBtnEl.style.cursor = newNextUpgradeCost === null ? 'default' : 'pointer';
+                      upgradeBtnEl.disabled = newNextUpgradeCost === null;
+                    }
+                    // Update downgrade button to become available if upgraded from Trivial
+                    const newDowngradeRefund = (newTierIndex > 0 && typeof ProtocolSystem.getNextUpgradeCost === 'function') 
+                      ? (() => {
+                          const state = ProtocolSystem.protocolBoard[protocolName];
+                          const prevTier = ProtocolSystem.upgradeTiers[newTierIndex - 1];
+                          state.upgradeTier = prevTier;
+                          const refund = ProtocolSystem.getNextUpgradeCost(protocolName);
+                          state.upgradeTier = result.newTier;
+                          return refund;
+                        })()
+                      : null;
+                    const downgradeBtnEl = card.querySelector('.downgrade-btn');
+                    if (downgradeBtnEl) {
+                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && newDowngradeRefund ? ` (+${newDowngradeRefund}B)` : ''}`;
+                      downgradeBtnEl.style.color = newTierIndex > 0 ? '#ff6666' : '#555';
+                      downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? '#ff6666' : '#550000'}`;
+                      downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
+                      downgradeBtnEl.style.cursor = newTierIndex > 0 ? 'pointer' : 'default';
+                      downgradeBtnEl.disabled = newTierIndex <= 0;
+                    }
+                    // Update total stat display
+                    const statTotalDiv = document.querySelector('[data-stat-total]');
+                    if (statTotalDiv && typeof selected !== 'undefined') {
+                      const statTotals = { Range: 0, Power: 0, Intensity: 0, Movement: 0, Health: 0, Pickup: 0 };
+                      selected.forEach(pName => {
+                        const mods = (typeof ProtocolSystem.getProtocolEffectiveMods === 'function')
+                          ? ProtocolSystem.getProtocolEffectiveMods(pName)
+                          : (PROTOCOLS[pName]?.statMods || {});
+                        Object.entries(mods).forEach(([stat, value]) => {
+                          if (statTotals.hasOwnProperty(stat)) statTotals[stat] += value;
+                        });
+                      });
+                      const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+                      const statStrings = statOrder.map(stat => {
+                        const v = statTotals[stat];
+                        let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
+                        let sign = v > 0 ? "+" : (v < 0 ? "" : "");
+                        return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
+                      });
+                      statTotalDiv.innerHTML = `${statStrings.join(", ")}`;
+                    }
+                  }
+                }
+              );
+            });
+          }
+
+          if (downgradeBtn) {
+            downgradeBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              if (currentTierIndex <= 0) return;
+              showUpgradeConfirmModal(
+                `Downgrade ${protocolName} to ${ProtocolSystem.upgradeTiers[currentTierIndex - 1]} and refund ${downgradeRefund ? downgradeRefund + " Bytes" : "last upgrade cost"}?`,
+                () => {
+                  const result = ProtocolSystem.downgradeProtocol(protocolName);
+                  if (result.success) {
+                    totalCollectedBytes += result.refund || 0;
+                    saveCollectedBytes();
+                    bytesDisplay.textContent = `Bytes: ${totalCollectedBytes}`;
+                    // Update the card with new tier info
+                    const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
+                    const totalTierCount = ProtocolSystem.upgradeTiers.length;
+                    const newNextUpgradeCost = ProtocolSystem.getNextUpgradeCost(protocolName);
+                    card.querySelector('[data-tier-info]').textContent = `${result.newTier} (${newTierIndex + 1}/${totalTierCount})`;
+                    // Update mods based on new tier
+                    const newEffectiveModsDowngrade = ProtocolSystem.getProtocolEffectiveMods(protocolName);
+                    const newModsTextDowngrade = Object.entries(newEffectiveModsDowngrade)
+                      .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k}`)
+                      .join(", ");
+                    card.querySelector('[data-mods]').textContent = newModsTextDowngrade || "No mods";
+                    const downgradeRefundNew = (newTierIndex > 0 && typeof ProtocolSystem.getNextUpgradeCost === 'function') 
+                      ? (() => {
+                          const state = ProtocolSystem.protocolBoard[protocolName];
+                          const prevTier = ProtocolSystem.upgradeTiers[newTierIndex - 1];
+                          state.upgradeTier = prevTier;
+                          const refund = ProtocolSystem.getNextUpgradeCost(protocolName);
+                          state.upgradeTier = result.newTier;
+                          return refund;
+                        })()
+                      : null;
+                    // Update downgrade button display
+                    const downgradeBtnEl = card.querySelector('.downgrade-btn');
+                    if (downgradeBtnEl) {
+                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && downgradeRefundNew ? ` (+${downgradeRefundNew}B)` : ''}`;
+                      downgradeBtnEl.style.color = newTierIndex > 0 ? '#ff6666' : '#555';
+                      downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? '#ff6666' : '#550000'}`;
+                      downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
+                      downgradeBtnEl.style.cursor = newTierIndex > 0 ? 'pointer' : 'default';
+                      downgradeBtnEl.disabled = newTierIndex <= 0;
+                    }
+                    const upgradeBtnEl = card.querySelector('.upgrade-btn');
+                    if (upgradeBtnEl) {
+                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${newNextUpgradeCost}B)`;
+                      upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#005500' : '#00ffdd';
+                      upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#005500' : '#00ffdd'}`;
+                      upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
+                      upgradeBtnEl.style.cursor = newNextUpgradeCost === null ? 'default' : 'pointer';
+                      upgradeBtnEl.disabled = newNextUpgradeCost === null;
+                    }
+                    // Update total stat display
+                    const statTotalDiv = document.querySelector('[data-stat-total]');
+                    if (statTotalDiv && typeof selected !== 'undefined') {
+                      const statTotals = { Range: 0, Power: 0, Intensity: 0, Movement: 0, Health: 0, Pickup: 0 };
+                      selected.forEach(pName => {
+                        const mods = (typeof ProtocolSystem.getProtocolEffectiveMods === 'function')
+                          ? ProtocolSystem.getProtocolEffectiveMods(pName)
+                          : (PROTOCOLS[pName]?.statMods || {});
+                        Object.entries(mods).forEach(([stat, value]) => {
+                          if (statTotals.hasOwnProperty(stat)) statTotals[stat] += value;
+                        });
+                      });
+                      const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+                      const statStrings = statOrder.map(stat => {
+                        const v = statTotals[stat];
+                        let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
+                        let sign = v > 0 ? "+" : (v < 0 ? "" : "");
+                        return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
+                      });
+                      statTotalDiv.innerHTML = `${statStrings.join(", ")}`;
+                    }
+                  }
+                },
+                true
+              );
+            });
+          }
+
+          // Tooltip: compare stat change if selected vs unselected
+          card.addEventListener("mouseenter", () => {
+            // Show stat difference using: (x - a) + y and (x - b) + y
+            const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+            const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
+            const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+              ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+              : (PROTOCOLS[protocolName]?.statMods || {});
+            let html = `<div style='min-width:220px; max-width:340px; font-family:sans-serif; font-size:1em; background:rgba(0,20,30,0.98); border-radius:10px; border:2px solid #00ffdd; box-shadow:0 0 18px #00ffdd44; padding:12px 14px;'>`;
+            if (selected.length === 0) {
+              html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:4px;'>No protocol selected</div>`;
+            } else if (selected.length === 1) {
+              // Only one selected: show (x - a) + y, where x = a
+              const aName = selected[0];
+              const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(aName)
+                : (PROTOCOLS[aName]?.statMods || {});
+              // x = a
+              // (x - a) + y = y
+              html += `<div style='color:#00ffdd; font-size:1.01em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${aName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
+              html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
+              html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+              html += statOrder.map(stat => {
+                const x = Number(aMods[stat]) || 0;
+                const c = Number(hoveredMods[stat]) || 0;
+                let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
+                let cStr = c < 0 ? c.toString() : c.toString();
+                return `<div style='display:flex; align-items:center;'><span style='width:70px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:18px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 4px;'>→</span> <span style='color:${color}; min-width:18px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
+              }).join("");
+              html += `</div>`;
+              html += `</div>`;
+            } else if (selected.length === 2) {
+              // Two selected: show (x - a) + y and (x - b) + y side by side
+              const aName = selected[0];
+              const bName = selected[1];
+              const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(aName)
+                : (PROTOCOLS[aName]?.statMods || {});
+              const bMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(bName)
+                : (PROTOCOLS[bName]?.statMods || {});
+              // x = a + b
+              // (x - a) + y = c
+              html += `<div style='display:grid; grid-template-columns:1fr 1fr; gap:12px;'>`;
+              
+              // Column 1: Protocol A
+              html += `<div>`;
+              html += `<div style='color:#00ffdd; font-size:0.95em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${aName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
+              html += `<div style='font-size:0.92em;'>`;
+              html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+              html += statOrder.map(stat => {
+                const a = Number(aMods[stat]) || 0;
+                const b = Number(bMods[stat]) || 0;
+                const y = Number(hoveredMods[stat]) || 0;
+                const x = a + b;
+                const c = b + y;
+                let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
+                let cStr = c < 0 ? c.toString() : c.toString();
+                return `<div style='display:flex; align-items:center;'><span style='width:60px; display:inline-block; font-size:0.9em;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:16px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 3px;'>→</span> <span style='color:${color}; min-width:16px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
+              }).join("");
+              html += `</div>`;
+              html += `</div>`;
+              html += `</div>`;
+              
+              // Column 2: Protocol B
+              html += `<div>`;
+              html += `<div style='color:#00ffdd; font-size:0.95em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${bName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
+              html += `<div style='font-size:0.92em;'>`;
+              html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+              html += statOrder.map(stat => {
+                const a = Number(aMods[stat]) || 0;
+                const b = Number(bMods[stat]) || 0;
+                const y = Number(hoveredMods[stat]) || 0;
+                const x = a + b;
+                const d = a + y;
+                let color = d > x ? "#00ff88" : d < x ? "#ff4444" : "#bbbbbb";
+                let dStr = d < 0 ? d.toString() : d.toString();
+                return `<div style='display:flex; align-items:center;'><span style='width:60px; display:inline-block; font-size:0.9em;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:16px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 3px;'>→</span> <span style='color:${color}; min-width:16px; display:inline-block; text-align:right;'>${dStr}</span></div>`;
+              }).join("");
+              html += `</div>`;
+              html += `</div>`;
+              html += `</div>`;
+              
+              html += `</div>`;
+            }
+            html += `</div>`;
+            let tooltip = document.createElement("div");
+            tooltip.innerHTML = html;
+            tooltip.style.position = "fixed";
+            tooltip.style.zIndex = 9999;
+            tooltip.style.pointerEvents = "none";
+            document.body.appendChild(tooltip);
+            function moveTooltip(e) {
+              tooltip.style.left = (e.clientX + 18) + "px";
+              tooltip.style.top = (e.clientY + 8) + "px";
+            }
+            moveTooltip(window.event || {});
+            card._tooltip = tooltip;
+            card.addEventListener("mousemove", moveTooltip);
+          });
+          card.addEventListener("mouseleave", () => {
+            if (card._tooltip) {
+              document.body.removeChild(card._tooltip);
+              card._tooltip = null;
+            }
+            card.removeEventListener("mousemove", () => {});
+          });
+
+          const favoriteBadge = document.createElement("div");
+          favoriteBadge.textContent = "✶";
+          favoriteBadge.title = "Toggle favorite";
+          favoriteBadge.style.position = "absolute";
+          favoriteBadge.style.top = "8px";
+          favoriteBadge.style.right = "8px";
+          favoriteBadge.style.width = "20px";
+          favoriteBadge.style.height = "20px";
+          favoriteBadge.style.boxSizing = "border-box";
+          favoriteBadge.style.borderRadius = "50%";
+          favoriteBadge.style.border = "1px solid #00ffdd";
+          favoriteBadge.style.background = "rgba(0, 35, 40, 0.92)";
+          favoriteBadge.style.fontWeight = "bold";
+          favoriteBadge.style.fontSize = "1.1rem";
+          favoriteBadge.style.lineHeight = "1";
+          favoriteBadge.style.display = "flex";
+          favoriteBadge.style.alignItems = "center";
+          favoriteBadge.style.justifyContent = "center";
+          favoriteBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+          favoriteBadge.style.cursor = "pointer";
+          card.appendChild(favoriteBadge);
+
+          const selectedBadge = document.createElement("div");
+          selectedBadge.textContent = "✓";
+          selectedBadge.title = "Starter protocol selected";
+          selectedBadge.style.position = "absolute";
+          selectedBadge.style.top = "8px";
+          selectedBadge.style.right = "32px";
+          selectedBadge.style.width = "18px";
+          selectedBadge.style.height = "18px";
+          selectedBadge.style.borderRadius = "50%";
+          selectedBadge.style.border = "1px solid #00ffdd";
+          selectedBadge.style.background = "rgba(0, 35, 40, 0.92)";
+          selectedBadge.style.color = "#00ffdd";
+          selectedBadge.style.fontWeight = "bold";
+          selectedBadge.style.fontSize = "0.85rem";
+          selectedBadge.style.lineHeight = "1";
+          selectedBadge.style.display = "none";
+          selectedBadge.style.alignItems = "center";
+          selectedBadge.style.justifyContent = "center";
+          selectedBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+          selectedBadge.style.pointerEvents = "none";
+          card.appendChild(selectedBadge);
+
+          const applyFavoriteBadgeState = () => {
+            const isFavorite = typeof ProtocolSystem.isFavorite === "function"
+              ? ProtocolSystem.isFavorite(protocolName)
+              : false;
+            favoriteBadge.style.color = isFavorite ? "#ffd84d" : "#4e696f";
+            favoriteBadge.style.textShadow = isFavorite ? "0 0 8px rgba(255,216,77,0.85)" : "none";
+          };
+          applyFavoriteBadgeState();
+
+          favoriteBadge.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            if (typeof ProtocolSystem.toggleFavorite === "function") {
+              ProtocolSystem.toggleFavorite(protocolName);
+              applyFavoriteBadgeState();
+            }
+          });
+
+          const renderCardState = () => {
+            const isSelected = selected.includes(protocolName);
+            card.style.background = isSelected ? "rgba(0, 255, 221, 0.22)" : "rgba(0, 77, 92, 0.7)";
+            card.style.borderColor = isSelected ? "#ffffff" : "#00ffdd";
+            card.style.boxShadow = isSelected ? "0 0 14px rgba(255,255,255,0.35)" : "none";
+            selectedBadge.style.display = isSelected ? "flex" : "none";
+          };
+          renderCardState();
+
+          card.addEventListener("click", () => {
+
+            const idx = selected.indexOf(protocolName);
+            if (idx >= 0) {
+              // Deselect if already selected
+              selected.splice(idx, 1);
+              if (typeof ProtocolSystem.setStarters === "function") {
+                ProtocolSystem.setStarters([...selected]);
+              } else {
+                ProtocolSystem.starterProtocols = [...selected];
+              }
+              renderCardState();
+              refreshCount();
+              return;
+            }
+            if (selected.length < 2) {
+              // Add if under limit
+              selected.push(protocolName);
+              if (typeof ProtocolSystem.setStarters === "function") {
+                ProtocolSystem.setStarters([...selected]);
+              } else {
+                ProtocolSystem.starterProtocols = [...selected];
+              }
+              renderCardState();
+              refreshCount();
+              return;
+            }
+            // If already 2 selected, prompt to replace
+            const modal = document.createElement("div");
+            modal.style.position = "fixed";
+            modal.style.left = 0;
+            modal.style.top = 0;
+            modal.style.width = "100vw";
+            modal.style.height = "100vh";
+            modal.style.background = "rgba(0,0,0,0.7)";
+            modal.style.display = "flex";
+            modal.style.alignItems = "center";
+            modal.style.justifyContent = "center";
+            modal.style.zIndex = 2000;
+            const box = document.createElement("div");
+            box.style.background = "#01222b";
+            box.style.border = "2px solid #00ffdd";
+            box.style.borderRadius = "10px";
+            box.style.padding = "28px 32px";
+            box.style.display = "flex";
+            box.style.flexDirection = "column";
+            box.style.alignItems = "center";
+            box.style.boxShadow = "0 0 18px #00ffdd55";
+            const msg = document.createElement("div");
+            msg.textContent = "Starter limit reached. Replace which starter?";
+            msg.style.color = "#00ffdd";
+            msg.style.fontWeight = "bold";
+            msg.style.fontSize = "1.1rem";
+            msg.style.marginBottom = "18px";
+            box.appendChild(msg);
+            const btnRow = document.createElement("div");
+            btnRow.style.display = "flex";
+            btnRow.style.gap = "18px";
+            btnRow.style.marginBottom = "10px";
+            selected.forEach(selName => {
+              // Button container for name and stat change
+              const btnContainer = document.createElement("div");
+              btnContainer.style.display = "flex";
+              btnContainer.style.flexDirection = "column";
+              btnContainer.style.alignItems = "center";
+              btnContainer.style.minWidth = "160px";
+              btnContainer.style.maxWidth = "220px";
+              btnContainer.style.margin = "0 2px";
+
+              // Protocol name button
+              const btn = document.createElement("button");
+              btn.textContent = selName;
+              btn.style.padding = "0.6rem 1.2rem";
+              btn.style.background = "rgba(0,0,0,0.7)";
+              btn.style.color = "#00ffdd";
+              btn.style.border = "2px solid #00ffdd";
+              btn.style.borderRadius = "8px";
+              btn.style.fontSize = "1rem";
+              btn.style.cursor = "pointer";
+              btn.style.marginBottom = "6px";
+              btn.addEventListener("click", () => {
+                // Replace selected starter in-place and update UI
+                const idxToReplace = selected.indexOf(selName);
+                if (idxToReplace !== -1) {
+                  selected.splice(idxToReplace, 1, protocolName);
+                  if (typeof ProtocolSystem.setStarters === "function") {
+                    ProtocolSystem.setStarters([...selected]);
+                  } else {
+                    ProtocolSystem.starterProtocols = [...selected];
+                  }
+                  document.body.removeChild(modal);
+                  // Re-render all protocol cards' state and selection count
+                  const allCards = content.querySelectorAll('button');
+                  allCards.forEach(cardBtn => {
+                    if (typeof cardBtn.renderCardState === 'function') cardBtn.renderCardState();
+                  });
+                  refreshCount();
+                }
+              });
+
+              // --- Stat comparison below protocol name, 2-column layout ---
+              const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
+              const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
+              const aName = selName;
+              const bName = selected.find(n => n !== selName);
+              const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(aName)
+                : (PROTOCOLS[aName]?.statMods || {});
+              const bMods = bName && ((typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(bName)
+                : (PROTOCOLS[bName]?.statMods || {}));
+              const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
+                ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
+                : (PROTOCOLS[protocolName]?.statMods || {});
+              // x = a + b
+              // (x - a) + y = c
+              let statHtml = `<div style='margin-bottom:2px; font-size:0.97em; background:rgba(0,20,30,0.92); border-radius:8px; border:1.5px solid #00ffdd; box-shadow:0 0 8px #00ffdd33; padding:7px 10px; width:100%;'>`;
+              statHtml += `<div style='color:#00ffdd; font-weight:bold; margin-bottom:2px; text-align:center;'>Result if replaced:</div>`;
+              statHtml += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
+              statOrder.forEach((stat, i) => {
+                const a = Number(aMods[stat]) || 0;
+                const b = bMods ? (Number(bMods[stat]) || 0) : 0;
+                const y = Number(hoveredMods[stat]) || 0;
+                const x = a + b;
+                const c = b + y;
+                let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
+                let cStr = c < 0 ? c.toString() : c.toString();
+                statHtml += `<div style='display:flex; align-items:center;'><span style='width:54px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:16px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 3px;'>→</span> <span style='color:${color}; min-width:16px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
+              });
+              statHtml += `</div></div>`;
+              btnContainer.appendChild(btn);
+              btnContainer.insertAdjacentHTML('beforeend', statHtml);
+              btnRow.appendChild(btnContainer);
+            });
+            box.appendChild(btnRow);
+            const cancelBtn = document.createElement("button");
+            cancelBtn.textContent = "Cancel";
+            cancelBtn.style.padding = "0.5rem 1.1rem";
+            cancelBtn.style.background = "rgba(0,0,0,0.5)";
+            cancelBtn.style.color = "#fff";
+            cancelBtn.style.border = "1.5px solid #aaa";
+            cancelBtn.style.borderRadius = "8px";
+            cancelBtn.style.fontSize = "1rem";
+            cancelBtn.style.marginTop = "8px";
+            cancelBtn.style.cursor = "pointer";
+            cancelBtn.addEventListener("click", () => {
+              document.body.removeChild(modal);
+            });
+            box.appendChild(cancelBtn);
+            modal.appendChild(box);
+            document.body.appendChild(modal);
+          });
+
+          // Attach renderCardState to card for external refresh
+          card.renderCardState = renderCardState;
+          grid.appendChild(card);
+        });
+      });
+    }
+
+    refreshCount();
+
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.justifyContent = "center";
+    actions.style.alignItems = "center";
+    actions.style.gap = "18px";
+    actions.style.marginTop = "18px";
+    panel.appendChild(actions);
+
+    const backBtn2 = document.createElement("button");
+    backBtn2.textContent = "Back";
+    backBtn2.style.width = "150px"; 
+    backBtn2.style.fontSize = "1rem";
+    backBtn2.style.padding = "0.7rem 1.2rem";
+    backBtn2.style.background = "rgba(0,0,0,0.7)";
+    backBtn2.style.color = "#fff";
+    backBtn2.style.border = "2px solid #fff";
+    backBtn2.style.borderRadius = "8px";
+    backBtn2.style.cursor = "pointer";
+    actions.appendChild(backBtn2);
+
+    const startBtn = document.createElement("button");
+    startBtn.textContent = source === "mainMenu" ? "Play" : "Start Run";
+    startBtn.style.width = "150px"; 
+    startBtn.style.fontSize = "1rem";
+    startBtn.style.padding = "0.7rem 1.2rem";
+    startBtn.style.background = "rgba(0,0,0,0.7)";
+    startBtn.style.color = "#00ffdd";
+    startBtn.style.border = "2px solid #00ffdd";
+    startBtn.style.borderRadius = "8px";
+    startBtn.style.cursor = "pointer";
+    actions.appendChild(startBtn);
+
+    backBtn2.addEventListener("click", () => {
+      starterOverlay.remove();
+      if (source === "mainMenu") {
+        showMenu();
+      } else {
+        showDifficultyMenu();
+      }
+    });
+
+    startBtn.addEventListener("click", () => {
+      window._pendingStarterProtocols = [...selected];
+      starterOverlay.remove();
+      if (source === "mainMenu") {
+        showDifficultyMenu();
+      } else {
+        startGame(difficulty, startStatPoints, startHealth);
+      }
+    });
+
+    document.body.appendChild(starterOverlay);
+  }
   function showMenu() {
     const ENEMY_GLOSSARY = {
       factionName: "UNCLASSIFIED HOSTILES",
@@ -518,10 +1533,10 @@ window.onload = function () {
       showDifficultyMenu();
     });
 
-    // Protocols button: show protocol menu
+    // Protocols button: show starter protocol modal (new database)
     protocolBtn.addEventListener("click", function() {
       menuOverlay.remove();
-      showProtocolMenu();
+      showStarterProtocolModal(null, null, null, "mainMenu");
       window._showMainMenu = () => {
         showMenu();
       };
@@ -651,580 +1666,6 @@ window.onload = function () {
     diffOverlay.appendChild(buttonContainer);
     document.body.appendChild(diffOverlay);
 
-    function startGame(difficulty, startStatPoints, startHealth) {
-      window.sentinelDifficulty = difficulty;
-      ProtocolSystem.setStarters(window._pendingStarterProtocols || []);
-      showMenuScreen = false;
-      fadeOutMenuAmbience();
-      restartGame();
-      statPoints = startStatPoints;
-      player.health = player.maxHealth = startHealth;
-      
-      // Set starting wave and level based on player selection
-      if (window._selectedStartWave !== undefined) {
-        wave = window._selectedStartWave;
-        if (window._selectedStartLevel !== undefined) {
-          level = window._selectedStartLevel;
-          // Calculate xpToLevel based on current level using the game formula
-          xpToLevel = Math.floor(10 + Math.pow(level, 1.8));
-          statPoints = Math.max(0, startStatPoints + (level - 1) * 2);
-        }
-      }
-      
-      spawnWave();
-      gameStarted = true;
-    }
-
-    function showStarterProtocolModal(difficulty, startStatPoints, startHealth) {
-      const discoveredProtocols = ProtocolSystem.getDiscovered();
-      const starterOverlay = document.createElement("div");
-      starterOverlay.id = "starterProtocolOverlay";
-      starterOverlay.style.position = "fixed";
-      starterOverlay.style.left = 0;
-      starterOverlay.style.top = 0;
-      starterOverlay.style.width = "100vw";
-      starterOverlay.style.height = "100vh";
-      starterOverlay.style.background = "rgba(0,0,0,0.95)";
-      starterOverlay.style.display = "flex";
-      starterOverlay.style.flexDirection = "column";
-      starterOverlay.style.justifyContent = "center";
-      starterOverlay.style.alignItems = "center";
-      starterOverlay.style.zIndex = 1002;
-
-      const panel = document.createElement("div");
-      panel.style.width = "860px";
-      panel.style.maxHeight = "680px";
-      panel.style.background = "rgba(0, 20, 30, 0.98)";
-      panel.style.border = "2px solid #00ffdd";
-      panel.style.borderRadius = "10px";
-      panel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
-      panel.style.display = "flex";
-      panel.style.flexDirection = "column";
-      panel.style.padding = "20px";
-      starterOverlay.appendChild(panel);
-
-      const title = document.createElement("h2");
-      title.textContent = "SELECT STARTER PROTOCOLS";
-      title.style.color = "#00ffdd";
-      title.style.margin = "0 0 8px 0";
-      title.style.textAlign = "center";
-      panel.appendChild(title);
-
-      const subtitle = document.createElement("div");
-      subtitle.textContent = "Choose up to 2 permanently discovered protocols to start this run.";
-      subtitle.style.color = "#aaf6ff";
-      subtitle.style.fontSize = "0.95rem";
-      subtitle.style.textAlign = "center";
-      subtitle.style.marginBottom = "14px";
-      panel.appendChild(subtitle);
-
-      const selectionCount = document.createElement("div");
-      selectionCount.style.color = "#00ffdd";
-      selectionCount.style.textAlign = "center";
-      selectionCount.style.marginBottom = "10px";
-      panel.appendChild(selectionCount);
-
-      // Add total stat change display
-      const totalStatDiv = document.createElement("div");
-      totalStatDiv.style.color = "#aaf6ff";
-      totalStatDiv.style.textAlign = "center";
-      totalStatDiv.style.marginBottom = "10px";
-      panel.appendChild(totalStatDiv);
-
-      const content = document.createElement("div");
-      content.style.flex = "1";
-      content.style.overflowY = "auto";
-      content.style.border = "1px solid rgba(0,255,221,0.25)";
-      content.style.borderRadius = "8px";
-      content.style.padding = "12px";
-      panel.appendChild(content);
-
-      let selected = Array.isArray(ProtocolSystem.starterProtocols)
-        ? ProtocolSystem.starterProtocols.filter(name => discoveredProtocols.includes(name)).slice(0, 2)
-        : [];
-      const refreshCount = () => {
-        selectionCount.textContent = `Selected: ${selected.length}/2`;
-        // Calculate and display total stat change for selected starters, with color
-        const statTotals = { Range: 0, Power: 0, Intensity: 0, Movement: 0, Health: 0, Pickup: 0 };
-        selected.forEach(protocolName => {
-          const mods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-            ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
-            : (PROTOCOLS[protocolName]?.statMods || {});
-          Object.entries(mods).forEach(([stat, value]) => {
-            if (statTotals.hasOwnProperty(stat)) statTotals[stat] += value;
-          });
-        });
-        // Format the stat totals for display with color
-        const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
-        const statStrings = statOrder.map(stat => {
-          const v = statTotals[stat];
-          let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
-          let sign = v > 0 ? "+" : (v < 0 ? "" : "");
-          return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
-        });
-        totalStatDiv.innerHTML = `${statStrings.join(", ")}`;
-      };
-
-      if (discoveredProtocols.length === 0) {
-        const noneMsg = document.createElement("div");
-        noneMsg.textContent = "No protocols discovered yet. Start run with 0 starter protocols.";
-        noneMsg.style.color = "#ffcc88";
-        noneMsg.style.textAlign = "center";
-        noneMsg.style.padding = "24px";
-        content.appendChild(noneMsg);
-      } else {
-        const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
-        discoveredProtocols.forEach(protocolName => {
-          const family = PROTOCOLS[protocolName]?.family;
-          if (familyGroups[family]) {
-            familyGroups[family].push(protocolName);
-          }
-        });
-
-        Object.entries(familyGroups).forEach(([familyName, protocols]) => {
-          if (protocols.length === 0) return;
-
-          const familyHeader = document.createElement("div");
-          familyHeader.textContent = familyName;
-          familyHeader.style.color = "#00ffdd";
-          familyHeader.style.fontSize = "1rem";
-          familyHeader.style.fontWeight = "bold";
-          familyHeader.style.margin = "8px 4px 8px 4px";
-          familyHeader.style.borderBottom = "1px solid rgba(0,255,221,0.45)";
-          familyHeader.style.paddingBottom = "4px";
-          content.appendChild(familyHeader);
-
-          const grid = document.createElement("div");
-          grid.style.display = "grid";
-          grid.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
-          grid.style.gap = "10px";
-          grid.style.marginBottom = "12px";
-          content.appendChild(grid);
-
-          protocols.forEach(protocolName => {
-
-            const proto = PROTOCOLS[protocolName];
-            const rawUpgradeTier = ProtocolSystem.protocolBoard[protocolName]?.upgradeTier;
-            const upgradeTier = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
-              ? ProtocolSystem.normalizeUpgradeTier(rawUpgradeTier)
-              : (rawUpgradeTier || (ProtocolSystem.upgradeTiers?.[0] || "Trivial"));
-            const effectiveStarterMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-              ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
-              : proto.statMods;
-            const card = document.createElement("button");
-            card.type = "button";
-            card.style.position = "relative";
-            card.style.textAlign = "left";
-            card.style.padding = "10px";
-            card.style.borderRadius = "8px";
-            card.style.border = "2px solid #00ffdd";
-            card.style.background = "rgba(0, 77, 92, 0.7)";
-            card.style.color = "#00ffdd";
-            card.style.cursor = "pointer";
-            card.style.transition = "all 0.15s";
-
-            const mods = Object.entries(effectiveStarterMods)
-              .filter(([_, v]) => v !== 0)
-              .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k}`)
-              .join(", ");
-
-            card.innerHTML = `<div style="font-weight:bold; margin-bottom:4px;">${protocolName}</div>
-                              <div style="font-size:0.8rem; color:#c8ffff; margin-top:3px;">${upgradeTier}</div>            
-                              <div style="font-size:0.85rem; color:#aaf6ff; margin-top:3px;">${proto.rarity} • ${proto.tier}</div>
-                              <div style="font-size:0.8rem; color:#aaf6ff; margin-top:4px;">${mods || "No mods"}</div>`;
-
-            // Tooltip: compare stat change if selected vs unselected
-            card.addEventListener("mouseenter", () => {
-              // Show stat difference using: (x - a) + y and (x - b) + y
-              const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
-              const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
-              const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
-                : (PROTOCOLS[protocolName]?.statMods || {});
-              let html = `<div style='min-width:220px; max-width:340px; font-family:sans-serif; font-size:1em; background:rgba(0,20,30,0.98); border-radius:10px; border:2px solid #00ffdd; box-shadow:0 0 18px #00ffdd44; padding:12px 14px;'>`;
-              if (selected.length === 0) {
-                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:4px;'>No protocol selected</div>`;
-              } else if (selected.length === 1) {
-                // Only one selected: show (x - a) + y, where x = a
-                const aName = selected[0];
-                const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                  ? ProtocolSystem.getProtocolEffectiveMods(aName)
-                  : (PROTOCOLS[aName]?.statMods || {});
-                // x = a
-                // (x - a) + y = y
-                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:2px;'>If replacing: ${aName}</div>`;
-                html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
-                html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
-                html += statOrder.map(stat => {
-                  const x = Number(aMods[stat]) || 0;
-                  const c = Number(hoveredMods[stat]) || 0;
-                  let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
-                  let cStr = c < 0 ? c.toString() : c.toString();
-                  return `<div style='display:flex; align-items:center;'><span style='width:70px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:18px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 4px;'>→</span> <span style='color:${color}; min-width:18px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
-                }).join("");
-                html += `</div>`;
-                html += `</div>`;
-              } else if (selected.length === 2) {
-                // Two selected: show (x - a) + y and (x - b) + y
-                const aName = selected[0];
-                const bName = selected[1];
-                const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                  ? ProtocolSystem.getProtocolEffectiveMods(aName)
-                  : (PROTOCOLS[aName]?.statMods || {});
-                const bMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                  ? ProtocolSystem.getProtocolEffectiveMods(bName)
-                  : (PROTOCOLS[bName]?.statMods || {});
-                // x = a + b
-                // (x - a) + y = c
-                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:2px;'>If replaced: ${aName}</div>`;
-                html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
-                html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
-                html += statOrder.map(stat => {
-                  const a = Number(aMods[stat]) || 0;
-                  const b = Number(bMods[stat]) || 0;
-                  const y = Number(hoveredMods[stat]) || 0;
-                  const x = a + b;
-                  const c = b + y;
-                  let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
-                  let cStr = c < 0 ? c.toString() : c.toString();
-                  return `<div style='display:flex; align-items:center;'><span style='width:70px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:18px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 4px;'>→</span> <span style='color:${color}; min-width:18px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
-                }).join("");
-                html += `</div>`;
-                html += `</div>`;
-                // (x - b) + y = d
-                html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:2px;'>If replaced: ${bName}</div>`;
-                html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
-                html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
-                html += statOrder.map(stat => {
-                  const a = Number(aMods[stat]) || 0;
-                  const b = Number(bMods[stat]) || 0;
-                  const y = Number(hoveredMods[stat]) || 0;
-                  const x = a + b;
-                  const d = a + y;
-                  let color = d > x ? "#00ff88" : d < x ? "#ff4444" : "#bbbbbb";
-                  let dStr = d < 0 ? d.toString() : d.toString();
-                  return `<div style='display:flex; align-items:center;'><span style='width:70px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:18px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 4px;'>→</span> <span style='color:${color}; min-width:18px; display:inline-block; text-align:right;'>${dStr}</span></div>`;
-                }).join("");
-                html += `</div>`;
-                html += `</div>`;
-              }
-              html += `</div>`;
-              let tooltip = document.createElement("div");
-              tooltip.innerHTML = html;
-              tooltip.style.position = "fixed";
-              tooltip.style.zIndex = 9999;
-              tooltip.style.pointerEvents = "none";
-              document.body.appendChild(tooltip);
-              function moveTooltip(e) {
-                tooltip.style.left = (e.clientX + 18) + "px";
-                tooltip.style.top = (e.clientY + 8) + "px";
-              }
-              moveTooltip(window.event || {});
-              card._tooltip = tooltip;
-              card.addEventListener("mousemove", moveTooltip);
-            });
-            card.addEventListener("mouseleave", () => {
-              if (card._tooltip) {
-                document.body.removeChild(card._tooltip);
-                card._tooltip = null;
-              }
-              card.removeEventListener("mousemove", () => {});
-            });
-
-            const favoriteBadge = document.createElement("div");
-            favoriteBadge.textContent = "✶";
-            favoriteBadge.title = "Toggle favorite";
-            favoriteBadge.style.position = "absolute";
-            favoriteBadge.style.top = "8px";
-            favoriteBadge.style.right = "8px";
-            favoriteBadge.style.width = "20px";
-            favoriteBadge.style.height = "20px";
-            favoriteBadge.style.boxSizing = "border-box";
-            favoriteBadge.style.borderRadius = "50%";
-            favoriteBadge.style.border = "1px solid #00ffdd";
-            favoriteBadge.style.background = "rgba(0, 35, 40, 0.92)";
-            favoriteBadge.style.fontWeight = "bold";
-            favoriteBadge.style.fontSize = "1.1rem";
-            favoriteBadge.style.lineHeight = "1";
-            favoriteBadge.style.display = "flex";
-            favoriteBadge.style.alignItems = "center";
-            favoriteBadge.style.justifyContent = "center";
-            favoriteBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
-            favoriteBadge.style.cursor = "pointer";
-            card.appendChild(favoriteBadge);
-
-            const selectedBadge = document.createElement("div");
-            selectedBadge.textContent = "✓";
-            selectedBadge.title = "Starter protocol selected";
-            selectedBadge.style.position = "absolute";
-            selectedBadge.style.top = "8px";
-            selectedBadge.style.right = "32px";
-            selectedBadge.style.width = "18px";
-            selectedBadge.style.height = "18px";
-            selectedBadge.style.borderRadius = "50%";
-            selectedBadge.style.border = "1px solid #00ffdd";
-            selectedBadge.style.background = "rgba(0, 35, 40, 0.92)";
-            selectedBadge.style.color = "#00ffdd";
-            selectedBadge.style.fontWeight = "bold";
-            selectedBadge.style.fontSize = "0.85rem";
-            selectedBadge.style.lineHeight = "1";
-            selectedBadge.style.display = "none";
-            selectedBadge.style.alignItems = "center";
-            selectedBadge.style.justifyContent = "center";
-            selectedBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
-            selectedBadge.style.pointerEvents = "none";
-            card.appendChild(selectedBadge);
-
-            const applyFavoriteBadgeState = () => {
-              const isFavorite = typeof ProtocolSystem.isFavorite === "function"
-                ? ProtocolSystem.isFavorite(protocolName)
-                : false;
-              favoriteBadge.style.color = isFavorite ? "#ffd84d" : "#4e696f";
-              favoriteBadge.style.textShadow = isFavorite ? "0 0 8px rgba(255,216,77,0.85)" : "none";
-            };
-            applyFavoriteBadgeState();
-
-            favoriteBadge.addEventListener("click", (evt) => {
-              evt.stopPropagation();
-              if (typeof ProtocolSystem.toggleFavorite === "function") {
-                ProtocolSystem.toggleFavorite(protocolName);
-                applyFavoriteBadgeState();
-              }
-            });
-
-            const renderCardState = () => {
-              const isSelected = selected.includes(protocolName);
-              card.style.background = isSelected ? "rgba(0, 255, 221, 0.22)" : "rgba(0, 77, 92, 0.7)";
-              card.style.borderColor = isSelected ? "#ffffff" : "#00ffdd";
-              card.style.boxShadow = isSelected ? "0 0 14px rgba(255,255,255,0.35)" : "none";
-              selectedBadge.style.display = isSelected ? "flex" : "none";
-            };
-            renderCardState();
-
-            card.addEventListener("click", () => {
-
-              const idx = selected.indexOf(protocolName);
-              if (idx >= 0) {
-                // Deselect if already selected
-                selected.splice(idx, 1);
-                if (typeof ProtocolSystem.setStarters === "function") {
-                  ProtocolSystem.setStarters([...selected]);
-                } else {
-                  ProtocolSystem.starterProtocols = [...selected];
-                }
-                renderCardState();
-                refreshCount();
-                return;
-              }
-              if (selected.length < 2) {
-                // Add if under limit
-                selected.push(protocolName);
-                if (typeof ProtocolSystem.setStarters === "function") {
-                  ProtocolSystem.setStarters([...selected]);
-                } else {
-                  ProtocolSystem.starterProtocols = [...selected];
-                }
-                renderCardState();
-                refreshCount();
-                return;
-              }
-              // If already 2 selected, prompt to replace
-              const modal = document.createElement("div");
-              modal.style.position = "fixed";
-              modal.style.left = 0;
-              modal.style.top = 0;
-              modal.style.width = "100vw";
-              modal.style.height = "100vh";
-              modal.style.background = "rgba(0,0,0,0.7)";
-              modal.style.display = "flex";
-              modal.style.alignItems = "center";
-              modal.style.justifyContent = "center";
-              modal.style.zIndex = 2000;
-              const box = document.createElement("div");
-              box.style.background = "#01222b";
-              box.style.border = "2px solid #00ffdd";
-              box.style.borderRadius = "10px";
-              box.style.padding = "28px 32px";
-              box.style.display = "flex";
-              box.style.flexDirection = "column";
-              box.style.alignItems = "center";
-              box.style.boxShadow = "0 0 18px #00ffdd55";
-              const msg = document.createElement("div");
-              msg.textContent = "Starter limit reached. Replace which starter?";
-              msg.style.color = "#00ffdd";
-              msg.style.fontWeight = "bold";
-              msg.style.fontSize = "1.1rem";
-              msg.style.marginBottom = "18px";
-              box.appendChild(msg);
-              const btnRow = document.createElement("div");
-              btnRow.style.display = "flex";
-              btnRow.style.gap = "18px";
-              btnRow.style.marginBottom = "10px";
-              selected.forEach(selName => {
-                // Button container for name and stat change
-                const btnContainer = document.createElement("div");
-                btnContainer.style.display = "flex";
-                btnContainer.style.flexDirection = "column";
-                btnContainer.style.alignItems = "center";
-                btnContainer.style.minWidth = "160px";
-                btnContainer.style.maxWidth = "220px";
-                btnContainer.style.margin = "0 2px";
-
-                // Protocol name button
-                const btn = document.createElement("button");
-                btn.textContent = selName;
-                btn.style.padding = "0.6rem 1.2rem";
-                btn.style.background = "rgba(0,0,0,0.7)";
-                btn.style.color = "#00ffdd";
-                btn.style.border = "2px solid #00ffdd";
-                btn.style.borderRadius = "8px";
-                btn.style.fontSize = "1rem";
-                btn.style.cursor = "pointer";
-                btn.style.marginBottom = "6px";
-                btn.addEventListener("click", () => {
-                  // Replace selected starter in-place and update UI
-                  const idxToReplace = selected.indexOf(selName);
-                  if (idxToReplace !== -1) {
-                    selected.splice(idxToReplace, 1, protocolName);
-                    if (typeof ProtocolSystem.setStarters === "function") {
-                      ProtocolSystem.setStarters([...selected]);
-                    } else {
-                      ProtocolSystem.starterProtocols = [...selected];
-                    }
-                    document.body.removeChild(modal);
-                    // Re-render all protocol cards' state and selection count
-                    const allCards = content.querySelectorAll('button');
-                    allCards.forEach(cardBtn => {
-                      if (typeof cardBtn.renderCardState === 'function') cardBtn.renderCardState();
-                    });
-                    refreshCount();
-                  }
-                });
-
-                // --- Stat comparison below protocol name, 2-column layout ---
-                const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
-                const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
-                const aName = selName;
-                const bName = selected.find(n => n !== selName);
-                const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                  ? ProtocolSystem.getProtocolEffectiveMods(aName)
-                  : (PROTOCOLS[aName]?.statMods || {});
-                const bMods = bName && ((typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                  ? ProtocolSystem.getProtocolEffectiveMods(bName)
-                  : (PROTOCOLS[bName]?.statMods || {}));
-                const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                  ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
-                  : (PROTOCOLS[protocolName]?.statMods || {});
-                // x = a + b
-                // (x - a) + y = c
-                let statHtml = `<div style='margin-bottom:2px; font-size:0.97em; background:rgba(0,20,30,0.92); border-radius:8px; border:1.5px solid #00ffdd; box-shadow:0 0 8px #00ffdd33; padding:7px 10px; width:100%;'>`;
-                statHtml += `<div style='color:#00ffdd; font-weight:bold; margin-bottom:2px; text-align:center;'>Result if replaced:</div>`;
-                statHtml += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
-                statOrder.forEach((stat, i) => {
-                  const a = Number(aMods[stat]) || 0;
-                  const b = bMods ? (Number(bMods[stat]) || 0) : 0;
-                  const y = Number(hoveredMods[stat]) || 0;
-                  const x = a + b;
-                  const c = b + y;
-                  let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
-                  let cStr = c < 0 ? c.toString() : c.toString();
-                  statHtml += `<div style='display:flex; align-items:center;'><span style='width:54px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:16px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 3px;'>→</span> <span style='color:${color}; min-width:16px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
-                });
-                statHtml += `</div></div>`;
-                btnContainer.appendChild(btn);
-                btnContainer.insertAdjacentHTML('beforeend', statHtml);
-                btnRow.appendChild(btnContainer);
-              });
-              box.appendChild(btnRow);
-              const cancelBtn = document.createElement("button");
-              cancelBtn.textContent = "Cancel";
-              cancelBtn.style.padding = "0.5rem 1.1rem";
-              cancelBtn.style.background = "rgba(0,0,0,0.5)";
-              cancelBtn.style.color = "#fff";
-              cancelBtn.style.border = "1.5px solid #aaa";
-              cancelBtn.style.borderRadius = "8px";
-              cancelBtn.style.fontSize = "1rem";
-              cancelBtn.style.marginTop = "8px";
-              cancelBtn.style.cursor = "pointer";
-              cancelBtn.addEventListener("click", () => {
-                document.body.removeChild(modal);
-              });
-              box.appendChild(cancelBtn);
-              modal.appendChild(box);
-              document.body.appendChild(modal);
-            });
-
-            // Attach renderCardState to card for external refresh
-            card.renderCardState = renderCardState;
-            grid.appendChild(card);
-          });
-        });
-      }
-
-      refreshCount();
-
-      const actions = document.createElement("div");
-      actions.style.display = "flex";
-      actions.style.justifyContent = "center";
-      actions.style.alignItems = "center";
-      actions.style.gap = "18px";
-      actions.style.marginTop = "18px";
-      panel.appendChild(actions);
-
-      const backBtn2 = document.createElement("button");
-      backBtn2.textContent = "← Back";
-      backBtn2.style.fontSize = "1rem";
-      backBtn2.style.padding = "0.7rem 1.2rem";
-      backBtn2.style.background = "rgba(0,0,0,0.7)";
-      backBtn2.style.color = "#fff";
-      backBtn2.style.border = "2px solid #fff";
-      backBtn2.style.borderRadius = "8px";
-      backBtn2.style.cursor = "pointer";
-      actions.appendChild(backBtn2);
-
-      // Protocol Database button
-      const dbBtn = document.createElement("button");
-      dbBtn.textContent = "Protocol Database";
-      dbBtn.style.fontSize = "1rem";
-      dbBtn.style.padding = "0.7rem 1.2rem";
-      dbBtn.style.background = "rgba(0,0,0,0.7)";
-      dbBtn.style.color = "#00ffdd";
-      dbBtn.style.border = "2px solid #00ffdd";
-      dbBtn.style.borderRadius = "8px";
-      dbBtn.style.cursor = "pointer";
-      dbBtn.style.margin = "0 18px";
-      actions.appendChild(dbBtn);
-
-      const startBtn = document.createElement("button");
-      startBtn.textContent = "Start Run";
-      startBtn.style.fontSize = "1rem";
-      startBtn.style.padding = "0.7rem 1.2rem";
-      startBtn.style.background = "rgba(0,0,0,0.7)";
-      startBtn.style.color = "#00ffdd";
-      startBtn.style.border = "2px solid #00ffdd";
-      startBtn.style.borderRadius = "8px";
-      startBtn.style.cursor = "pointer";
-      actions.appendChild(startBtn);
-
-      backBtn2.addEventListener("click", () => {
-        starterOverlay.remove();
-        showDifficultyMenu();
-      });
-
-      dbBtn.addEventListener("click", () => {
-        starterOverlay.remove();
-        showProtocolMenu();
-      });
-
-      startBtn.addEventListener("click", () => {
-        window._pendingStarterProtocols = [...selected];
-        starterOverlay.remove();
-        startGame(difficulty, startStatPoints, startHealth);
-      });
-
-      document.body.appendChild(starterOverlay);
-    }
-
     function showWaveSelectionMenu(difficulty, startStatPoints, startHealth) {
       const waveOverlay = document.createElement("div");
       waveOverlay.id = "waveSelectionOverlay";
@@ -1332,7 +1773,9 @@ window.onload = function () {
       }
 
       const unlockedWaves = getUnlockedWaves();
-      AVAILABLE_WAVES.forEach(waveInfo => {
+      
+      // Display all milestone waves
+      MILESTONE_WAVES.forEach(waveInfo => {
         const isUnlocked = unlockedWaves.includes(waveInfo.wave);
         const btn = makeWaveButton(waveInfo.wave, waveInfo.level, isUnlocked);
         buttonContainer.appendChild(btn);
@@ -1349,15 +1792,15 @@ window.onload = function () {
 
     normalBtn.addEventListener("click", () => {
       diffOverlay.remove();
-      showWaveSelectionMenu("Normal", 5, 10);
+      showWaveSelectionMenu("Normal", 5, 15);
     });
     hardcoreBtn.addEventListener("click", () => {
       diffOverlay.remove();
-      showWaveSelectionMenu("Hardcore", 0, 5);
+      showWaveSelectionMenu("Hardcore", 5, 23);
     });
     apocalypseBtn.addEventListener("click", () => {
       diffOverlay.remove();
-      showWaveSelectionMenu("Apocalypse", 5, 5);
+      showWaveSelectionMenu("Apocalypse", 5, 30);
     });
 
       // Back button
@@ -1367,69 +1810,8 @@ window.onload = function () {
     });
   }
 
-  // Protocol menu
-  function showProtocolMenu(initialScrollTop = null) {
-    const menuOverlay = document.createElement("div");
-    const canvasRect = canvas.getBoundingClientRect();
-    menuOverlay.id = "protocolMenuOverlay";
-    menuOverlay.style.position = "fixed";
-    menuOverlay.style.left = `${canvasRect.left}px`;
-    menuOverlay.style.top = `${canvasRect.top}px`;
-    menuOverlay.style.transform = "none";
-    menuOverlay.style.width = `${canvasRect.width}px`;
-    menuOverlay.style.height = `${canvasRect.height}px`;
-    menuOverlay.style.background = "rgba(0, 20, 30, 0.98)";
-    menuOverlay.style.border = "2px solid #00ffdd";
-    menuOverlay.style.borderRadius = "8px";
-    menuOverlay.style.display = "flex";
-    menuOverlay.style.flexDirection = "column";
-    menuOverlay.style.justifyContent = "flex-start";
-    menuOverlay.style.alignItems = "center";
-    menuOverlay.style.zIndex = 1001;
-    menuOverlay.style.boxShadow = "0 0 30px rgba(0, 255, 221, 0.3)";
-    menuOverlay.style.fontFamily = "sans-serif";
-    menuOverlay.style.overflow = "visible";
-
-    // Hide scrollbar CSS for webkit browsers
-    const style = document.createElement("style");
-    style.textContent = ".protocol-scroll::-webkit-scrollbar { display: none; }";
-    menuOverlay.appendChild(style);
-
-    // Back button header section
-    const headerSection = document.createElement("div");
-    headerSection.style.width = "100%";
-    headerSection.style.height = "auto";
-    headerSection.style.padding = "10px 15px";
-    headerSection.style.display = "flex";
-    headerSection.style.alignItems = "center";
-    headerSection.style.justifyContent = "flex-start";
-    headerSection.style.position = "relative";
-    headerSection.style.zIndex = 10;
-
-    // Back button
-    const backBtn = document.createElement("button");
-    backBtn.textContent = "← Back to Menu";
-    backBtn.style.fontSize = "0.9rem";
-    backBtn.style.marginLeft = "12px";
-    backBtn.style.padding = "0.4rem 1rem";
-    backBtn.style.background = "rgba(0,0,0,0.7)";
-    backBtn.style.color = "#00ffdd";
-    backBtn.style.border = "2px solid #00ffdd";
-    backBtn.style.borderRadius = "6px";
-    backBtn.style.cursor = "pointer";
-    backBtn.style.transition = "background 0.2s";
-    backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
-    backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
-    headerSection.appendChild(backBtn);
-
-    const bytesBadge = document.createElement("div");
-    const bytesValue = Math.max(0, Math.floor(typeof totalCollectedBytes === "number" ? totalCollectedBytes : loadCollectedBytes()));
-    bytesBadge.textContent = `Bytes: ${bytesValue}`;
-    bytesBadge.style.position = "absolute";
-    bytesBadge.style.right = "18px";
-    bytesBadge.style.top = "10px";
-    bytesBadge.style.color = "#00ffdd";
-    bytesBadge.style.fontWeight = "bold";
+  // Draw jagged lightning bolt between two points
+  function drawLightningBolt(x1, y1, x2, y2, color, segments = 8, jaggedness = 16) {
     bytesBadge.style.fontSize = "1rem";
     bytesBadge.style.background = "rgba(0, 0, 0, 0)";
     bytesBadge.style.borderRadius = "6px";
@@ -1438,750 +1820,12 @@ window.onload = function () {
 
     menuOverlay.appendChild(headerSection);
 
-    function showUpgradeConfirmModal(message, onConfirm) {
-      const confirmOverlay = document.createElement("div");
-      confirmOverlay.style.position = "fixed";
-      confirmOverlay.style.left = "0";
-      confirmOverlay.style.top = "0";
-      confirmOverlay.style.width = "100vw";
-      confirmOverlay.style.height = "100vh";
-      confirmOverlay.style.background = "rgba(0, 0, 0, 0.74)";
-      confirmOverlay.style.display = "flex";
-      confirmOverlay.style.alignItems = "center";
-      confirmOverlay.style.justifyContent = "center";
-      confirmOverlay.style.zIndex = "1105";
-
-      const confirmPanel = document.createElement("div");
-      confirmPanel.style.width = "min(460px, 90vw)";
-      confirmPanel.style.background = "rgba(0, 20, 30, 0.98)";
-      confirmPanel.style.border = "2px solid #00ffdd";
-      confirmPanel.style.borderRadius = "10px";
-      confirmPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
-      confirmPanel.style.padding = "16px";
-      confirmPanel.style.color = "#c8ffff";
-      confirmPanel.style.fontFamily = "sans-serif";
-      confirmOverlay.appendChild(confirmPanel);
-
-      // Allow customizing modal for downgrade
-      const isDowngrade = arguments.length > 2 && arguments[2] === true;
-      const confirmTitle = document.createElement("div");
-      confirmTitle.textContent = isDowngrade ? "CONFIRM DOWNGRADE" : "CONFIRM UPGRADE";
-      confirmTitle.style.color = isDowngrade ? "#ff6666" : "#00ffdd";
-      confirmTitle.style.fontWeight = "bold";
-      confirmTitle.style.fontSize = "1.05rem";
-      confirmTitle.style.marginBottom = "10px";
-      confirmPanel.appendChild(confirmTitle);
-
-      const confirmMessage = document.createElement("div");
-      confirmMessage.textContent = message;
-      confirmMessage.style.color = isDowngrade ? "#ffb3b3" : "#aaf6ff";
-      confirmMessage.style.fontSize = "0.95rem";
-      confirmMessage.style.lineHeight = "1.4";
-      confirmMessage.style.marginBottom = "14px";
-      confirmPanel.appendChild(confirmMessage);
-
-      const actionRow = document.createElement("div");
-      actionRow.style.display = "flex";
-      actionRow.style.justifyContent = "flex-end";
-      actionRow.style.gap = "8px";
-      confirmPanel.appendChild(actionRow);
-
-      const cancelBtn = document.createElement("button");
-      cancelBtn.type = "button";
-      cancelBtn.textContent = "Cancel";
-      cancelBtn.style.padding = "0.5rem 0.85rem";
-      cancelBtn.style.borderRadius = "6px";
-      cancelBtn.style.border = "1px solid #ffffff";
-      cancelBtn.style.background = "rgba(0,0,0,0.55)";
-      cancelBtn.style.color = "#ffffff";
-      cancelBtn.style.cursor = "pointer";
-      actionRow.appendChild(cancelBtn);
-
-      const confirmBtn = document.createElement("button");
-      confirmBtn.type = "button";
-      confirmBtn.textContent = isDowngrade ? "Downgrade" : "Upgrade";
-      confirmBtn.style.padding = "0.5rem 0.85rem";
-      confirmBtn.style.borderRadius = "6px";
-      confirmBtn.style.border = isDowngrade ? "1px solid #ff6666" : "1px solid #00ffdd";
-      confirmBtn.style.background = "rgba(0,0,0,0.55)";
-      confirmBtn.style.color = isDowngrade ? "#ff6666" : "#00ffdd";
-      confirmBtn.style.cursor = "pointer";
-      actionRow.appendChild(confirmBtn);
-
-      let resolved = false;
-      const closeModal = (confirmed) => {
-        if (resolved) return;
-        resolved = true;
-        document.removeEventListener("keydown", onKeyDown);
-        confirmOverlay.remove();
-        if (confirmed && typeof onConfirm === "function") {
-          onConfirm();
-        }
-      };
-
-      const onKeyDown = (evt) => {
-        if (evt.key === "Escape") {
-          closeModal(false);
-        }
-      };
-
-      cancelBtn.addEventListener("click", () => closeModal(false));
-      confirmBtn.addEventListener("click", () => closeModal(true));
-      confirmOverlay.addEventListener("click", (evt) => {
-        if (evt.target === confirmOverlay) {
-          closeModal(false);
-        }
-      });
-      document.addEventListener("keydown", onKeyDown);
-      document.body.appendChild(confirmOverlay);
-    }
-
-    function showUpgradeInfoModal(titleText, message) {
-      const infoOverlay = document.createElement("div");
-      infoOverlay.style.position = "fixed";
-      infoOverlay.style.left = "0";
-      infoOverlay.style.top = "0";
-      infoOverlay.style.width = "100vw";
-      infoOverlay.style.height = "100vh";
-      infoOverlay.style.background = "rgba(0, 0, 0, 0.74)";
-      infoOverlay.style.display = "flex";
-      infoOverlay.style.alignItems = "center";
-      infoOverlay.style.justifyContent = "center";
-      infoOverlay.style.zIndex = "1105";
-
-      const infoPanel = document.createElement("div");
-      infoPanel.style.width = "min(460px, 90vw)";
-      infoPanel.style.background = "rgba(0, 20, 30, 0.98)";
-      infoPanel.style.border = "2px solid #00ffdd";
-      infoPanel.style.borderRadius = "10px";
-      infoPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
-      infoPanel.style.padding = "16px";
-      infoPanel.style.color = "#c8ffff";
-      infoPanel.style.fontFamily = "sans-serif";
-      infoOverlay.appendChild(infoPanel);
-
-      const infoTitle = document.createElement("div");
-      infoTitle.textContent = titleText;
-      infoTitle.style.color = "#00ffdd";
-      infoTitle.style.fontWeight = "bold";
-      infoTitle.style.fontSize = "1.05rem";
-      infoTitle.style.marginBottom = "10px";
-      infoPanel.appendChild(infoTitle);
-
-      const infoMessage = document.createElement("div");
-      infoMessage.textContent = message;
-      infoMessage.style.color = "#aaf6ff";
-      infoMessage.style.fontSize = "0.95rem";
-      infoMessage.style.lineHeight = "1.4";
-      infoMessage.style.marginBottom = "14px";
-      infoPanel.appendChild(infoMessage);
-
-      const actionRow = document.createElement("div");
-      actionRow.style.display = "flex";
-      actionRow.style.justifyContent = "flex-end";
-      actionRow.style.gap = "8px";
-      infoPanel.appendChild(actionRow);
-
-      const okBtn = document.createElement("button");
-      okBtn.type = "button";
-      okBtn.textContent = "OK";
-      okBtn.style.padding = "0.5rem 0.85rem";
-      okBtn.style.borderRadius = "6px";
-      okBtn.style.border = "1px solid #00ffdd";
-      okBtn.style.background = "rgba(0,0,0,0.55)";
-      okBtn.style.color = "#00ffdd";
-      okBtn.style.cursor = "pointer";
-      actionRow.appendChild(okBtn);
-
-      let resolved = false;
-      const closeModal = () => {
-        if (resolved) return;
-        resolved = true;
-        document.removeEventListener("keydown", onKeyDown);
-        infoOverlay.remove();
-      };
-
-      const onKeyDown = (evt) => {
-        if (evt.key === "Escape" || evt.key === "Enter") {
-          closeModal();
-        }
-      };
-
-      okBtn.addEventListener("click", closeModal);
-      infoOverlay.addEventListener("click", (evt) => {
-        if (evt.target === infoOverlay) {
-          closeModal();
-        }
-      });
-      document.addEventListener("keydown", onKeyDown);
-      document.body.appendChild(infoOverlay);
-    }
-
-    // Title
-    const title = document.createElement("h2");
-    title.textContent = "PROTOCOL DATABASE";
-    title.style.color = "#00ffdd";
-    title.style.fontSize = "1.8rem";
-    title.style.margin = "30px 0 15px 0";
-    title.style.textShadow = "0 0 12px #00ffdd";
-    menuOverlay.appendChild(title);
-
-    // Scrollable content container
+    // Scrollable content area
     const scrollContent = document.createElement("div");
-    scrollContent.style.width = "100%";
-    scrollContent.style.overflowY = "auto";
     scrollContent.style.flex = "1";
-    scrollContent.style.paddingRight = "10px";
-    scrollContent.style.paddingLeft = "15px";
-    scrollContent.style.paddingRight = "10px";
-    scrollContent.style.scrollbarWidth = "none"; // Firefox
-    scrollContent.style.msOverflowStyle = "none"; // IE/Edge
-    // Add webkit scrollbar hiding via CSS class
-    scrollContent.className = "protocol-scroll";
-
-    // Group protocols by family
-    const allProtocols = Object.keys(PROTOCOLS);
-    const starterProtocolSet = new Set(
-      Array.isArray(ProtocolSystem.starterProtocols)
-        ? ProtocolSystem.starterProtocols.slice(0, 2)
-        : []
-    );
-    const favoriteProtocolSet = new Set(
-      typeof ProtocolSystem.getFavorites === "function"
-        ? ProtocolSystem.getFavorites()
-        : []
-    );
-    const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
-    
-    allProtocols.forEach(protocolName => {
-      const protocol = PROTOCOLS[protocolName];
-      if (familyGroups[protocol.family]) {
-        familyGroups[protocol.family].push(protocolName);
-      }
-    });
-
-    // Create family sections
-    Object.entries(familyGroups).forEach(([family, protocols]) => {
-      // Family header
-      const familyHeader = document.createElement("div");
-      familyHeader.style.color = "#00ffdd";
-      familyHeader.style.fontSize = "1.1rem";
-      familyHeader.style.fontWeight = "bold";
-      familyHeader.style.marginTop = "15px";
-      familyHeader.style.marginLeft = "15px";
-      familyHeader.style.marginBottom = "10px";
-      familyHeader.style.marginRight = "15px";
-      familyHeader.style.borderBottom = "2px solid #00ffdd";
-      familyHeader.style.paddingBottom = "5px";
-      familyHeader.textContent = family;
-      scrollContent.appendChild(familyHeader);
-
-      // Grid for this family
-      const gridContainer = document.createElement("div");
-      gridContainer.style.display = "grid";
-      gridContainer.style.gridTemplateColumns = "repeat(3, 1fr)";
-      gridContainer.style.gap = "12px";
-      gridContainer.style.width = "95%";
-      gridContainer.style.margin = "24px";
-      gridContainer.style.padding = "0";
-
-      protocols.forEach(protocolName => {
-        const protocol = PROTOCOLS[protocolName];
-        const state = ProtocolSystem.protocolBoard[protocolName] || { discovered: false, isNew: false };
-
-        const card = document.createElement("div");
-        card.style.borderRadius = "6px";
-        card.style.padding = "20px";
-        card.style.minHeight = "190px";
-        card.style.display = "flex";
-        card.style.flexDirection = "column";
-        card.style.justifyContent = "center";
-        card.style.position = "relative";
-        card.style.cursor = "pointer";
-        card.style.transition = "all 0.2s";
-
-        const applyCardStyle = (isHovered) => {
-          const protocolState = ProtocolSystem.protocolBoard[protocolName] || { discovered: false, isNew: false };
-          const discovered = (typeof ProtocolSystem.isDiscovered === "function")
-            ? ProtocolSystem.isDiscovered(protocolName, false)
-            : protocolState.discovered;
-          const isNew = protocolState.isNew;
-          if (discovered) {
-            card.style.background = isHovered ? "rgba(0, 100, 120, 0.9)" : "rgba(0, 77, 92, 0.8)";
-            card.style.border = isNew ? "2px solid #fff06a" : "2px solid #00ffdd";
-            card.style.boxShadow = isNew ? "0 0 14px rgba(255, 240, 106, 0.65)" : "0 0 10px rgba(0, 255, 221, 0.3)";
-          } else {
-            card.style.background = isHovered ? "rgba(50, 50, 50, 0.9)" : "rgba(30, 30, 30, 0.8)";
-            card.style.border = "2px solid #444";
-            card.style.boxShadow = "none";
-          }
-        };
-        applyCardStyle(false);
-
-        card.addEventListener("mouseover", () => {
-          if (ProtocolSystem.protocolBoard[protocolName]?.isNew) {
-            ProtocolSystem.markSeen(protocolName);
-          }
-          applyCardStyle(true);
-          card.style.transform = "scale(1.05)";
-        });
-        card.addEventListener("mouseout", () => {
-          applyCardStyle(false);
-          card.style.transform = "scale(1)";
-        });
-
-        const favoriteBtn = document.createElement("div");
-        favoriteBtn.textContent = "✶";
-        favoriteBtn.title = "Toggle favorite";
-        favoriteBtn.style.position = "absolute";
-        favoriteBtn.style.top = "8px";
-        favoriteBtn.style.right = "8px";
-        favoriteBtn.style.width = "20px";
-        favoriteBtn.style.height = "20px";
-        favoriteBtn.style.boxSizing = "border-box";
-        favoriteBtn.style.borderRadius = "50%";
-        favoriteBtn.style.border = "1px solid #00ffdd";
-        favoriteBtn.style.background = "rgba(0, 35, 40, 0.92)";
-        favoriteBtn.style.fontWeight = "bold";
-        favoriteBtn.style.fontSize = "1.1rem";
-        favoriteBtn.style.lineHeight = "1";
-        favoriteBtn.style.display = "flex";
-        favoriteBtn.style.alignItems = "center";
-        favoriteBtn.style.justifyContent = "center";
-        favoriteBtn.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
-        favoriteBtn.style.cursor = "pointer";
-        const applyFavoriteBtnState = () => {
-          const isFavorite = typeof ProtocolSystem.isFavorite === "function"
-            ? ProtocolSystem.isFavorite(protocolName)
-            : favoriteProtocolSet.has(protocolName);
-          favoriteBtn.style.color = isFavorite ? "#ffd84d" : "#4e696f";
-          favoriteBtn.style.textShadow = isFavorite ? "0 0 8px rgba(255,216,77,0.85)" : "none";
-        };
-        applyFavoriteBtnState();
-        favoriteBtn.addEventListener("click", (evt) => {
-          evt.stopPropagation();
-          if (typeof ProtocolSystem.toggleFavorite === "function") {
-            ProtocolSystem.toggleFavorite(protocolName);
-            applyFavoriteBtnState();
-          }
-        });
-        card.appendChild(favoriteBtn);
-
-        // Protocol name
-        const nameEl = document.createElement("div");
-        nameEl.textContent = protocolName;
-        const discovered = (typeof ProtocolSystem.isDiscovered === "function")
-          ? ProtocolSystem.isDiscovered(protocolName, false)
-          : state.discovered;
-        nameEl.style.color = discovered ? "#00ffdd" : "#888";
-        nameEl.style.fontWeight = "bold";
-        nameEl.style.fontSize = "1rem";
-        nameEl.style.marginBottom = "5px";
-        card.appendChild(nameEl);
-
-        if (state.isNew && discovered) {
-          const newEl = document.createElement("div");
-          newEl.textContent = "NEW";
-          newEl.style.color = "#fff06a";
-          newEl.style.fontWeight = "bold";
-          newEl.style.fontSize = "0.75rem";
-          newEl.style.marginBottom = "4px";
-          card.appendChild(newEl);
-        }
-
-        const isStarterSelected = discovered && starterProtocolSet.has(protocolName);
-        if (isStarterSelected) {
-          const starterBadge = document.createElement("div");
-          starterBadge.textContent = "✓";
-          starterBadge.title = "Starter protocol selected";
-          starterBadge.style.position = "absolute";
-          starterBadge.style.top = "8px";
-          starterBadge.style.right = "32px";
-          starterBadge.style.width = "18px";
-          starterBadge.style.height = "18px";
-          starterBadge.style.borderRadius = "50%";
-          starterBadge.style.border = "1px solid #00ffdd";
-          starterBadge.style.background = "rgba(0, 35, 40, 0.92)";
-          starterBadge.style.color = "#00ffdd";
-          starterBadge.style.fontWeight = "bold";
-          starterBadge.style.fontSize = "0.85rem";
-          starterBadge.style.lineHeight = "1";
-          starterBadge.style.display = "flex";
-          starterBadge.style.alignItems = "center";
-          starterBadge.style.justifyContent = "center";
-          starterBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
-          starterBadge.style.pointerEvents = "none";
-          card.appendChild(starterBadge);
-        }
-
-        if (discovered) {
-          card.addEventListener("click", () => {
-            const currentStarters = Array.isArray(ProtocolSystem.starterProtocols)
-              ? ProtocolSystem.starterProtocols
-                  .filter(name => (typeof ProtocolSystem.isDiscovered === "function")
-                    ? ProtocolSystem.isDiscovered(name, false)
-                    : !!ProtocolSystem.protocolBoard[name]?.discovered)
-                  .slice(0, 2)
-              : [];
-            const existingIndex = currentStarters.indexOf(protocolName);
-            let nextStarters;
-
-            if (existingIndex >= 0) {
-              nextStarters = currentStarters.filter(name => name !== protocolName);
-              const applied = (typeof ProtocolSystem.setStarters === "function")
-                ? ProtocolSystem.setStarters(nextStarters)
-                : false;
-              if (!applied) return;
-              const restoreScrollTop = scrollContent.scrollTop;
-              menuOverlay.remove();
-              showProtocolMenu(restoreScrollTop);
-              return;
-            }
-            if (currentStarters.length < 2) {
-              nextStarters = [...currentStarters, protocolName];
-              const applied = (typeof ProtocolSystem.setStarters === "function")
-                ? ProtocolSystem.setStarters(nextStarters)
-                : false;
-              if (!applied) return;
-              const restoreScrollTop = scrollContent.scrollTop;
-              menuOverlay.remove();
-              showProtocolMenu(restoreScrollTop);
-              return;
-            }
-            // If already 2 selected, prompt to replace
-            const modal = document.createElement("div");
-            modal.style.position = "fixed";
-            modal.style.left = 0;
-            modal.style.top = 0;
-            modal.style.width = "100vw";
-            modal.style.height = "100vh";
-            modal.style.background = "rgba(0,0,0,0.7)";
-            modal.style.display = "flex";
-            modal.style.alignItems = "center";
-            modal.style.justifyContent = "center";
-            modal.style.zIndex = 2000;
-            const box = document.createElement("div");
-            box.style.background = "#01222b";
-            box.style.border = "2px solid #00ffdd";
-            box.style.borderRadius = "10px";
-            box.style.padding = "28px 32px";
-            box.style.display = "flex";
-            box.style.flexDirection = "column";
-            box.style.alignItems = "center";
-            box.style.boxShadow = "0 0 18px #00ffdd55";
-            const msg = document.createElement("div");
-            msg.textContent = "Starter limit reached. Replace which starter?";
-            msg.style.color = "#00ffdd";
-            msg.style.fontWeight = "bold";
-            msg.style.fontSize = "1.1rem";
-            msg.style.marginBottom = "18px";
-            box.appendChild(msg);
-            const btnRow = document.createElement("div");
-            btnRow.style.display = "flex";
-            btnRow.style.gap = "18px";
-            btnRow.style.marginBottom = "10px";
-            currentStarters.forEach(selName => {
-              // Button container for name and stat change
-              const btnContainer = document.createElement("div");
-              btnContainer.style.display = "flex";
-              btnContainer.style.flexDirection = "column";
-              btnContainer.style.alignItems = "center";
-              btnContainer.style.minWidth = "160px";
-              btnContainer.style.maxWidth = "220px";
-              btnContainer.style.margin = "0 2px";
-
-              // Protocol name button
-              const btn = document.createElement("button");
-              btn.textContent = selName;
-              btn.style.padding = "0.6rem 1.2rem";
-              btn.style.background = "rgba(0,0,0,0.7)";
-              btn.style.color = "#00ffdd";
-              btn.style.border = "2px solid #00ffdd";
-              btn.style.borderRadius = "8px";
-              btn.style.fontSize = "1rem";
-              btn.style.cursor = "pointer";
-              btn.style.marginBottom = "6px";
-              btn.addEventListener("click", () => {
-                // Replace selected starter
-                const idxToReplace = currentStarters.indexOf(selName);
-                if (idxToReplace !== -1) {
-                  nextStarters = [...currentStarters];
-                  const replacedName = nextStarters[idxToReplace];
-                  nextStarters.splice(idxToReplace, 1, protocolName);
-                  const applied = (typeof ProtocolSystem.setStarters === "function")
-                    ? ProtocolSystem.setStarters(nextStarters)
-                    : false;
-                  if (!applied) return;
-                  document.body.removeChild(modal);
-                  // Re-render the protocol menu to reflect new selection state
-                  const restoreScrollTop = scrollContent.scrollTop;
-                  menuOverlay.remove();
-                  showProtocolMenu(restoreScrollTop);
-                }
-              });
-
-              // --- Stat comparison below protocol name, single column layout ---
-              const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
-              const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
-              const aName = selName;
-              const bName = currentStarters.find(n => n !== selName);
-              const aMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                ? ProtocolSystem.getProtocolEffectiveMods(aName)
-                : (PROTOCOLS[aName]?.statMods || {});
-              const bMods = bName && ((typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                ? ProtocolSystem.getProtocolEffectiveMods(bName)
-                : (PROTOCOLS[bName]?.statMods || {}));
-              const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-                ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
-                : (PROTOCOLS[protocolName]?.statMods || {});
-              // x = a + b
-              // (x - a) + y = c
-              let statHtml = `<div style='margin-bottom:2px; font-size:0.97em; background:rgba(0,20,30,0.92); border-radius:8px; border:1.5px solid #00ffdd; box-shadow:0 0 8px #00ffdd33; padding:7px 10px; width:100%;'>`;
-              statHtml += `<div style='color:#00ffdd; font-weight:bold; margin-bottom:2px; text-align:center;'>Result if replaced:</div>`;
-              statHtml += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
-              statOrder.forEach((stat, i) => {
-                const a = Number(aMods[stat]) || 0;
-                const b = bMods ? (Number(bMods[stat]) || 0) : 0;
-                const y = Number(hoveredMods[stat]) || 0;
-                const x = a + b;
-                const c = b + y;
-                let color = c > x ? "#00ff88" : c < x ? "#ff4444" : "#bbbbbb";
-                let cStr = c < 0 ? c.toString() : c.toString();
-                statHtml += `<div style='display:flex; align-items:center;'><span style='width:54px; display:inline-block;'>${statShort[stat]}</span> <span style='color:#bbbbbb; min-width:16px; display:inline-block; text-align:right;'>${x}</span> <span style='margin:0 3px;'>→</span> <span style='color:${color}; min-width:16px; display:inline-block; text-align:right;'>${cStr}</span></div>`;
-              });
-              statHtml += `</div></div>`;
-              btnContainer.appendChild(btn);
-              btnContainer.insertAdjacentHTML('beforeend', statHtml);
-              btnRow.appendChild(btnContainer);
-            });
-            box.appendChild(btnRow);
-            const cancelBtn = document.createElement("button");
-            cancelBtn.textContent = "Cancel";
-            cancelBtn.style.padding = "0.5rem 1.1rem";
-            cancelBtn.style.background = "rgba(0,0,0,0.5)";
-            cancelBtn.style.color = "#fff";
-            cancelBtn.style.border = "1.5px solid #aaa";
-            cancelBtn.style.borderRadius = "8px";
-            cancelBtn.style.fontSize = "1rem";
-            cancelBtn.style.marginTop = "8px";
-            cancelBtn.style.cursor = "pointer";
-            cancelBtn.addEventListener("click", () => {
-              document.body.removeChild(modal);
-            });
-            box.appendChild(cancelBtn);
-            modal.appendChild(box);
-            document.body.appendChild(modal);
-          });
-        }
-
-        // Rarity
-        const rarityEl = document.createElement("div");
-        rarityEl.textContent = protocol.rarity;
-        rarityEl.style.color = discovered ? "#aaf6ff" : "#666";
-        rarityEl.style.fontSize = "0.85rem";
-        rarityEl.style.marginBottom = "5px";
-        card.appendChild(rarityEl);
-
-        const currentUpgradeLevel = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
-          ? ProtocolSystem.normalizeUpgradeTier(state.upgradeTier)
-          : (state.upgradeTier || (ProtocolSystem.upgradeTiers?.[0] || "Trivial"));
-        const currentTierIndex = (typeof ProtocolSystem.getUpgradeTierIndex === "function")
-          ? ProtocolSystem.getUpgradeTierIndex(currentUpgradeLevel)
-          : 0;
-        const totalTierCount = (Array.isArray(ProtocolSystem.upgradeTiers) && ProtocolSystem.upgradeTiers.length > 0)
-          ? ProtocolSystem.upgradeTiers.length
-          : 5;
-        const nextUpgradeCost = (typeof ProtocolSystem.getNextUpgradeCost === "function")
-          ? ProtocolSystem.getNextUpgradeCost(protocolName)
-          : null;
-
-        const upgradeLevelEl = document.createElement("div");
-        upgradeLevelEl.textContent = `Upgrade Level: ${currentUpgradeLevel} (${currentTierIndex + 1}/${totalTierCount})`;
-        upgradeLevelEl.style.color = discovered ? "#c8ffff" : "#666";
-        upgradeLevelEl.style.fontSize = "0.8rem";
-        upgradeLevelEl.style.marginBottom = "3px";
-        card.appendChild(upgradeLevelEl);
-
-        const nextCostEl = document.createElement("div");
-        nextCostEl.textContent = `Upgrade Cost: ${nextUpgradeCost === null ? "MAX" : `${nextUpgradeCost} Bytes`}`;
-        nextCostEl.style.color = discovered ? "#aaf6ff" : "#666";
-        nextCostEl.style.fontSize = "0.8rem";
-        nextCostEl.style.marginBottom = "4px";
-        card.appendChild(nextCostEl);
-
-        const intentEl = document.createElement("div");
-        intentEl.textContent = protocol.intent || "Unknown";
-        intentEl.style.color = discovered ? "#aaf6ff" : "#666";
-        intentEl.style.fontSize = "0.8rem";
-        intentEl.style.marginBottom = "12px";
-        card.appendChild(intentEl);
-
-        const effectiveMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
-          ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
-          : protocol.statMods;
-        const nextUpgradeEffects = (typeof ProtocolSystem.getProtocolNextUpgradeEffects === "function")
-          ? ProtocolSystem.getProtocolNextUpgradeEffects(protocolName)
-          : {};
-        const formatSigned = (num) => `${num > 0 ? "+" : ""}${num}`;
-        const statTexts = [];
-        Object.keys(protocol.statMods).forEach(stat => {
-          const effectiveValue = effectiveMods[stat] || 0;
-          if (effectiveValue === 0) return;
-          const nextEffect = nextUpgradeCost === null ? null : (nextUpgradeEffects[stat] || 0);
-          const nextTotalValue = nextEffect === null ? null : (effectiveValue + nextEffect);
-          const nextTotalText = nextTotalValue === null ? "MAX" : formatSigned(nextTotalValue);
-          statTexts.push(`${formatSigned(effectiveValue)} ${stat} (next ${nextTotalText})`);
-        });
-
-        const powerModifierLabelEl = document.createElement("div");
-        powerModifierLabelEl.textContent = "Power Modifier:";
-        powerModifierLabelEl.style.color = discovered ? "#00ff88" : "#555";
-        powerModifierLabelEl.style.fontSize = "0.8rem";
-        powerModifierLabelEl.style.fontWeight = "bold";
-        powerModifierLabelEl.style.marginTop = "0";
-        card.appendChild(powerModifierLabelEl);
-
-        const powerModifierListEl = document.createElement("div");
-        powerModifierListEl.textContent = statTexts.length > 0 ? statTexts.join("\n") : "No modifiers";
-        powerModifierListEl.style.color = discovered ? "#00ff88" : "#555";
-        powerModifierListEl.style.fontSize = "0.8rem";
-        powerModifierListEl.style.whiteSpace = "pre-line";
-        powerModifierListEl.style.lineHeight = "1.25";
-        card.appendChild(powerModifierListEl);
-
-        if (discovered) {
-          // Button container
-          const btnContainer = document.createElement("div");
-          btnContainer.style.display = "flex";
-          btnContainer.style.gap = "8px";
-          btnContainer.style.marginTop = "8px";
-
-          // Upgrade button
-          const upgradeBtn = document.createElement("button");
-          upgradeBtn.type = "button";
-          upgradeBtn.textContent = nextUpgradeCost === null ? "MAX" : "Upgrade";
-          upgradeBtn.style.padding = "0.35rem 0.6rem";
-          upgradeBtn.style.borderRadius = "6px";
-          upgradeBtn.style.border = "1px solid #00ffdd";
-          upgradeBtn.style.background = "rgba(0,0,0,0.4)";
-          upgradeBtn.style.color = "#00ffdd";
-          upgradeBtn.style.fontSize = "0.78rem";
-          upgradeBtn.style.cursor = nextUpgradeCost === null ? "default" : "pointer";
-          if (nextUpgradeCost === null) {
-            upgradeBtn.disabled = true;
-            upgradeBtn.style.opacity = "0.65";
-          }
-          upgradeBtn.addEventListener("click", (evt) => {
-            evt.stopPropagation();
-            if (nextUpgradeCost === null) return;
-            if (totalCollectedBytes < nextUpgradeCost) {
-              showUpgradeInfoModal(
-                "INSUFFICIENT BYTES",
-                `Not enough Bytes. Need ${nextUpgradeCost}, have ${totalCollectedBytes}.`
-              );
-              return;
-            }
-            const nextTierName = (typeof ProtocolSystem.getNextUpgradeTierName === "function")
-              ? ProtocolSystem.getNextUpgradeTierName(protocolName)
-              : "Next";
-            showUpgradeConfirmModal(
-              `Upgrade ${protocolName} to ${nextTierName} for ${nextUpgradeCost} Bytes?`,
-              () => {
-                const result = (typeof ProtocolSystem.upgradeProtocol === "function")
-                  ? ProtocolSystem.upgradeProtocol(protocolName, totalCollectedBytes)
-                  : { success: false };
-                if (!result.success) {
-                  if (result.reason === "insufficient") {
-                    showUpgradeInfoModal(
-                      "INSUFFICIENT BYTES",
-                      `Not enough Bytes. Need ${result.cost}, have ${totalCollectedBytes}.`
-                    );
-                  }
-                  return;
-                }
-                totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
-                saveCollectedBytes();
-                const restoreScrollTop = scrollContent.scrollTop;
-                menuOverlay.remove();
-                showProtocolMenu(restoreScrollTop);
-              }
-            );
-          });
-          btnContainer.appendChild(upgradeBtn);
-
-          // Downgrade button
-          const canDowngrade = currentTierIndex > 0;
-          const downgradeBtn = document.createElement("button");
-          downgradeBtn.type = "button";
-          downgradeBtn.textContent = "Downgrade";
-          downgradeBtn.style.padding = "0.35rem 0.6rem";
-          downgradeBtn.style.borderRadius = "6px";
-          downgradeBtn.style.border = "1px solid #ff6666";
-          downgradeBtn.style.background = "rgba(0,0,0,0.4)";
-          downgradeBtn.style.color = canDowngrade ? "#ff6666" : "#555";
-          downgradeBtn.style.fontSize = "0.78rem";
-          downgradeBtn.style.cursor = canDowngrade ? "pointer" : "default";
-          if (!canDowngrade) {
-            downgradeBtn.disabled = true;
-            downgradeBtn.style.opacity = "0.65";
-          }
-          downgradeBtn.addEventListener("click", (evt) => {
-            evt.stopPropagation();
-            if (!canDowngrade) return;
-            // Confirm downgrade
-            showUpgradeConfirmModal(
-              `Downgrade ${protocolName} to ${ProtocolSystem.upgradeTiers[currentTierIndex - 1]} and refund last upgrade cost?`,
-              () => {
-                const result = (typeof ProtocolSystem.downgradeProtocol === "function")
-                  ? ProtocolSystem.downgradeProtocol(protocolName)
-                  : { success: false };
-                if (!result.success) {
-                  showUpgradeInfoModal(
-                    "CANNOT DOWNGRADE",
-                    result.reason === "min-tier"
-                      ? "Already at minimum tier."
-                      : "Unable to downgrade."
-                  );
-                  return;
-                }
-                totalCollectedBytes += result.refund || 0;
-                saveCollectedBytes();
-                const restoreScrollTop = scrollContent.scrollTop;
-                menuOverlay.remove();
-                showProtocolMenu(restoreScrollTop);
-              },
-              true // isDowngrade
-            );
-          });
-          btnContainer.appendChild(downgradeBtn);
-
-          card.appendChild(btnContainer);
-        }
-
-        // Lock badge
-        if (!discovered) {
-          const lockEl = document.createElement("div");
-          lockEl.textContent = "🔒 Locked";
-          lockEl.style.color = "#ff6666";
-          lockEl.style.fontWeight = "bold";
-          lockEl.style.fontSize = "0.8rem";
-          lockEl.style.marginTop = "5px";
-          card.appendChild(lockEl);
-        }
-
-        gridContainer.appendChild(card);
-      });
-
-      scrollContent.appendChild(gridContainer);
-    });
+    scrollContent.style.width = "100%";
     menuOverlay.appendChild(scrollContent);
     document.body.appendChild(menuOverlay);
-
-    if (Number.isFinite(initialScrollTop) && initialScrollTop > 0) {
-      requestAnimationFrame(() => {
-        scrollContent.scrollTop = initialScrollTop;
-      });
-    }
 
     // Back button functionality
     backBtn.addEventListener("click", () => {
@@ -2189,11 +1833,39 @@ window.onload = function () {
       showMenu();
     });
 
-    return menuOverlay;
   }
 
-              // Draw jagged lightning bolt between two points
-              function drawLightningBolt(x1, y1, x2, y2, color, segments = 8, jaggedness = 16) {
+  // Draw jagged lightning bolt between two points
+  function drawLightningBolt(x1, y1, x2, y2, color, segments = 8, jaggedness = 16) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    // Removed shadowColor and shadowBlur for mobs
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      // Linear interpolation
+      let nx = x1 + (x2 - x1) * t;
+      let ny = y1 + (y2 - y1) * t;
+      // Add random jaggedness perpendicular to the main direction
+      const dx = y2 - y1;
+      const dy = x1 - x2;
+      const mag = Math.sqrt(dx * dx + dy * dy);
+      if (mag > 0) {
+        nx += (dx / mag) * (Math.random() - 0.5) * jaggedness;
+        ny += (dy / mag) * (Math.random() - 0.5) * jaggedness;
+      }
+      ctx.lineTo(nx, ny);
+    }
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // Draw jagged lightning bolt between two points
+            function drawLightningBolt(x1, y1, x2, y2, color, segments = 8, jaggedness = 16) {
                 ctx.save();
                 ctx.strokeStyle = color;
                 ctx.lineWidth = 1.5;
@@ -2293,18 +1965,38 @@ window.onload = function () {
   let runBytesFinalized = false;
   const bytePickupNotifications = [];
 
-  // Wave unlock system
-  const AVAILABLE_WAVES = [
+  // Milestone waves available across all difficulties: 1, 5, 10, 20, 30, 40
+  const MILESTONE_WAVES = [
     { wave: 1, level: 1 },
     { wave: 5, level: 5 },
     { wave: 10, level: 9 },
-    { wave: 20, level: 16 }
+    // Wave 15 is level 11
+    { wave: 20, level: 13 },
+    { wave: 30, level: 17 },
+    { wave: 40, level: 21 }
   ];
 
   function getUnlockedWaves() {
     try {
       const raw = localStorage.getItem(UNLOCKED_WAVES_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [1]; // Wave 1 always unlocked
+      if (!raw) {
+        // First run: only wave 1 is available
+        return [1];
+      }
+      
+      const parsed = JSON.parse(raw);
+      
+      // FIX: If we have old format [1, 5, 10, 20], upgrade to [1]
+      if (Array.isArray(parsed) && parsed.length <= 4 && parsed[0] === 1) {
+        const isOldFormat = parsed.every(w => [1, 5, 10, 20].includes(w));
+        if (isOldFormat) {
+          const newFormat = [1];
+          localStorage.setItem(UNLOCKED_WAVES_STORAGE_KEY, JSON.stringify(newFormat));
+          return newFormat;
+        }
+      }
+      
+      return parsed;
     } catch (err) {
       return [1];
     }
@@ -2321,6 +2013,15 @@ window.onload = function () {
 
   function isWaveUnlocked(waveNum) {
     return getUnlockedWaves().includes(waveNum);
+  }
+
+  function lockWave(waveNum) {
+    const unlocked = getUnlockedWaves();
+    const index = unlocked.indexOf(waveNum);
+    if (index > -1) {
+      unlocked.splice(index, 1);
+      localStorage.setItem(UNLOCKED_WAVES_STORAGE_KEY, JSON.stringify(unlocked));
+    }
   }
 
   function loadCollectedBytes() {
@@ -3263,9 +2964,8 @@ window.onload = function () {
     const rule = dropRules[enemyType] || { chance: 0.1 };
     if (!forceDrop && Math.random() > rule.chance) return;
 
-    const activeOrbProtocols = new Set(protocolOrbs.map(orb => orb.protocolName));
-    const droppableProtocols = Object.keys(PROTOCOLS)
-      .filter(name => !activeOrbProtocols.has(name));
+    // Allow duplicates: protocols can drop even if another orb of the same protocol is already on-screen.
+    const droppableProtocols = Object.keys(PROTOCOLS);
     if (droppableProtocols.length === 0) return;
 
     const getPool = (rarity, tiers = null) => {
@@ -3343,7 +3043,6 @@ window.onload = function () {
       requiredFrames: requiredSeconds * 60,
       progressFrames: 0
     });
-    console.log(`✓ Protocol orb dropped from ${enemyType}: ${droppedProtocol} (${rarity})`);
   }
 
   function completeProtocolOrb(orb) {
@@ -3381,9 +3080,7 @@ window.onload = function () {
         );
       }
       if (useRunOnlyDiscovery) {
-        console.log(`✓ Protocol discovered from orb (run-only editor): ${orb.protocolName}`);
       } else {
-        console.log(`✓ Protocol discovered from orb: ${orb.protocolName}`);
       }
       if (!wasRunDiscovered) {
         protocolWarnings.push({
@@ -3405,7 +3102,6 @@ window.onload = function () {
         protocolWarnings.shift();
       }
       if (!useRunOnlyDiscovery) {
-        console.log(`+${protocolInfluence} Bytes (Influence)`);
       }
     }
   }
@@ -3760,11 +3456,17 @@ window.onload = function () {
       player.attackCooldown = player.cooldownBase;
       if (nearest.health <= 0) {
         const noLootDrop = !!(nearest.noLoot || nearest.noXP);
+        // Check if wave end condition is "boss" - suppress XP drops in that case
+        const isBossWaveEndCondition = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+        
         if (nearest.type === "gruntBoss") {
-          gainXP(xpToLevel);
+          // Don't award direct XP if using boss wave end condition
+          if (!isBossWaveEndCondition) {
+            gainXP(xpToLevel);
+          }
         }
         if (!noLootDrop && nearest.type === "grunt" && wave !== 5) {
-          if (!nearest.noXP) {
+          if (!nearest.noXP && !isBossWaveEndCondition) {
             xpDrops.push({ x: nearest.x, y: nearest.y + 2 });
           }
         }
@@ -4087,7 +3789,6 @@ const droplifelenght = 280;
   // Main function to spawn waves based on the current wave number, with custom logic for each wave
   function spawnWave() {
     if (!window.SentinelWaveControl || typeof window.SentinelWaveControl.spawnWave !== "function") {
-      console.warn("SentinelWaveControl.spawnWave is unavailable.");
       return;
     }
     window.SentinelWaveControl.spawnWave(getWaveControlContext());
@@ -4854,6 +4555,8 @@ const droplifelenght = 280;
     window._bossMinorBursts = null;
     window._wave10MinorsSpawned = false;
     window._editorSessionActive = false;
+    window._timelineWaveState = null;
+    window._timelineCompletedWaves = {};
     gameOver = false;
     showStats = false;
     paused = false;
@@ -5189,11 +4892,66 @@ const droplifelenght = 280;
       const e = enemies[i];
           if (e.health <= 0) {
             // Create colored particles on enemy death with different tones
-            if (e.type === "gruntBoss" || e.type === "gruntBossMinor") {
+            if (e.type === "gruntBoss") {
               // Boss death nova: emit a ring of magenta particles
               const novaCount = 36;
-              // Make gruntBossMinor's nova radius smaller
-              const novaRadius = e.type === "gruntBossMinor" ? e.radius + 22 : e.radius + 32;
+              const novaRadius = e.radius + 32;
+              for (let j = 0; j < novaCount; j++) {
+                const angle = (Math.PI * 2 * j) / novaCount;
+                const speed = 3.2 + Math.random() * 1.8;
+                const color = ["#b800e0", "#d900ff", "#ff33ff", "#910091"][Math.floor(Math.random()*4)];
+                const size = 7 + Math.random() * 3;
+                const life = 32 + Math.random() * 24;
+                const decay = 0.92 + Math.random() * 0.04;
+                spawnParticle(
+                  e.x + Math.cos(angle) * novaRadius,
+                  e.y + Math.sin(angle) * novaRadius,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
+                  life,
+                  color,
+                  decay,
+                  size,
+                  "enemyDeath"
+                );
+              }
+              // Don't drop XP if wave end condition is "boss"
+              const isBossWaveEndCondition1 = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+              // Drop the same rewards for all boss types (rare + 2 common protocols, plus 25 XP drops)
+              if (!(e.noLoot || e.noXP) && !isBossWaveEndCondition1) {
+                tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
+                for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
+                  const spread = 16;
+                  tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
+                    forceDrop: true,
+                    rarity: "Common"
+                  });
+                }
+                for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                  const xpAngle = Math.random() * Math.PI * 2;
+                  const xpDist = 14 + Math.random() * 34;
+                  xpDrops.push({
+                    x: e.x + Math.cos(xpAngle) * xpDist,
+                    y: e.y + Math.sin(xpAngle) * xpDist
+                  });
+                }
+              }
+              // Boss-gated waves use direct completion; other waves use standard burst progression
+              if (wave === 5) {
+                unlockWave(5);
+                wave++;
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
+              }
+            } else if (e.type === "gruntBossMinor") {
+              // Grunt boss minor is not a true boss; keep its special death visuals + small XP payout
+              const novaCount = 36;
+              const novaRadius = e.radius + 22;
               for (let j = 0; j < novaCount; j++) {
                 const angle = (Math.PI * 2 * j) / novaCount;
                 const speed = 3.2 + Math.random() * 1.8;
@@ -5214,7 +4972,8 @@ const droplifelenght = 280;
                 );
               }
               // Scatter 5 xpDrops around gruntBossMinor's location
-              if (e.type === "gruntBossMinor") {
+              const isBossWaveEndCondition1 = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+              if (!isBossWaveEndCondition1) {
                 for (let k = 0; k < 5; k++) {
                   const angle = Math.random() * Math.PI * 2;
                   const dist = 18 + Math.random() * 22;
@@ -5223,28 +4982,6 @@ const droplifelenght = 280;
                     y: e.y + Math.sin(angle) * dist
                   });
                 }
-              }
-              // Boss-gated waves use direct completion; other waves use standard burst progression
-              if (e.type === "gruntBoss" && wave === 5) {
-                unlockWave(5);
-                wave++;
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
-              } else if (e.type === "slingerBoss" && wave === 10) {
-                unlockWave(10);
-                wave++;
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
               }
             } else if (e.type === "brute" || e.type === "bruteBoss" || e.type === "slingerBoss") {
               // Brute death burst: mimic nova 'growing' burst
@@ -5322,6 +5059,27 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
+              if (!(e.noLoot || e.noXP)) {
+                const isBossWaveEndConditionStalker = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+                if (!isBossWaveEndConditionStalker) {
+                  tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
+                  for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
+                    const spread = 16;
+                    tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
+                      forceDrop: true,
+                      rarity: "Common"
+                    });
+                  }
+                  for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                    const xpAngle = Math.random() * Math.PI * 2;
+                    const xpDist = 14 + Math.random() * 34;
+                    xpDrops.push({
+                      x: e.x + Math.cos(xpAngle) * xpDist,
+                      y: e.y + Math.sin(xpAngle) * xpDist
+                    });
+                  }
+                }
+              }
               // Wave 30 boss gate
               if (wave === 30) {
                 unlockWave(30);
@@ -5367,7 +5125,9 @@ const droplifelenght = 280;
               }
             }
             if (!(e.noLoot || e.noXP)) {
-              if (e.type === "bruteBoss" || e.type === "slingerBoss") {
+              const isBoss = ["gruntBoss", "bruteBoss", "slingerBoss", "stalkerBoss"].includes(e.type);
+              if (isBoss) {
+                // Bosses always drop 1 rare + 2 common protocols, plus 25 XP drops.
                 tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
                 for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
                   const spread = 16;
@@ -6873,8 +6633,6 @@ const droplifelenght = 280;
           if (typeof burstCount !== 'undefined') burstCount = window._sentinelWaveState.burstCount;
         }
         const ctxWave = getWaveControlContext();
-        const waveUsesBossGate = wave === 5 || wave === 10 || wave === 20 || wave === 30;
-        const finalBurstReached = window._sentinelWaveState && window._sentinelWaveState.burstCount !== Infinity && window._sentinelWaveState.burstIndex >= window._sentinelWaveState.burstCount;
         
         // CRITICAL: For timeline waves, check if wave completed by verifying state was cleared
         const isUsingTimeline = window._editorWaveOverride && window._editorWaveOverride[wave] && window._editorWaveOverride[wave].timelineMode;
@@ -6882,23 +6640,24 @@ const droplifelenght = 280;
         if (isUsingTimeline && !window._timelineWaveState) {
           // Timeline state was cleared - wave completed
           timelineWaveJustCompleted = true;
-          console.log(`[MainLoop] Timeline wave ${wave} detected as complete (state cleared)`);
         }
         
+        // Use the actual endCondition from the wave's timeline configuration
+        // Only timeline waves with 'boss' endCondition are boss-gated
+        const endConditionIsBoss = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+        const waveUsesBossGate = isUsingTimeline && endConditionIsBoss;
+        const finalBurstReached = window._sentinelWaveState && window._sentinelWaveState.burstCount !== Infinity && window._sentinelWaveState.burstIndex >= window._sentinelWaveState.burstCount;
+        
         const allEnemiesCleared = enemies.length === 0;
-        const allowTimedOrClearAdvance = !waveUsesBossGate && (finalBurstReached || timelineWaveJustCompleted);
+        // Timeline waves that just completed can always advance (their end condition was already verified)
+        // Non-timeline waves advance when final burst reached, unless they're boss-gated
+        const allowTimedOrClearAdvance = timelineWaveJustCompleted || (!waveUsesBossGate && finalBurstReached);
+        
+        // DEBUG: Log wave progression for waves 1-5
+        if (wave <= 5 && window.debugWave) {
+        }
         if (allowTimedOrClearAdvance) {
           if (window.debugWaveTransition) {
-            console.log('[MainLoop] allowTimedOrClearAdvance triggered:', {
-              wave,
-              finalBurstReached,
-              timelineWaveJustCompleted,
-              burstIndex: ctxWave.getBurstIndex(),
-              burstCount: ctxWave.getBurstCount(),
-              enemiesLength: enemies.length,
-              interWavePending,
-              interWaveDelayTimer
-            });
           }
           if (!interWavePending) {
             interWavePending = true;
@@ -6909,22 +6668,17 @@ const droplifelenght = 280;
           const timerExpired = interWaveDelayTimer <= 0;
           const shouldAdvanceWave = allEnemiesCleared || timerExpired;
           if (shouldAdvanceWave) {
-            console.log(`[MainLoop] WAVE ADVANCEMENT: wave ${wave} -> ${wave + 1} (condition: ${timelineWaveJustCompleted ? 'timeline-complete' : (finalBurstReached ? 'burst-complete' : 'unknown')})`);
+            // DEBUG: Log before advancing
             if (window.debugWaveTransition) {
-              console.log('[MainLoop] Advancing wave details:', {
-                currentWave: wave,
-                nextWave: wave + 1,
-                burstIndex: ctxWave.getBurstIndex(),
-                burstCount: ctxWave.getBurstCount(),
-                enemiesLength: enemies.length,
-                allEnemiesCleared,
-                timerExpired,
-                isUsingTimeline
-              });
             }
             interWavePending = false;
             interWaveDelayTimer = 0;
             wave++;
+            // Auto-unlock the next wave for future runs (for waves 1-40)
+            if (wave <= 40 && typeof unlockWave === "function") {
+              unlockWave(wave);
+            }
+            
             try {
               let warnAudio = new Audio('warning.wav');
               warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0;
