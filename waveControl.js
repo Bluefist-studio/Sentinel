@@ -1,23 +1,8 @@
 // Global debug function to print wave state and burst arrays
 window.printWaveDebug = function() {
-  console.log('--- Sentinel Wave Debug ---');
-  console.log('window._sentinelWaveState:', window._sentinelWaveState);
-  console.log('window._customBursts:', window._customBursts);
-  console.log('window._customBrutes:', window._customBrutes);
-  console.log('window._customSlingers:', window._customSlingers);
-  console.log('window._customShielders:', window._customShielders);
-  console.log('window._customBeamers:', window._customBeamers);
-  console.log('window._customKamikazes:', window._customKamikazes);
-  console.log('window._customStalkers:', window._customStalkers);
-  console.log('window._customBossMinors:', window._customBossMinors);
-  console.log('window._customBosses:', window._customBosses);
-  console.log('window._customSlingerBosses:', window._customSlingerBosses);
-  console.log('window._customBruteBosses:', window._customBruteBosses);
-  console.log('window._customStalkerBosses:', window._customStalkerBosses);
-  console.log('---------------------------');
 };
 window.SentinelWaveControl = (function () {
-  const CODE_WAVE_MIN = 16;
+  const CODE_WAVE_MIN = 1;
   const CODE_WAVE_MAX = 50;
   const MOB_INTERVAL_KEYS = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss"];
   const MOB_INTERVAL_KEY_ALIASES = {
@@ -100,13 +85,28 @@ window.SentinelWaveControl = (function () {
     return true;
   }
 
-  // Paste future editor code strings into these wave slots (16-50).
+  // Paste future editor code strings into these wave slots (1-50).
   const DEFAULT_WAVE_EDITOR_CODES = {
-    16: "SWC3:eyJ2IjozLCJvIjp7IjE2Ijp7InQiOnRydWUsImwiOnsiZCI6MTgsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFsyLDJdLFs0LDNdLFs2LDNdLFs4LDRdLFsxMCw0XSxbMTIsMl0sWzE0LDJdXSwiYiI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXX19fX19",
-    17: "SWC3:eyJ2IjozLCJvIjp7IjE3Ijp7InQiOnRydWUsImwiOnsiZCI6MTgsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFsyLDJdLFs0LDNdLFs2LDNdLFs4LDRdLFsxMCw0XSxbMTIsMl0sWzE0LDJdLFsxNiwyXSxbMTgsMl1dLCJiIjpbWzAsMl0sWzIsMV0sWzQsMV0sWzYsMl1dLCJnYm0iOltbMiwxXSxbNywxXSxbMTIsMV1dfX19fX0=",
-    18: "SWC3:eyJ2IjozLCJvIjp7IjE4Ijp7InQiOnRydWUsImwiOnsiZCI6MTgsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFsyLDJdLFs0LDNdLFs2LDNdLFs4LDRdLFsxMCw0XSxbMTIsMl0sWzE0LDJdLFsxNiwyXSxbMTgsMl1dLCJiIjpbWzEsMl1dLCJrIjpbWzIsMV0sWzMsMV0sWzcsMV0sWzcuNSwxXSxbOCwxXSxbMTMsMV0sWzEyLDFdLFsxMi41LDFdLFsyLjUsMV1dLCJnYm0iOltbMiwzXV19fX19fQ==",
-    19: "SWC3:eyJ2IjozLCJvIjp7IjE5Ijp7InQiOnRydWUsImwiOnsiZCI6MTgsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFsyLDJdLFs0LDNdLFs2LDNdLFs4LDJdLFsxMCwyXSxbMTIsMl0sWzE0LDJdXSwiYiI6W1swLDFdLFsyLDFdLFs0LDFdLFs2LDJdXSwicyI6W1swLDFdLFsyLDFdLFs1LDFdLFs3LDFdLFsxMCwxXSxbMTIsMV1dLCJrIjpbWzIsMV0sWzcsMV0sWzEyLDFdXSwiZ2JtIjpbWzIsMV0sWzcsMV0sWzEyLDFdXX19fX19",
-    20: null, //Brute boss wave - no preset, must be configured in editor
+    1: "SWC3:eyJ2IjozLCJvIjp7IjEiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzUsMl0sWzEwLDNdLFsxNSw0XSxbMjAsNV0sWzAsMV1dfX19fX0=",
+    2: "SWC3:eyJ2IjozLCJvIjp7IjIiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzUsM10sWzEwLDNdLFsxNSwzXSxbMjAsM10sWzAsM10sWzIuNSwxXSxbNy41LDFdLFsxMi41LDFdLFsxNy41LDFdXX19fX19",
+    3: "SWC3:eyJ2IjozLCJvIjp7IjMiOnsidCI6dHJ1ZSwibCI6eyJkIjoxNiwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzAsM10sWzQsMl0sWzgsMl0sWzEyLDNdLFszLDFdLFs3LDJdLFsxMSwyXSxbMTUuOTksM10sWzE0LDJdLFsxNC41LDJdLFsxMC41LDFdXX19fX19",
+    4: "SWC3:eyJ2IjozLCJvIjp7IjQiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzE1LDFdLFswLDFdLFsyLjUsMV0sWzcuNSwxXSxbMTIuNSwxXSxbMTcuNSwxXSxbMTgsMV0sWzAuNSwxXSxbMTYsMV0sWzE0LjUsMV0sWzQsMV0sWzIsMV0sWzEsMV0sWzExLjUsMV0sWzE4LjUsMV0sWzguNSwxXSxbNiwxXSxbMTMuNSwxXSxbNywxXSxbMywxXSxbMTAuNSwxXSxbMTYuNSwxXSxbNSwxXSxbOS41LDFdLFsxOS45OSwxXSxbMTkuNSwxXV19fX19fQ==",
+    5: "SWC3:eyJ2IjozLCJvIjp7IjUiOnsidCI6dHJ1ZSwibCI6eyJkIjoxMjAsImUiOiJib3NzIiwibSI6eyJnIjpbWzQsMl0sWzgsMl0sWzEyLDJdLFsxNiwzXSxbMjAsM10sWzI0LDNdLFsyOCwzXSxbMzIsM10sWzM2LDNdLFs0MCwzXSxbNDQsM10sWzQ4LDNdLFs1MiwzXSxbNTYsM10sWzYwLDNdLFs2NCw0XSxbNjgsNF0sWzcyLDRdLFs3Niw0XSxbODAsNV0sWzg0LDVdLFs4OCw2XSxbOTIsNl0sWzk2LDddLFsxMDAsN10sWzEwNCw4XSxbMTA4LDhdLFsxMTIsOV0sWzExNiw5XSxbMTIwLDldLFsxMjQsM10sWzEyOCwzXSxbMTMyLDNdLFsxMzYsM10sWzE0MCwzXSxbMTQ0LDNdLFsxNDgsM10sWzE1MiwzXSxbMTU2LDNdLFsxNjAsM10sWzE2NCwzXSxbMTY4LDNdLFsxNzIsM10sWzE3NiwzXSxbMTgwLDRdLFsxODQsNF0sWzE4OCw0XSxbMTkyLDRdLFsxOTYsNF0sWzIwMCw0XSxbMjA0LDRdLFsyMDgsNF0sWzIxMiw0XSxbMjE2LDRdLFsyMjAsNF0sWzIyNCw0XSxbMjI4LDRdLFsyMzIsNF0sWzIzNiw0XSxbMjQwLDVdLFsyNDQsNV0sWzI0OCw1XSxbMjUyLDVdLFsyNTYsNV0sWzI2MCw1XSxbMjY0LDVdLFsyNjgsNV0sWzI3Miw1XSxbMjc2LDVdLFsyODAsNV0sWzI4NCw1XSxbMjg4LDJdLFsyOTIsMl0sWzI5NiwyXSxbMzAwLDJdLFswLDJdLFsyODksMV0sWzI4OC41LDFdLFsyODcuNSw1XV0sImdiIjpbWzAsMV1dfX19fX0=",
+    6: "SWC3:eyJ2IjozLCJvIjp7IjYiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJzIjpbWzMsMV0sWzYsMl0sWzEyLDNdLFsxOCwzXSxbMCwxXV19fX19fQ==",
+    7: "SWC3:eyJ2IjozLCJvIjp7IjciOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzIsMV0sWzQsMV0sWzYsMV0sWzgsMV0sWzEwLDFdLFsxMiwxXSxbMTQsMV0sWzE2LDFdLFsxOCwxXSxbMjAsMV0sWzAsMV1dLCJzIjpbWzMsMV0sWzYsMl0sWzEyLDNdLFsxOCwzXSxbMCwxXV19fX19fQ==",
+    8: "SWC3:eyJ2IjozLCJvIjp7IjgiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzEsMV0sWzIsMV0sWzMsMV0sWzQsMV0sWzUsMV0sWzYsMV0sWzcsMV0sWzgsMV0sWzksMV0sWzEwLDFdLFsxMSwxXSxbMTIsMV0sWzEzLDFdLFsxNCwxXSxbMTUsMV0sWzE2LDFdLFsxNywxXSxbMTgsMV0sWzE5LDFdLFsyMCwxXSxbMCwxXV0sInMiOltbMywxXSxbNiwxXSxbMTIsMV0sWzE4LDFdLFswLDNdXX19fX19",
+    9: "SWC3:eyJ2IjozLCJvIjp7IjkiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImFsbEVsaW1pbmF0ZWQiLCJtIjp7ImciOltbMiwxXSxbNiwyXSxbMTAsMl0sWzE0LDJdLFsxOCwyXSxbMCwxXSxbMC41LDFdLFsxLDFdLFsxLjUsMV0sWzQsMV0sWzgsMV0sWzEyLDFdLFsxNiwxXSxbMjAsMV1dLCJzIjpbWzMsMl0sWzYsMl0sWzEyLDFdLFsxOCwxXSxbMCwxXV0sImdibSI6W1swLDFdXX19fX19",
+    10: "SWC3:eyJ2IjozLCJvIjp7IjEwIjp7InQiOnRydWUsImwiOnsiZCI6MTcsImUiOiJib3NzIiwibSI6eyJzYiI6W1swLDFdXX19fX19",
+    11: "SWC3:eyJ2IjozLCJvIjp7IjExIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiayI6W1syLDFdLFs0LDFdLFs2LDJdLFs3LDJdLFs4LDJdLFsxMCwxXSxbMTEsMV0sWzEzLDFdLFsxNCwxXSxbMTcsMl0sWzE4LDJdLFswLDFdLFsxMC41LDJdLFsxMy41LDJdLFsxMiwyXSxbMTYsMl0sWzE5LDJdLFsyMCwyXV19fX19fQ==",
+    12: "SWC3:eyJ2IjozLCJvIjp7IjEyIjp7InQiOnRydWUsImwiOnsiZCI6MjUsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1s5LDFdLFs5LjUsMV0sWzEwLjUsMV0sWzEwLDFdLFsxNC41LDFdLFsxNSwxXSxbMTUuNSwxXSxbMTYsMV0sWzE2LjUsMV0sWzguNSwxXV0sImsiOltbMSwxXSxbMiwxXSxbNy41LDFdLFsxMy41LDFdLFsxOSwxXSxbMjAsMV0sWzIyLDFdLFsyMywxXSxbMCwxXSxbOCwxXSxbNywxXSxbMTMsMV0sWzE0LDFdLFsxOS41LDFdLFsyMi41LDFdXX19fX19",
+    13: "SWC3:eyJ2IjozLCJvIjp7IjEzIjp7InQiOnRydWUsImwiOnsiZCI6MjUsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1s5LDFdLFs5LjUsMV0sWzEwLjUsMV0sWzEwLDFdLFsxNC41LDFdLFsxNSwxXSxbMTUuNSwxXSxbMTYsMV0sWzE2LjUsMV0sWzguNSwxXV0sInMiOltbNy41LDFdLFsxMy41LDFdLFsxOS41LDFdLFswLDFdLFswLjUsMV0sWzgsMV0sWzE0LDFdLFsyMCwxXV0sImsiOltbMSwxXSxbMiwxXSxbNy41LDFdLFsxMy41LDFdLFsxOSwxXSxbMjAsMV0sWzIyLDFdLFsyMywxXSxbMCwxXSxbOCwxXSxbNywxXSxbMTMsMV0sWzE0LDFdLFsxOS41LDFdLFsyMi41LDFdXX19fX19",
+    14: "SWC3:eyJ2IjozLCJvIjp7IjE0Ijp7InQiOnRydWUsImwiOnsiZCI6MjUsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1s5LDFdLFs5LjUsMV0sWzEwLjUsMV0sWzEwLDFdLFsxNC41LDFdLFsxNSwxXSxbMTUuNSwxXSxbMTYsMV0sWzE2LjUsMV0sWzguNSwxXSxbMCwxXSxbMSwyXSxbMiwyXSxbMywxXV0sImsiOltbMSwyXSxbMiwxXSxbNy41LDFdLFsxMy41LDFdLFsxOSwxXSxbMjAsMV0sWzIyLDFdLFsyMywxXSxbMCwxXSxbOCwxXSxbNywxXSxbMTMsMV0sWzE0LDFdLFsxOS41LDFdLFsyMi41LDFdLFszLDFdLFs0LDFdXSwiZ2JtIjpbWzAsMV0sWzcsMV0sWzEzLjUsMV1dfX19fX0=",
+    15: "SWC3:eyJ2IjozLCJvIjp7IjE1Ijp7InQiOnRydWUsImwiOnsiZCI6MjEsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDNdLFszLDNdLFs2LDNdLFs5LDNdLFsxMiwzXSxbMTUsM10sWzE4LDNdXSwiYiI6W1swLDJdLFs2LDJdLFsxMiwyXSxbMTgsMl1dLCJzIjpbWzMsMV0sWzksMV0sWzE1LDFdXSwic2giOltbMiwxXSxbOCwxXSxbMTQsMV0sWzIwLDFdXSwiayI6W1s1LDFdLFsxMSwxXSxbMTcsMV1dfX19fX0=",
+    16: "SWC3:eyJ2IjozLCJvIjp7IjE2Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDNdLFszLDNdLFs2LDNdLFs5LDNdLFsxMiwzXSxbMTUsM10sWzE4LDNdXSwiYiI6W1swLDJdLFsxMiwyXV0sInMiOltbMywxXSxbOSwxXSxbMTUsMV1dfX19fX0=",
+    17: "SWC3:eyJ2IjozLCJvIjp7IjE3Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDNdLFszLDNdLFs2LDNdLFs5LDNdLFsxMiwzXSxbMTUsM10sWzE4LDNdXSwiYiI6W1swLDJdLFsxMiwyXV0sInMiOltbMywxXSxbOSwxXSxbMTUsMV1dLCJrIjpbWzIsMV0sWzMsMV0sWzgsMV0sWzksMV0sWzE0LjUsMV0sWzE1LjUsMV1dfX19fX0=",
+    18: "SWC3:eyJ2IjozLCJvIjp7IjE4Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDNdLFszLDNdLFs2LDNdLFs5LDNdLFsxMiwzXSxbMTUsM10sWzE4LDNdXSwiYiI6W1swLDJdLFsxMiwyXV0sInMiOltbMywxXSxbOSwxXSxbMTUsMV1dLCJrIjpbWzIsMl0sWzMsMV0sWzgsMl0sWzksMV0sWzE0LjUsMl0sWzE1LjUsMV0sWzQsMV0sWzEwLDFdLFsxNi41LDFdXX19fX19",
+    19: "SWC3:eyJ2IjozLCJvIjp7IjE5Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDNdLFszLDNdLFs2LDNdLFs5LDNdLFsxMiwzXSxbMTUsM10sWzE4LDNdXSwiYiI6W1swLDJdLFsxMiwyXV0sInMiOltbMywxXSxbOSwxXSxbMTUsMV1dLCJrIjpbWzIsMl0sWzMsMV0sWzgsMl0sWzksMV0sWzE0LjUsMl0sWzE1LjUsMV0sWzQsMV0sWzEwLDFdLFsxNi41LDFdLFs2LDFdLFsxMi41LDFdLFsxOC41LDFdXX19fX19",
+    20: "SWC3:eyJ2IjozLCJvIjp7IjIwIjp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIiwibSI6eyJiYiI6W1swLDFdXX19fX19",
     21: "SWC3:eyJ2IjozLCJvIjp7IjIxIjp7InQiOnRydWUsImwiOnsiZCI6NDIsImUiOiJkdXJhdGlvbiIsIm0iOnsic3QiOltbMCwxXSxbNCwxXSxbOCwxXSxbMTIsMV0sWzE2LDFdLFsyMCwxXSxbMjQsMV0sWzI4LDFdLFszMiwxXSxbMzYsMV1dfX19fX0=",
     22: "SWC3:eyJ2IjozLCJvIjp7IjIyIjp7InQiOnRydWUsImwiOnsiZCI6NDIsImUiOiJkdXJhdGlvbiIsIm0iOnsiYiI6W1swLDNdXSwic3QiOltbNCwyXSxbOCwxXSxbMTIsMV0sWzE2LDFdLFsyMCwxXSxbMjQsMV0sWzI4LDFdLFszMiwxXSxbMzYsMV1dLCJnYm0iOltbMCwzXV19fX19fQ==",
     23: "SWC3:eyJ2IjozLCJvIjp7IjIzIjp7InQiOnRydWUsImwiOnsiZCI6NDIsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFs0LDJdLFs4LDJdLFsxMiwyXSxbMTYsMl0sWzIwLDJdLFsyNCwyXSxbMjgsMl0sWzMyLDJdLFszNiwyXV0sImIiOltbMCwzXV0sImsiOltbMCwxXSxbNCwxXSxbOCwxXSxbMTIsMV0sWzE2LDFdLFsyMCwxXSxbMjQsMV0sWzI4LDFdLFszMiwxXSxbMzYsMV1dLCJzdCI6W1s0LDJdLFsxMiwyXSxbMjAsMl0sWzI4LDJdXX19fX19",
@@ -116,7 +116,7 @@ window.SentinelWaveControl = (function () {
     27: "SWC3:eyJ2IjozLCJvIjp7IjI3Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJhbGxFbGltaW5hdGVkIiwibSI6eyJnIjpbWzAsM10sWzAuNSwzXSxbMSwzXSxbMS41LDNdLFsyLDNdLFsyLjUsM11dLCJiIjpbWzEuNSwzXV0sInNoIjpbWzIuNSwyXSxbNy41LDJdLFsxMi41LDJdXSwic3QiOltbNCwyXSxbMTMsMV0sWzguNSwxXSxbMTcuNSwxXV0sImdibSI6W1syLDFdXX19fX19",
     28: "SWC3:eyJ2IjozLCJvIjp7IjI4Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl1dLCJrIjpbWzE1LDFdLFsxOCwxXSxbMCwxXSxbMC41LDFdLFsxLDFdLFszLjUsMV0sWzExLjUsMV0sWzE0LjUsMV0sWzE3LjUsMV0sWzE4LjUsMV0sWzQsMV0sWzcsMV0sWzQuNSwxXSxbNy41LDFdLFs4LDFdLFsxMC41LDFdLFsxMSwxXSxbMTQsMV1dLCJzdCI6W1s1LDFdLFsxNSwxXSxbNy41LDFdLFsyLjUsMV0sWzEwLDFdLFsxMi41LDFdXX19fX19",
     29: "SWC3:eyJ2IjozLCJvIjp7IjI5Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwicyI6W1s0LDFdLFs2LDFdLFs4LDFdLFsxMCwxXSxbMTIsMV0sWzE0LDFdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl0sWzUsMV0sWzEwLDFdLFsxNC41LDFdXSwic3QiOltbNSwxXSxbMTUsMV0sWzcuNSwxXSxbMi41LDFdLFsxMCwxXSxbMTIuNSwxXV19fX19fQ==",
-    30: "SWC3:eyJ2IjozLCJvIjp7IjMwIjp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJhbGxFbGltaW5hdGVkIn19fX0=",
+    30: "SWC3:eyJ2IjozLCJvIjp7IjMwIjp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIn19fX0=",
     31: null,
     32: null,
     33: null,
@@ -148,48 +148,38 @@ window.SentinelWaveControl = (function () {
     }
   }
 
+  // Pre-decode all wave codes into _editorWaveOverride at startup.
+  // This must happen here (before Editor.js runs) so Editor.js's initializeCodeWaves()
+  // cannot overwrite with its bad raw-wrapper format.
+  function preloadAllWaveTimelines() {
+    if (!window.SentinelEditor || typeof window.SentinelEditor.decodeWaveCode !== "function") {
+      // SentinelEditor not ready yet - will be handled by spawnWave() instead
+      return;
+    }
+    window._editorWaveOverride = window._editorWaveOverride || {};
+    for (const [waveNumStr, code] of Object.entries(DEFAULT_WAVE_EDITOR_CODES)) {
+      const waveNum = parseInt(waveNumStr, 10);
+      if (!code) continue;
+      try {
+        const decoded = window.SentinelEditor.decodeWaveCode(code);
+        const waveCfg = decoded[waveNum];
+        if (waveCfg && waveCfg.t && waveCfg.l) {
+          window._editorWaveOverride[waveNum] = {
+            timelineMode: true,
+            timeline: { ...waveCfg.l, endCondition: waveCfg.e || 'duration' },
+            _source: 'preload'
+          };
+        }
+      } catch (_) {}
+    }
+    preloadAllWaveTimelines();
+  }
+
   function getEditorWaveCode(waveNumber) {
     if (window.SentinelWaveEditorCodes && typeof window.SentinelWaveEditorCodes[waveNumber] === "string") {
       return window.SentinelWaveEditorCodes[waveNumber];
     }
     return null;
-  }
-
-  function getCodeWaveFallbackPreset(waveNumber) {
-    const index = Math.max(0, waveNumber - 16);
-    const nullWaveIndex = Math.max(0, waveNumber - 22);
-    const isRecoveryWave = waveNumber % 5 === 0;
-
-    const burstCount = Math.min(12, 6 + Math.floor(nullWaveIndex * 0.5));
-    const burstInterval = Math.max(300, 520 - (nullWaveIndex * 10) - (isRecoveryWave ? -20 : 0));
-
-    const makeRamp = (base, growth, min, max, unlockAt = 0) => {
-      if (nullWaveIndex < unlockAt) {
-        return Array.from({ length: burstCount }, () => 0);
-      }
-      const wavePressure = isRecoveryWave ? 0.82 : 1;
-      return Array.from({ length: burstCount }, (_, i) => {
-        const value = (base + Math.floor(i * growth)) * wavePressure;
-        return Math.max(min, Math.min(max, Math.floor(value)));
-      });
-    };
-
-    return {
-      burstCount,
-      burstInterval,
-      customBursts: makeRamp(2 + Math.floor(nullWaveIndex * 0.18), 0.24, 1, 6),
-      customBrutes: makeRamp(nullWaveIndex >= 2 ? 1 : 0, 0.08, 0, 2, 2),
-      customSlingers: makeRamp(1 + Math.floor(nullWaveIndex * 0.12), 0.1, 0, 3),
-      customShielders: makeRamp(nullWaveIndex >= 6 ? 1 : 0, 0.05, 0, 2, 6),
-      customBeamers: makeRamp(nullWaveIndex >= 9 ? 1 : 0, 0.04, 0, 2, 9),
-      customKamikazes: makeRamp(Math.floor(nullWaveIndex * 0.16), 0.12, 0, 3),
-      customStalkers: makeRamp(nullWaveIndex >= 11 ? 1 : 0, 0.04, 0, 2, 11),
-      customBossMinors: makeRamp(nullWaveIndex >= 14 ? 1 : 0, 0.03, 0, 1, 14),
-      customBosses: makeRamp(nullWaveIndex >= 24 ? 1 : 0, 0.02, 0, 1, 24),
-      customSlingerBosses: makeRamp(0, 0, 0, 0),
-      customBruteBosses: makeRamp(0, 0, 0, 0),
-      customStalkerBosses: makeRamp(0, 0, 0, 0)
-    };
   }
 
   function applyCodeWaveConfig(ctx, config) {
@@ -222,10 +212,6 @@ window.SentinelWaveControl = (function () {
       try {
         config = window.SentinelEditor.getWaveConfigFromCode(waveCode, waveNumber);
       } catch (_) {}
-    }
-
-    if (!config) {
-      config = getCodeWaveFallbackPreset(waveNumber);
     }
 
     applyCodeWaveConfig(ctx, config);
@@ -422,7 +408,8 @@ window.SentinelWaveControl = (function () {
     enemy.collisionRadius = 30;
     enemy.speed = 0.75;
     enemy.health = 2600 + (wave * 16);
-    enemy.damage = 2;
+    // Reduced damage to make the slinger boss less punishing
+    enemy.damage = 1;
     enemy.attackCooldown = 0;
     enemy.attackRange = 5000;
     enemy.color = "#ff9f1a";
@@ -733,11 +720,9 @@ window.SentinelWaveControl = (function () {
     if (!ctx) return;
 
     const newWave = ctx.getWave();
-    console.log(`[SpawnWave] Initializing wave ${newWave}`);
 
     // CRITICAL: Clear timeline state when starting new wave to prevent old timeline from bleeding through
     if (window._timelineWaveState && window._timelineWaveState.wave !== newWave) {
-      console.log(`[SpawnWave] Clearing old timeline state from wave ${window._timelineWaveState.wave}`);
       window._timelineWaveState = null;
     }
     
@@ -786,143 +771,34 @@ window.SentinelWaveControl = (function () {
       window._wave10MinorsSpawned = false;
     }
 
-    if (wave === 1) {
-      ctx.setBurstCount(5);
-      ctx.setBurstInterval(330);
-      window._customBursts = [1, 2, 3, 4, 5];
-      window._customBrutes = null;
-    } else if (wave === 2) {
-      ctx.setBurstCount(5);
-      ctx.setBurstInterval(240);
-      window._customBursts = Array.from({ length: 5 }, () => 2 + Math.floor(Math.random() * 3));
-      window._customBrutes = null;
-    } else if (wave === 3) {
-      ctx.setBurstCount(5);
-      ctx.setBurstInterval(240);
-      window._customBursts = Array.from({ length: 5 }, () => 3 + Math.floor(Math.random() * 3));
-      window._customBrutes = null;
-    } else if (wave === 4) {
-      ctx.setBurstCount(5);
-      ctx.setBurstInterval(240);
-      window._customBursts = [3, 3, 4, 4, 5, 7].slice(0, 5);
-      window._customBrutes = null;
-    } else if (wave === 5) {
-      ctx.setBurstCount(Infinity);
-      ctx.setBurstInterval(400);
-      window._customBursts = null;
-      window._customBrutes = null;
-      spawnGruntBoss(ctx);
-    } else if (wave === 6) {
-      ctx.setBurstCount(6);
-      ctx.setBurstInterval(150);
-      window._customBursts = null;
-      window._customBrutes = null;
-      window._customSlingers = [1, 0, 0, 1, 0, 1];
-    } else if (wave === 7) {
-      ctx.setBurstCount(7);
-      ctx.setBurstInterval(300);
-      window._customBursts = null;
-      window._customBrutes = null;
-      window._customSlingers = [2, 0, 0, 2, 0, 3, 0];
-    } else if (wave === 8) {
-      ctx.setBurstCount(7);
-      ctx.setBurstInterval(300);
-      window._customBursts = null;
-      window._customBrutes = null;
-      window._customSlingers = [3, 0, 0, 2, 0, 3, 0];
-      spawnGruntBossMinor(ctx);
-    } else if (wave === 9) {
-      ctx.setBurstCount(8);
-      ctx.setBurstInterval(300);
-      window._customBursts = null;
-      window._customBrutes = null;
-      window._customSlingers = [2, 1, 1, 1, 2, 1, 1, 2];
-      spawnGruntBossMinor(ctx);
-      setTimeout(() => spawnGruntBossMinor(ctx), 10000);
-    } else if (wave === 10) {
-      ctx.setBurstCount(Infinity);
-      ctx.setBurstInterval(300);
-      window._customBursts = null;
-      window._customBrutes = null;
-      window._customSlingers = null;
-      window._customShielders = null;
-      window._customBeamers = null;
-      window._customKamikazes = null;
-      window._customStalkers = null;
-      window._customBossMinors = null;
-      window._customBosses = null;
-      window._customSlingerBosses = null;
-      window._customBruteBosses = null;
-      window._customStalkerBosses = null;
-      spawnSlingerBoss(ctx);
-    } else if (wave === 11) {
-      ctx.setBurstCount(15);
-      ctx.setBurstInterval(250);
-      window._customBursts = null;
-      window._customBrutes = null;
-      window._customSlingers = null;
-      window._customKamikazes = [1, 1, 2, 2, 3, 3, 1, 2, 3, 4, 4, 2, 3, 4, 5];
-    } else if (wave === 12) {
-      ctx.setBurstCount(15);
-      ctx.setBurstInterval(300);
-      window._customBrutes = null;
-      window._customSlingers = [0, 2, 0, 1, 0, 0, 2, 0, 1, 0, 0, 2, 0, 2, 0];
-      window._customKamikazes = [0, 0, 0, 1, 0, 2, 0, 1, 0, 1, 0, 2, 0, 1, 2];
-      window._customBossMinors = [2, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0];
-    } else if (wave === 13) {
-      ctx.setBurstCount(15);
-      ctx.setBurstInterval(300);
-      window._customBursts = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
-      window._customBrutes = null;
-      window._customSlingers = [0, 2, 0, 1, 0, 0, 2, 0, 1, 0, 0, 2, 0, 2, 0];
-      window._customKamikazes = [3,3,3,3,2,1,0,1,0,1,0,3,3,3,3];
-      window._customBossMinors = [2, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0];
-    } else if (wave === 14) {
-      ctx.setBurstCount(15);
-      ctx.setBurstInterval(300);
-      ctx.setBurstCount(30);
-      ctx.setBurstInterval(120);
-      window._customBursts = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
-      window._customBrutes = null;
-      window._customSlingers = [0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0];
-      window._customKamikazes = [0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1];
-      window._customBossMinors = [1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,0];
-    } else if (wave === 15) {
-      ctx.setBurstCount(15);
-      ctx.setBurstInterval(300);
-      ctx.setBurstCount(30);
-      ctx.setBurstInterval(120);
-      window._customBursts = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
-      window._customBrutes = null;
-      window._customSlingers = [0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0];
-      window._customKamikazes = [0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1];
-      window._customBossMinors = [1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,0,0];
-    } else if (wave === 20) {
-      ctx.setBurstCount(Infinity);
-      ctx.setBurstInterval(300);
-      window._customBursts = null;
-      window._customBrutes = null;
-      window._customSlingers = null;
-      window._customShielders = null;
-      window._customBeamers = null;
-      window._customKamikazes = null;
-      window._customStalkers = null;
-      window._customBossMinors = null;
-      window._customBosses = null;
-      window._customSlingerBosses = null;
-      window._customBruteBosses = null;
-      window._customStalkerBosses = null;
-      spawnBruteBoss(ctx);
-    } else if (wave >= 16) {
-      configureCodeWave(ctx, wave);
+    // Decode wave code and create timeline override for this wave.
+    // Always overwrites to ensure correct format (Editor.js may have stored bad data).
+    if (wave >= 1 && window.SentinelWaveEditorCodes && window.SentinelWaveEditorCodes[wave]) {
+      if (window.SentinelEditor && typeof window.SentinelEditor.decodeWaveCode === "function") {
+        try {
+          const decoded = window.SentinelEditor.decodeWaveCode(window.SentinelWaveEditorCodes[wave]);
+          const waveCfg = decoded[wave];
+          let timeline = null;
+          if (waveCfg) {
+            if (waveCfg.t && waveCfg.l) {
+              // Compressed format: t=timelineMode, l=timeline data, e=endCondition
+              timeline = { ...waveCfg.l, endCondition: waveCfg.e || 'duration' };
+            } else if (waveCfg.timelineMode && waveCfg.timeline) {
+              // Already decompressed format
+              timeline = waveCfg.timeline;
+            }
+          }
+          if (timeline) {
+            window._editorWaveOverride = window._editorWaveOverride || {};
+            window._editorWaveOverride[wave] = { timelineMode: true, timeline, _source: 'spawnWave' };
+          } else {
+          }
+        } catch (err) {
+        }
+      }
     } else {
-      ctx.setBurstCount(0);
-      ctx.setBurstInterval(300);
-      window._customBrutes = null;
-    }
-
-    if ((wave === 1 || wave === 2 || wave === 3 || wave === 4) && !Array.isArray(window._customBursts)) {
-      window._customBursts = [2, 3, 4, 5];
+      if (!window.SentinelWaveEditorCodes?.[wave]) {
+      }
     }
 
     ctx.resetBurstProgress();
@@ -942,7 +818,6 @@ window.SentinelWaveControl = (function () {
     
     // If this wave already completed, don't process timeline anymore
     if (window._timelineCompletedWaves[wave]) {
-      console.log(`[Timeline] Wave ${wave} already completed, skipping processing`);
       return false;  // Signal no new action, let main loop handle advancement
     }
     
@@ -951,17 +826,15 @@ window.SentinelWaveControl = (function () {
     if (waveChanged && (!window._timelineWaveState || window._timelineWaveState.wave < wave)) {
       // Only reinit if transitioning to a NEW/higher wave, not if state was just cleared for same wave
       if (window._timelineWaveState) {
-        console.log(`[Timeline] Wave transition detected: ${window._timelineWaveState.wave} -> ${wave}. Reinitializing timeline state.`);
       }
       window._timelineWaveState = {
         wave,
         elapsedTime: 0,
-        spawnedEventKeys: new Set()  // Track spawned events by mobType_index key
+        spawnedEventKeys: new Set(),  // Track spawned events by mobType_index key
+        endCondition: timeline.endCondition || 'duration'  // Store end condition for access in main loop
       };
-      console.log(`[Timeline] Initialized wave ${wave}, duration: ${timeline.duration}s, ending: ${timeline.endCondition}`, timeline.mobs);
     } else if (!window._timelineWaveState) {
       // State was cleared but we're still on same wave - this wave is done
-      console.log(`[Timeline] Timeline state cleared for wave ${wave} but still on same wave - wave complete`);
       window._timelineCompletedWaves[wave] = true;
       return false;
     }
@@ -971,7 +844,6 @@ window.SentinelWaveControl = (function () {
     
     // DEBUG: Log elapsed time progression every 1 second
     if (Math.floor(state.elapsedTime) !== Math.floor(state.elapsedTime - (delta * SPEED_MULTIPLIER) / 100) || state.elapsedTime < 0.05) {
-      console.log(`[Timeline] Elapsed: ${state.elapsedTime.toFixed(2)}s (delta: ${((delta * SPEED_MULTIPLIER) / 100).toFixed(4)}s, speedMult: ${SPEED_MULTIPLIER})`);
     }
 
     // Spawn functions mapping
@@ -994,16 +866,6 @@ window.SentinelWaveControl = (function () {
     let anyEventRemaining = false;
     let anyEventSpawned = false;
 
-    // Don't process any more events if duration has expired
-    if (state.elapsedTime >= timeline.duration) {
-      console.log(`[Timeline] Wave ${wave} duration expired at ${state.elapsedTime.toFixed(2)}s (duration: ${timeline.duration}s). Marking as complete.`);
-      // Mark this wave as completed so we don't reinitialize it
-      window._timelineCompletedWaves[wave] = true;
-      // Return true to signal wave should end
-      window._timelineWaveState = null;
-      return true;
-    }
-
     if (timeline.mobs) {
       for (const [mobType, events] of Object.entries(timeline.mobs)) {
         if (!Array.isArray(events) || events.length === 0) continue;
@@ -1021,7 +883,6 @@ window.SentinelWaveControl = (function () {
 
           // Spawn when time reached and not yet spawned
           if (timeReached && !hasSpawned) {
-            console.log(`[Timeline] SPAWN: ${mobType} x${evt.amount} at time ${evt.time}s (elapsed: ${state.elapsedTime.toFixed(2)}s)`);
             spawnFn(ctx, evt.amount);
             state.spawnedEventKeys.add(eventKey);
             anyEventSpawned = true;
@@ -1040,24 +901,37 @@ window.SentinelWaveControl = (function () {
     let waveComplete = false;
 
     if (endCondition === 'duration') {
-      // Wave ends when duration expires (original behavior)
+      // Wave ends when duration expires (regardless of mobs alive)
       if (!anyEventRemaining && state.elapsedTime >= timeline.duration) {
         waveComplete = true;
       }
     } else if (endCondition === 'allEliminated') {
-      // Wave ends when all spawned enemies are eliminated
+      // Wave ends when all spawned enemies are eliminated (ignores duration timer)
+      const enemies = ctx.getEnemies();  // Gets ALL enemies regardless of mob type
+      // Check if all enemies are dead (health <= 0) - returns true only if every single enemy is dead
+      waveComplete = enemies.length > 0 && enemies.every(e => e.health <= 0);
+      if (waveComplete) {
+      }
+    } else if (endCondition === 'boss') {
+      // Wave ends when all boss-type enemies are eliminated (no XP drops on completion)
       const enemies = ctx.getEnemies();
-      waveComplete = enemies.length === 0;
+      // Boss types: gruntBossMinor, gruntBoss, slingerBoss, bruteBoss, stalkerBoss
+      const bossTypes = ['gruntBossMinor', 'gruntBoss', 'slingerBoss', 'bruteBoss', 'stalkerBoss'];
       
-      // Only check wave duration if this is the first time we're declaring it complete
-      // (Give it at least 0.5s minimum to ensure events had a chance to spawn)
-      if (waveComplete && state.elapsedTime < timeline.duration * 0.5) {
-        waveComplete = false;
+      // Find all boss enemies
+      const bossEnemies = enemies.filter(e => bossTypes.includes(e.type));
+      
+      // Wave is complete if:
+      // 1. There are/were boss enemies AND all are dead, OR
+      // 2. Events have all spawned and no bosses were ever spawned (shouldn't happen in practice)
+      if (bossEnemies.length > 0) {
+        waveComplete = bossEnemies.every(e => e.health <= 0);
+        if (waveComplete) {
+        }
       }
     }
 
     if (waveComplete) {
-      console.log(`[Timeline] Wave ${wave} complete (condition: ${endCondition}) at ${state.elapsedTime.toFixed(2)}s`);
       // Mark this wave as completed so we don't reinitialize it
       window._timelineCompletedWaves[wave] = true;
       window._timelineWaveState = null;
@@ -1067,356 +941,70 @@ window.SentinelWaveControl = (function () {
     return false;  // Wave still in progress
   }
 
+  function loadTimelineForWave(wave) {
+    // Try user override first (from editor), then fall back to default codes
+    const sources = [
+      window.waveEditorOverrides && window.waveEditorOverrides[wave],  // user-saved override
+      window._editorWaveOverride && window._editorWaveOverride[wave],  // editor session
+    ];
+
+    for (const src of sources) {
+      if (!src) continue;
+      // Already decoded into correct format
+      if (src.timelineMode && src.timeline) return src;
+      // Encoded wave code string stored as override
+      if (typeof src === 'string') {
+        try {
+          const decoded = window.SentinelEditor.decodeWaveCode(src);
+          const waveCfg = decoded[wave];
+          if (waveCfg && waveCfg.t && waveCfg.l) {
+            return { timelineMode: true, timeline: { ...waveCfg.l, endCondition: waveCfg.e || 'duration' } };
+          }
+        } catch (_) {}
+      }
+      // Raw decoded wrapper (e.g. from Editor.js initializeCodeWaves)
+      const waveCfg = src[wave] || src;
+      if (waveCfg && waveCfg.t && waveCfg.l) {
+        return { timelineMode: true, timeline: { ...waveCfg.l, endCondition: waveCfg.e || 'duration' } };
+      }
+    }
+
+    // Fall back to DEFAULT_WAVE_EDITOR_CODES
+    const code = window.SentinelWaveEditorCodes && window.SentinelWaveEditorCodes[wave];
+    if (code && window.SentinelEditor && typeof window.SentinelEditor.decodeWaveCode === 'function') {
+      try {
+        const decoded = window.SentinelEditor.decodeWaveCode(code);
+        const waveCfg = decoded[wave];
+        if (waveCfg && waveCfg.t && waveCfg.l) {
+          const result = { timelineMode: true, timeline: { ...waveCfg.l, endCondition: waveCfg.e || 'duration' }, _source: 'default' };
+          // Cache it so next frame is instant
+          window._editorWaveOverride = window._editorWaveOverride || {};
+          window._editorWaveOverride[wave] = result;
+          return result;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   function handleWaveSpawning(ctx, delta) {
     if (!ctx) return;
 
-    let wave = ctx.getWave();
-    console.log(`[WaveSpawning] Frame check - wave: ${wave}, burstCount: ${ctx.getBurstCount()}, burstIndex: ${ctx.getBurstIndex()}`);
+    const wave = ctx.getWave();
     
-    // Check if this wave has timeline data
-    // Priority: _editorWaveOverride (editor session) > waveEditorOverrides (from localStorage)
-    // IMPORTANT: Waves 1-15 should NEVER use timeline overrides - only code waves (16+) can be timeline-based
-    let override = null;
-    if (wave >= 16) {
-      override = (window._editorWaveOverride && window._editorWaveOverride[wave]) 
-                 || (window.waveEditorOverrides && window.waveEditorOverrides[wave]);
-    }
-    
-    // If no override exists but there IS a code wave for this wave, try to auto-convert it
-    // IMPORTANT: Only do this for code waves (wave 16+), never for normal waves (1-15)
-    if (!override && wave >= 16 && window.SentinelEditor && typeof window.SentinelEditor.getWaveConfigFromCode === "function" && window.SentinelWaveEditorCodes && window.SentinelWaveEditorCodes[wave]) {
-      try {
-        const code = window.SentinelWaveEditorCodes[wave];
-        
-        // First check if the code is already a timeline-based code (contains timeline mode flag)
-        // Try to decode it to see if it's already timelineMode
-        if (window.SentinelEditor && typeof window.SentinelEditor.decodeWaveCode === "function") {
-          try {
-            const decoded = window.SentinelEditor.decodeWaveCode(code);
-            const waveCfg = decoded[wave];
-            if (waveCfg && waveCfg.timelineMode && waveCfg.timeline) {
-              console.log(`[Timeline] Code wave ${wave} is already timeline-based. Loading directly.`);
-              window._editorWaveOverride = window._editorWaveOverride || {};
-              window._editorWaveOverride[wave] = {
-                timelineMode: true,
-                timeline: waveCfg.timeline,
-                _source: 'defaultCodeWave'
-              };
-              override = window._editorWaveOverride[wave];
-              // Don't return - let it fall through to timeline processing below
-            }
-          } catch (decodeErr) {
-            // If decode fails, try the burst config approach
-            console.log(`[Timeline] First decode attempt failed for wave ${wave}, trying burst approach`);
-          }
-        }
-        
-        // If not timeline mode, try to get burst config
-        const config = window.SentinelEditor.getWaveConfigFromCode(code, wave);
-        
-        if (config) {
-          console.log(`[Timeline] Auto-converting code wave ${wave} to timeline format...`);
-          
-          // Convert code wave to timeline
-          const burstIntervalSeconds = config.burstIntervalSeconds || (config.burstInterval ? config.burstInterval / 100 : 0.3);
-          const burstCount = config.burstCount || 30;
-          const duration = (burstCount * burstIntervalSeconds) + 2;
-          
-          const timeline = {
-            duration,
-            endCondition: 'duration',
-            mobs: {
-              grunts: [],
-              brutes: [],
-              slingers: [],
-              shielders: [],
-              beamers: [],
-              kamikazes: [],
-              stalkers: [],
-              gruntbossminor: [],
-              gruntboss: [],
-              slingerboss: [],
-              bruteboss: []
-            }
-          };
-          
-          // Map config to timeline events
-          const mobMapping = {
-            customBursts: 'grunts',
-            customBrutes: 'brutes',
-            customSlingers: 'slingers',
-            customShielders: 'shielders',
-            customBeamers: 'beamers',
-            customKamikazes: 'kamikazes',
-            customStalkers: 'stalkers',
-            customBossMinors: 'gruntbossminor',
-            customBosses: 'gruntboss',
-            customSlingerBosses: 'slingerboss',
-            customBruteBosses: 'bruteboss'
-          };
-          
-          for (const [configKey, mobType] of Object.entries(mobMapping)) {
-            const burstArray = config[configKey];
-            if (Array.isArray(burstArray)) {
-              for (let idx = 0; idx < burstArray.length; idx++) {
-                const amount = burstArray[idx];
-                if (amount > 0) {
-                  const time = Math.round((idx * burstIntervalSeconds) * 100) / 100;  // Snap to nearest 1ms
-                  timeline.mobs[mobType].push({ time, amount, mode: 'event' });
-                }
-              }
-            }
-          }
-          
-          // Create override for this wave
-          window._editorWaveOverride = window._editorWaveOverride || {};
-          window._editorWaveOverride[wave] = {
-            timelineMode: true,
-            timeline
-          };
-          override = window._editorWaveOverride[wave];
-          console.log(`[Timeline] Wave ${wave} auto-converted. Timeline:`, timeline);
-        }
-      } catch (err) {
-        console.error(`[Timeline] Failed to auto-convert code wave ${wave}:`, err);
-      }
-    }
+    const override = loadTimelineForWave(wave);
     
     if (override && override.timelineMode && override.timeline) {
-      // CRITICAL: Verify the override is actually for the current wave
-      const timelineWave = window._timelineWaveState ? window._timelineWaveState.wave : null;
-      if (timelineWave !== null && timelineWave !== wave) {
-        console.error(`[Timeline] MISMATCH DETECTED: handleWaveSpawning using wave ${wave} but timeline state is for wave ${timelineWave}. Clearing old state.`);
+      // Clear stale timeline state on wave change
+      if (window._timelineWaveState && window._timelineWaveState.wave !== wave) {
         window._timelineWaveState = null;
       }
-      
-      console.log(`[Timeline] Using timeline override for wave ${wave}, duration: ${override.timeline.duration}s, source: ${override._source || 'unknown'}`);
       const isComplete = handleTimelineWaveSpawning(ctx, delta, override.timeline);
       if (isComplete) {
-        // Timeline wave complete - trigger next wave
-        console.log(`[Timeline] Signaling wave ${wave} complete to main game loop`);
         ctx.setBurstIndex(ctx.getBurstCount());
       }
       return;
     }
-    
-    // Debug: Log when no timeline override found
-    if (!override) {
-      const hasEditorOverride = !!(window._editorWaveOverride && window._editorWaveOverride[wave]);
-      const hasStoredOverride = !!(window.waveEditorOverrides && window.waveEditorOverrides[wave]);
-      if (wave <= 21) {  // Only log for first 21 waves to avoid spam
-        console.log(`[Timeline] No override for wave ${wave} (editorOverride: ${hasEditorOverride}, stored: ${hasStoredOverride}). Using default wave logic.`);
-      }
-    } else if (!override.timelineMode) {
-      console.log(`[Timeline] Override found for wave ${wave} but not in timeline mode. Using default wave logic.`);
-    }
-
-    let burstCount = ctx.getBurstCount();
-    const burstInterval = ctx.getBurstInterval();
-    let burstIndex = ctx.getBurstIndex();
-
-    let burstTimer = ctx.getBurstTimer();
-    const enemies = ctx.getEnemies();
-    const SPEED_MULTIPLIER = ctx.getSpeedMultiplier();
-    const elapsedState = ensureMobElapsedState(wave);
-    const elapsedDelta = delta * SPEED_MULTIPLIER;
-    for (const key of MOB_INTERVAL_KEYS) {
-      elapsedState[key] += elapsedDelta;
-    }
-
-    const commit = () => {
-      ctx.setBurstCount(burstCount);
-      if (!window._forceBurstExhausted) {
-        ctx.setBurstIndex(burstIndex);
-      }
-      ctx.setBurstTimer(burstTimer);
-    };
-
-    const getBurstValue = (list, index) => {
-      if (!Array.isArray(list) || list.length === 0) return 0;
-      if (index < list.length) return list[index] || 0;
-      return 0;
-    };
-
-    // Helper to calculate number of bursts for a mob type
-    function calculateMobBurstCount(waveBurstInterval, waveBurstCount, mobBurstInterval) {
-      if (mobBurstInterval === 0) return waveBurstCount;
-      if (mobBurstInterval > 0) return Math.floor((waveBurstInterval * waveBurstCount) / mobBurstInterval);
-      return waveBurstCount;
-    }
-
-    const previewOverride = (window._editorPreviewOverride && window._editorPreviewWave === wave)
-      ? window._editorPreviewOverride
-      : null;
-
-    if (previewOverride) {
-      // For each mob, maintain its own timer and index
-      if (!window._mobPreviewTimers) window._mobPreviewTimers = {};
-      const mobTypes = [
-        ["grunts", "customBursts", spawnBurst],
-        ["brutes", "customBrutes", spawnBruteBurst],
-        ["slingers", "customSlingers", spawnSlingerBurst],
-        ["shielders", "customShielders", spawnShielderBurst],
-        ["beamers", "customBeamers", spawnBeamerBurst],
-        ["kamikazes", "customKamikazes", spawnKamikazeBurst],
-        ["stalkers", "customStalkers", spawnStalkerBurst],
-        ["gruntbossminor", "customBossMinors", spawnBossMinorBurst],
-        ["gruntboss", "customBosses", spawnBossBurst],
-        ["slingerboss", "customSlingerBosses", spawnSlingerBossBurst],
-        ["bruteboss", "customBruteBosses", spawnBruteBossBurst]
-      ];
-      let allDone = true;
-      for (const [mobKey, burstField, spawnFn] of mobTypes) {
-        if (!window._mobPreviewTimers[mobKey]) window._mobPreviewTimers[mobKey] = {timer: 0, index: 0};
-        const mobTimer = window._mobPreviewTimers[mobKey];
-        const burstList = previewOverride[burstField];
-        const mobInterval = getMobIntervalFor(mobKey, burstInterval, burstCount);
-        mobTimer.timer += delta * SPEED_MULTIPLIER;
-        while (mobTimer.index < burstList.length) {
-          const count = burstList[mobTimer.index];
-          if (mobTimer.timer >= mobInterval) {
-            mobTimer.timer -= mobInterval;
-            if (count > 0) {
-              spawnFn(ctx, count);
-            }
-            mobTimer.index++;
-          } else {
-            break;
-          }
-        }
-        if (mobTimer.index < burstList.length && burstList[mobTimer.index] !== 0) allDone = false;
-      }
-      if (allDone) {
-        window._editorPreviewOverride = null;
-        window._editorPreviewWave = null;
-        window._mobPreviewTimers = null;
-      }
-      commit();
-      return;
-    }
-
-    // Check if all coma code arrays are exhausted (all relevant arrays are empty, or burstIndex is at or past their end, or ends with 0)
-    const comaArrays = [
-      window._customBursts, window._customBrutes, window._customSlingers, window._customShielders,
-      window._customBeamers, window._customKamikazes, window._customStalkers, window._customBossMinors,
-      window._customBosses, window._customSlingerBosses, window._customBruteBosses
-    ];
-    let allExhausted = true;
-    for (const arr of comaArrays) {
-      if (Array.isArray(arr) && arr.length > 0) {
-        // Only end when burstIndex reaches the end of the array
-        if (burstIndex < arr.length) {
-          allExhausted = false;
-          break;
-        }
-      }
-    }
-    // Patch: Always set burstIndex to burstCount if all bursts are exhausted (for normal waves)
-    if (allExhausted && burstCount !== Infinity) {
-      if (window.debugWaveTransition) {
-        console.log('[WaveTransition] All bursts exhausted. Forcing burstIndex to burstCount:', burstCount);
-      }
-      // Force burstIndex to burstCount in all places
-      if (window._sentinelWaveState) {
-        window._sentinelWaveState.burstIndex = burstCount;
-        window._sentinelWaveState.burstCount = burstCount;
-      }
-      ctx.setBurstIndex(burstCount);
-      window._forceBurstExhausted = true;
-      commit();
-      return;
-    } else if (!allExhausted && window.debugWaveTransition) {
-      // Print which mob burst is blocking transition
-      comaArrays.forEach((arr, idx) => {
-        if (Array.isArray(arr) && arr.length > 0) {
-          let endIdx = arr.indexOf(0);
-          if (endIdx === -1) endIdx = arr.length;
-          if (burstIndex < endIdx) {
-            const mobNames = [
-              'grunts','brutes','slingers','shielders','beamers','kamikazes','stalkers',
-              'bossMinors','bosses','slingerBosses','bruteBosses']
-            console.log(`[WaveTransition] Mob type '${mobNames[idx]}' not exhausted: burstIndex=${burstIndex}, endIdx=${endIdx}, arr=`, arr);
-          }
-        }
-      });
-    }
-
-    if ((wave >= 1 && wave <= 4 && burstIndex < burstCount) || (wave === 5) || (wave >= 6 && wave <= 9 && burstIndex < burstCount) || (wave >= 11 && burstIndex < burstCount)) {
-      burstTimer += delta * SPEED_MULTIPLIER;
-      if (burstTimer >= burstInterval) {
-        burstTimer = 0;
-        let grunts = 0;
-        let brutes = 0;
-        let slingers = 0;
-        if (wave === 1 || wave === 2 || wave === 3 || wave === 4) {
-          grunts = getBurstValue(window._customBursts, burstIndex);
-        } else if (wave === 5) {
-          grunts = 1 + Math.floor(Math.random() * 2);
-        } else if (wave >= 6 && wave <= 9) {
-          grunts = 2 + Math.floor(Math.random() * 3);
-          slingers = getBurstValue(window._customSlingers, burstIndex);
-          brutes = getBurstValue(window._customBrutes, burstIndex);
-        }
-        if (window.sentinelDifficulty === "Apocalypse" && !(wave >= 11)) {
-          spawnKamikazeBurst(ctx, 1);
-        }
-        if (slingers > 0 && canSpawnByMobInterval(elapsedState, "slingers", getMobIntervalFor("slingers", burstInterval))) spawnSlingerBurst(ctx, slingers);
-        if (brutes > 0 && canSpawnByMobInterval(elapsedState, "brutes", getMobIntervalFor("brutes", burstInterval))) spawnBruteBurst(ctx, brutes);
-        if (wave === 11) {
-          const wave11KamikazeCount = getBurstValue(window._customKamikazes, burstIndex);
-          if (wave11KamikazeCount > 0 && canSpawnByMobInterval(elapsedState, "kamikazes", getMobIntervalFor("kamikazes", burstInterval))) spawnKamikazeBurst(ctx, wave11KamikazeCount);
-        }
-        if (wave >= 12) {
-          grunts = getBurstValue(window._customBursts, burstIndex);
-          const waveSlingerCount = getBurstValue(window._customSlingers, burstIndex);
-          const waveShielderCount = getBurstValue(window._customShielders, burstIndex);
-          const waveBeamerCount = getBurstValue(window._customBeamers, burstIndex);
-          const waveBruteCount = getBurstValue(window._customBrutes, burstIndex);
-          const waveKamikazeCount = getBurstValue(window._customKamikazes, burstIndex);
-          const waveStalkerCount = getBurstValue(window._customStalkers, burstIndex);
-          if (waveSlingerCount > 0 && canSpawnByMobInterval(elapsedState, "slingers", getMobIntervalFor("slingers", burstInterval))) spawnSlingerBurst(ctx, waveSlingerCount);
-          if (waveShielderCount > 0 && canSpawnByMobInterval(elapsedState, "shielders", getMobIntervalFor("shielders", burstInterval))) spawnShielderBurst(ctx, waveShielderCount);
-          if (waveBeamerCount > 0 && canSpawnByMobInterval(elapsedState, "beamers", getMobIntervalFor("beamers", burstInterval))) spawnBeamerBurst(ctx, waveBeamerCount);
-          if (waveBruteCount > 0 && canSpawnByMobInterval(elapsedState, "brutes", getMobIntervalFor("brutes", burstInterval))) spawnBruteBurst(ctx, waveBruteCount);
-          if (waveKamikazeCount > 0 && canSpawnByMobInterval(elapsedState, "kamikazes", getMobIntervalFor("kamikazes", burstInterval))) spawnKamikazeBurst(ctx, waveKamikazeCount);
-          if (waveStalkerCount > 0 && canSpawnByMobInterval(elapsedState, "stalkers", getMobIntervalFor("stalkers", burstInterval))) spawnStalkerBurst(ctx, waveStalkerCount);
-        }
-        const bossMinorCount = getBurstValue(window._customBossMinors, burstIndex);
-        if (bossMinorCount > 0 && canSpawnByMobInterval(elapsedState, "gruntbossminor", getMobIntervalFor("gruntbossminor", burstInterval))) {
-          for (let i = 0; i < bossMinorCount; i++) {
-            spawnGruntBossMinor(ctx);
-          }
-        }
-        const bossCount = getBurstValue(window._customBosses, burstIndex);
-        if (bossCount > 0 && canSpawnByMobInterval(elapsedState, "gruntboss", getMobIntervalFor("gruntboss", burstInterval))) {
-          for (let i = 0; i < bossCount; i++) {
-            spawnGruntBoss(ctx);
-          }
-        }
-        const slingerBossCount = getBurstValue(window._customSlingerBosses, burstIndex);
-        if (slingerBossCount > 0 && canSpawnByMobInterval(elapsedState, "slingerboss", getMobIntervalFor("slingerboss", burstInterval))) {
-          for (let i = 0; i < slingerBossCount; i++) {
-            spawnSlingerBoss(ctx);
-          }
-        }
-        const bruteBossCount = getBurstValue(window._customBruteBosses, burstIndex);
-        if (bruteBossCount > 0 && canSpawnByMobInterval(elapsedState, "bruteboss", getMobIntervalFor("bruteboss", burstInterval))) {
-          for (let i = 0; i < bruteBossCount; i++) {
-            spawnBruteBoss(ctx);
-          }
-        }
-        const stalkerBossCount = getBurstValue(window._customStalkerBosses, burstIndex);
-        if (stalkerBossCount > 0 && canSpawnByMobInterval(elapsedState, "stalkerBoss", getMobIntervalFor("stalkerBoss", burstInterval))) {
-          for (let i = 0; i < stalkerBossCount; i++) {
-            spawnStalkerBoss(ctx);
-          }
-        }
-        if (grunts > 0 && canSpawnByMobInterval(elapsedState, "grunts", getMobIntervalFor("grunts", burstInterval))) spawnBurst(ctx, grunts);
-        burstIndex++;
-      }
-    }
-
-    commit();
   }
 
   return {
@@ -1449,6 +1037,6 @@ window.SentinelWaveControl = (function () {
       window.SentinelWaveEditorCodes[parsed] = (typeof code === "string" && code.trim().length > 0) ? code.trim() : null;
       return true;
     },
-    getWaveEditorCodes: () => ({ ...window.SentinelWaveEditorCodes })
+    getWaveEditorCodes: () => window.SentinelWaveEditorCodes
   };
 })();
