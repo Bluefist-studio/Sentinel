@@ -156,7 +156,6 @@ const ProtocolSystem = {
       };
     });
     this.loadPersistentData();
-    console.log("✓ Protocol system initialized");
   },
 
   // Save permanent data locally
@@ -178,7 +177,7 @@ const ProtocolSystem = {
 
       localStorage.setItem(this.storageKey, JSON.stringify(payload));
     } catch (e) {
-      console.warn("Protocol persistent save failed", e);
+      // Persistent save failed silently
     }
   },
 
@@ -215,7 +214,7 @@ const ProtocolSystem = {
         this.savePersistentData();
       }
     } catch (e) {
-      console.warn("Protocol persistent load failed", e);
+      // Persistent load failed silently
     }
   },
 
@@ -240,7 +239,6 @@ const ProtocolSystem = {
       if (newlyUnlockedPermanent) {
         this.savePersistentData();
       }
-      console.log(`✓ Discovered: ${protocolName}`);
       return true;
     }
 
@@ -252,7 +250,6 @@ const ProtocolSystem = {
     if (!PROTOCOLS[protocolName]) return false;
     if (this.runDiscoveredProtocols.includes(protocolName)) return false;
     this.runDiscoveredProtocols.push(protocolName);
-    console.log(`✓ Run-only discovered: ${protocolName}`);
     return true;
   },
 
@@ -342,7 +339,7 @@ const ProtocolSystem = {
     const rarityFactor = protocol.rarity === "Rare" ? 1.45 : 1.0;
     const tierFactor = protocol.tier === "Higher" ? 1.2 : (protocol.tier === "Lower" ? 0.9 : 1.0);
 
-    const baseCost = (14 + (influence * 6)) * rarityFactor * tierFactor;
+    const baseCost = (10 + (influence * 4)) * rarityFactor * tierFactor;
     const steppedCost = baseCost * this.upgradeStepCostMultipliers[idx];
     const rounded = Math.ceil(steppedCost / 5) * 5;
 
@@ -393,7 +390,6 @@ const ProtocolSystem = {
     if (this.activeProtocols.includes(protocolName)) return false;
     
     this.activeProtocols.push(protocolName);
-    console.log(`✓ Activated: ${protocolName} (${this.activeProtocols.length}/6)`);
     return true;
   },
 
@@ -402,7 +398,6 @@ const ProtocolSystem = {
     const idx = this.activeProtocols.indexOf(protocolName);
     if (idx !== -1) {
       this.activeProtocols.splice(idx, 1);
-      console.log(`✓ Deactivated: ${protocolName}`);
       return true;
     }
     return false;
@@ -451,7 +446,6 @@ const ProtocolSystem = {
     ) {
       this.starterProtocols = [...protocols];
       this.savePersistentData();
-      console.log(`✓ Starter protocols set: ${protocols.join(", ")}`);
       return true;
     }
     return false;
@@ -496,7 +490,6 @@ const ProtocolSystem = {
         this.activate(p);
       }
     });
-    console.log(`✓ Run initialized with ${this.activeProtocols.length} protocols`);
   },
 
   // Get stat mods from active protocols
@@ -536,7 +529,6 @@ const ProtocolSystem = {
     this.runDiscoveredProtocols = [];
     this.activeProtocols = [];
     this.savePersistentData();
-    console.log("✓ All protocol discovery reset");
   },
   // Get all protocols by family and rarity
   getByFamilyAndRarity: function() {
@@ -574,5 +566,3 @@ if (document.readyState === 'loading') {
 } else {
   ProtocolSystem.init();
 }
-
-console.log("✓ Protocols module loaded");
