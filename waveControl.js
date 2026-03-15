@@ -228,11 +228,11 @@ window.SentinelWaveControl = (function () {
   function spawnGruntBoss(ctx) {
     const enemies = ctx.getEnemies();
     const wave = ctx.getWave();
-    // Use brute heavy.png for brute heavy (gruntBossMinor)
+    // Use grunt heavy.png for brute heavy (gruntBossMinor)
     let bruteHeavyImg = window._bruteHeavyImg;
     if (!bruteHeavyImg) {
       bruteHeavyImg = new window.Image();
-      bruteHeavyImg.src = "brute heavy.png";
+      bruteHeavyImg.src = encodeURI("grunt heavy.png");
       window._bruteHeavyImg = bruteHeavyImg;
     }
 
