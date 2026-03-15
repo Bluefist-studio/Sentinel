@@ -98,7 +98,7 @@
         window._menuAmbienceAudio.currentTime = 0;
         window._menuAmbienceAudio = null;
       }
-      let ambience = new Audio('ambience scifi2.wav');
+      let ambience = new Audio(encodeURI('ambience scifi2.wav'));
       ambience.volume = 0.1;
       ambience.loop = false;
       let playPromise = ambience.play();
@@ -112,19 +112,38 @@
   // Speed multiplier for game timing (higher = faster, lower = slower)
   const SPEED_MULTIPLIER = 120;
 
+  // Audio pooling to prevent "too many WebMediaPlayers" errors
+  window._audioPool = {};
+  function playSound(filename, volume = 1.0, loop = false) {
+    try {
+      if (!window._audioPool[filename]) {
+        window._audioPool[filename] = new Audio(encodeURI(filename));
+        window._audioPool[filename].loop = loop;
+      }
+      const audio = window._audioPool[filename];
+      audio.volume = volume;
+      audio.currentTime = 0;
+      const playPromise = audio.play();
+      if (playPromise) playPromise.catch(() => {});
+      return audio;
+    } catch (e) {
+      console.warn('Audio playback error:', e);
+    }
+  }
+
   
   // Mine sprite
   const mineImg = new window.Image();
   mineImg.src = "mine.png";
   // Grunt Boss sprite
   const gruntBossImg = new window.Image();
-  gruntBossImg.src = "grunt boss.png";
+  gruntBossImg.src = encodeURI("grunt boss.png");
   // Grunt Heavy sprite
   const gruntHeavyImg = new window.Image();
-  gruntHeavyImg.src = "grunt heavy.png";
+  gruntHeavyImg.src = encodeURI("grunt heavy.png");
   // Slinger Boss sprite
   const slingerBossImg = new window.Image();
-  slingerBossImg.src = "slinger boss.png";
+  slingerBossImg.src = encodeURI("slinger boss.png");
 // Sentinel v1.4 Recreated - Core game logic
 
 // Expose protocol reset to console
@@ -1937,7 +1956,7 @@ window.onload = function () {
   const bruteImg = new window.Image();
   bruteImg.src = "brute.png";
   const bruteBossImg = new window.Image();
-  bruteBossImg.src = "brute boss.png";
+  bruteBossImg.src = encodeURI("brute boss.png");
   const slingerImg = new window.Image();
   slingerImg.src = "slinger.png";
   const kamikazeImg = new window.Image();
@@ -1945,7 +1964,7 @@ window.onload = function () {
   const stalkerImg = new window.Image();
   stalkerImg.src = "stalker.png";
   const stalkerBossImg = new window.Image();
-  stalkerBossImg.src = "stalker boss.png";
+  stalkerBossImg.src = encodeURI("stalker boss.png");
   const beamerImg = new window.Image();
   beamerImg.src = "beamer.png";
   const shielderImg = new window.Image();
@@ -2603,10 +2622,16 @@ window.onload = function () {
       if (!firstRightClickDone && wave === 1 && gameStarted) {
         firstRightClickDone = true;
         try {
-          let warnAudio = new Audio('warning.wav');
+          if (!window._warnAudioPool) {
+            window._warnAudioPool = [];
+          }
+          let warnAudio = window._warnAudioPool.length > 0 ? window._warnAudioPool.pop() : new Audio('warning.wav');
           warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0;
           warnAudio.playbackRate = 0.7;
-          warnAudio.play();
+          warnAudio.currentTime = 0;
+          let playPromise = warnAudio.play();
+          if (playPromise) playPromise.catch(() => {});
+          setTimeout(() => window._warnAudioPool.push(warnAudio), 2000);
         } catch (e) {}
       }
     }
@@ -3327,7 +3352,7 @@ window.onload = function () {
     let isAttacking = nearest && minDist < player.range + nearest.radius && player.attackCooldown > 0 && followMouse;
     if (isAttacking) {
       if (!laserAudio) {
-        laserAudio = new Audio('micro_crackle_sparkling_background.wav');
+        laserAudio = new Audio(encodeURI('micro_crackle_sparkling_background.wav'));
         laserAudio.loop = true;
         laserAudio.volume = window.sentinelVolume.laser;
         window.laserAudio = laserAudio;
@@ -3542,16 +3567,7 @@ const droplifelenght = 280;
       const d = xpDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
         try {
-          let clickAudio = new Audio('click.wav');
-          clickAudio.volume = window.sentinelVolume.click;
-          if (window.AudioContext || window.webkitAudioContext) {
-            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
-            let src = ctx.createMediaElementSource(clickAudio);
-            let gain = ctx.createGain();
-            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
-            src.connect(gain).connect(ctx.destination);
-          }
-          clickAudio.play();
+          playSound('click.wav', window.sentinelVolume.click || 1.0);
         } catch (e) {}
         gainXP(1);
         // XP pickup feedback: explode into persistent blue pieces
@@ -3586,16 +3602,7 @@ const droplifelenght = 280;
       const d = slingerDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
         try {
-          let clickAudio = new Audio('click.wav');
-          clickAudio.volume = window.sentinelVolume.click;
-          if (window.AudioContext || window.webkitAudioContext) {
-            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
-            let src = ctx.createMediaElementSource(clickAudio);
-            let gain = ctx.createGain();
-            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
-            src.connect(gain).connect(ctx.destination);
-          }
-          clickAudio.play();
+          playSound('click.wav', window.sentinelVolume.click || 1.0);
         } catch (e) {}
         gainXP(2);
         // XP pickup feedback: explode into persistent blue pieces
@@ -3630,16 +3637,7 @@ const droplifelenght = 280;
       const d = bruteDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
         try {
-          let clickAudio = new Audio('click.wav');
-          clickAudio.volume = window.sentinelVolume.click;
-          if (window.AudioContext || window.webkitAudioContext) {
-            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
-            let src = ctx.createMediaElementSource(clickAudio);
-            let gain = ctx.createGain();
-            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
-            src.connect(gain).connect(ctx.destination);
-          }
-          clickAudio.play();
+          playSound('click.wav', window.sentinelVolume.click || 1.0);
         } catch (e) {}
         gainXP(1);
         player.health = Math.min(player.maxHealth, player.health + 1);
@@ -3675,16 +3673,7 @@ const droplifelenght = 280;
       const d = healthDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
         try {
-          let clickAudio = new Audio('click.wav');
-          clickAudio.volume = window.sentinelVolume.click;
-          if (window.AudioContext || window.webkitAudioContext) {
-            let ctx = window._clickAudioCtx || (window._clickAudioCtx = new (window.AudioContext || window.webkitAudioContext)());
-            let src = ctx.createMediaElementSource(clickAudio);
-            let gain = ctx.createGain();
-            gain.gain.value = window.sentinelVolume.clickBoost || 1.0;
-            src.connect(gain).connect(ctx.destination);
-          }
-          clickAudio.play();
+          playSound('click.wav', window.sentinelVolume.click || 1.0);
         } catch (e) {}
         player.health = Math.min(player.maxHealth, player.health + 1);
         // Health pickup feedback: explode into persistent green pieces
@@ -6680,10 +6669,7 @@ const droplifelenght = 280;
             }
             
             try {
-              let warnAudio = new Audio('warning.wav');
-              warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0;
-              warnAudio.playbackRate = 0.7;
-              warnAudio.play();
+              playSound('warning.wav', window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0);
             } catch (e) {}
             spawnWave();
             burstTimer = burstInterval;
@@ -6702,13 +6688,9 @@ const droplifelenght = 280;
         ctx.save();
         ctx.shadowColor = "#ff33ff";
         ctx.shadowBlur = 18;
-        const grad = ctx.createRadialGradient(d.x, d.y, 1, d.x, d.y, 5);
-        grad.addColorStop(0, "#ff87ff");
-        grad.addColorStop(0.4, "#ff31ff");
-        grad.addColorStop(1, "#910091");
+        ctx.fillStyle = "#ff31ff";
         ctx.beginPath();
         ctx.arc(d.x, d.y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
         ctx.fill();
         ctx.restore();
       });
@@ -6717,13 +6699,9 @@ const droplifelenght = 280;
         ctx.save();
         ctx.shadowColor = "#ffc250";
         ctx.shadowBlur = 18;
-        const grad = ctx.createRadialGradient(d.x, d.y, 1, d.x, d.y, 5);
-        grad.addColorStop(0, "#fcea64");
-        grad.addColorStop(0.4, "#ffd700");
-        grad.addColorStop(1, "#ff9900");
+        ctx.fillStyle = "#ffd700";
         ctx.beginPath();
         ctx.arc(d.x, d.y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
         ctx.fill();
         ctx.restore();
       });
@@ -6732,13 +6710,9 @@ const droplifelenght = 280;
         ctx.save();
         ctx.shadowColor = "#ff4444";
         ctx.shadowBlur = 18;
-        const grad = ctx.createRadialGradient(d.x, d.y, 1, d.x, d.y, 5);
-        grad.addColorStop(0, "#ff4949");
-        grad.addColorStop(0.4, "#ff1717");
-        grad.addColorStop(1, "#8B0000");
+        ctx.fillStyle = "#ff1717";
         ctx.beginPath();
         ctx.arc(d.x, d.y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
         ctx.fill();
         ctx.restore();
       });
@@ -6747,13 +6721,9 @@ const droplifelenght = 280;
         ctx.save();
         ctx.shadowColor = "#ff4444";
         ctx.shadowBlur = 18;
-        const grad = ctx.createRadialGradient(d.x, d.y, 1, d.x, d.y, 6);
-        grad.addColorStop(0, "#ff4949");
-        grad.addColorStop(0.4, "#ff1717");
-        grad.addColorStop(1, "#b11717");
+        ctx.fillStyle = "#ff1717";
         ctx.beginPath();
         ctx.arc(d.x, d.y, 6, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
         ctx.fill();
         ctx.restore();
       });
