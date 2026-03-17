@@ -1,0 +1,19 @@
+/* Protocol card selected state */
+.selected {
+  background: rgba(0, 255, 221, 0.22) !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(255,255,255,0.35) !important;
+  transition: all 0.15s;
+}
+body {
+  background: #181818;
+  color: #fff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+canvas {
+  display: block;
+  margin: 40px auto;
+  background: #222;
+  border-radius: 12px;
+  box-shadow: 0 0 24px #000;
+}
