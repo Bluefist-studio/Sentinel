@@ -3,64 +3,66 @@
 // Separate module for all protocol-related logic
 
 const PROTOCOLS = {
-  // Targeting Family - Common
-  "LongSight Protocol": { family: "Targeting", rarity: "Common", tier: "Lower", structure: "2+/1−", statMods: { Range: 1, Pickup: 1, Movement: -1 }, influence: 2, intent: "Awareness vs survivability" },
-  "Peripheral Scan": { family: "Targeting", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Range: 1, Health: 1, Movement: -1, Pickup: -1 }, influence: 1, intent: "Safer spacing" },
-  "Narrow Profile": { family: "Targeting", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Range: 1, Movement: 1, Health: -1, Pickup: -1 }, influence: 3, intent: "Agile positioning" },
-  "Target Lock": { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Range: 1, Power: 1, Movement: -1 }, influence: 5, intent: "Aggressive sniper" },
-  "Optical Stabilization": { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Range: 1, Intensity: 1, Health: -1 }, influence: 5, intent: "Sustained pressure" },
-  "Sensor Calibration": { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Range: 1, Movement: 1, Pickup: -1 }, influence: 5, intent: "Mobile targeting" },
-  "Sightline Optimization": { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Range: 1, Health: 1, Pickup: -1 }, influence: 4, intent: "Defensive spacing" },
-  "Precision Alignment": { family: "Targeting", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Range: 1, Power: 1 }, influence: 8, intent: "Pure damage targeting" },
-  "Focus Optimization": { family: "Targeting", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Range: 1, Intensity: 1 }, influence: 7, intent: "Tempo ranged combat" },
-  // Targeting Family - Rare
-  "Vector Mapping": { family: "Targeting", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Range: 1, Movement: 1, Pickup: 1, Power: -1, Health: -1 }, influence: 0, intent: "Control targeting" },
-  "Range Analysis": { family: "Targeting", rarity: "Rare", tier: "Lower", structure: "3+/1−", statMods: { Range: 1, Health: 1, Pickup: 1, Power: -1 }, influence: 3, intent: "Defensive targeting" },
-  "Threat Analysis": { family: "Targeting", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Range: 1, Intensity: 1, Pickup: 1, Movement: -1 }, influence: 5, intent: "Stationary control" },
-  "Ballistic Prediction": { family: "Targeting", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Range: 1, Power: 1, Movement: 1, Health: -1 }, influence: 9, intent: "Aggressive sniper" },
-  "Tracking Matrix": { family: "Targeting", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Range: 1, Movement: 1, Intensity: 1, Health: -1 }, influence: 8, intent: "Reposition combat" },
-  "Predictive Targeting": { family: "Targeting", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Range: 1, Power: 1, Intensity: 1 }, influence: 12, intent: "Peak offense targeting" },
-  "Focus Tracking": { family: "Targeting", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Range: 1, Movement: 1, Power: 1 }, influence: 11, intent: "Precision mobility" },
-  // Overdrive Family - Common
-  "Pulse Cycling": { family: "Overdrive", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Intensity: 1, Pickup: 1, Health: -1, Range: -1 }, influence: 0, intent: "Resource tempo" },
-  "Combat Flow": { family: "Overdrive", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Intensity: 1, Movement: 1, Health: -1, Pickup: -1 }, influence: 4, intent: "Fragile speed" },
-  "Thermal Scaling": { family: "Overdrive", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Intensity: 1, Power: 1, Movement: -1, Health: -1 }, influence: 4, intent: "Aggressive tempo" },
-  "Rapid Cycling": { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Intensity: 1, Movement: 1, Health: -1 }, influence: 5, intent: "Constant motion" },
-  "Pressure Loop": { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Intensity: 1, Power: 1, Pickup: -1 }, influence: 8, intent: "Tempo damage" },
-  "Combat Sync": { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Intensity: 1, Health: 1, Range: -1 }, influence: 3, intent: "Close sustain" },
-  "Kinetic Optimization": { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Intensity: 1, Range: 1, Movement: -1 }, influence: 4, intent: "Engagement uptime" },
-  "Overclock Protocol": { family: "Overdrive", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Intensity: 1, Power: 1 }, influence: 9, intent: "Pure aggression" },
-  "Hyper Cycle": { family: "Overdrive", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Intensity: 1, Movement: 1 }, influence: 7, intent: "Speed dominance" },
-  // Overdrive Family - Rare
-  "Thermal Spike": { family: "Overdrive", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Intensity: 1, Power: 1, Pickup: 1, Health: -1, Range: -1 }, influence: 5, intent: "Aggro farming" },
-  "Combat Cascade": { family: "Overdrive", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Intensity: 1, Movement: 1, Pickup: 1, Power: -1, Health: -1 }, influence: 1, intent: "Mobility tempo" },
-  "Impulse Routine": { family: "Overdrive", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Intensity: 1, Range: 1, Movement: 1, Health: -1, Pickup: -1 }, influence: 7, intent: "Engagement flow" },
-  "Momentum Routine": { family: "Overdrive", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Intensity: 1, Movement: 1, Power: 1, Health: -1 }, influence: 10, intent: "High-risk aggression" },
-  "Relentless Cycle": { family: "Overdrive", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Intensity: 1, Range: 1, Health: 1, Movement: -1 }, influence: 5, intent: "Pressure firing" },
-  "Combat Acceleration": { family: "Overdrive", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Intensity: 1, Movement: 1, Range: 1, Pickup: -1 }, influence: 9, intent: "Chase combat" },
-  "Feedback Loop": { family: "Overdrive", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Intensity: 1, Power: 1, Health: 1, Range: -1 }, influence: 8, intent: "Bruiser tempo" },
-  "Infinite Loop": { family: "Overdrive", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Intensity: 1, Power: 1, Movement: 1 }, influence: 12, intent: "Maximum aggression" },
-  "Overdrive Matrix": { family: "Overdrive", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Intensity: 1, Range: 1, Movement: 1 }, influence: 10, intent: "Perfect tempo control" },
-  // Utility Family - Common
-  "Recovery Routing": { family: "Utility", rarity: "Common", tier: "Lower", structure: "2+/1−", statMods: { Health: 1, Pickup: 1, Range: -1 }, influence: 0, intent: "Survival tradeoff" },
-  "Soft Step Routine": { family: "Utility", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Movement: 1, Pickup: 1, Range: -1 }, influence: 1, intent: "Mobility learning" },
-  "Buffer Allocation": { family: "Utility", rarity: "Common", tier: "Lower", structure: "2+/2−", statMods: { Health: 1, Movement: 1, Intensity: -1, Pickup: -1 }, influence: 0, intent: "Safe reposition" },
-  "Structural Safeguard": { family: "Utility", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Health: 1, Movement: 1, Power: -1 }, influence: 0, intent: "Durable mobility" },
-  "Collection Protocol": { family: "Utility", rarity: "Common", tier: "Standard", structure: "2+/0", statMods: { Pickup: 1, Movement: 1 }, influence: 4, intent: "Resource efficiency" },
-  "Adaptive Shielding": { family: "Utility", rarity: "Common", tier: "Standard", structure: "3+/1−", statMods: { Health: 1, Pickup: 1, Range: 1, Intensity: -1 }, influence: 2, intent: "Sustain focus" },
-  "Stability Control": { family: "Utility", rarity: "Common", tier: "Standard", structure: "2+/1−", statMods: { Movement: 1, Health: 1, Pickup: -1 }, influence: 4, intent: "Reliable control" },
-  "Mobility Protocol": { family: "Utility", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Movement: 1, Health: 1 }, influence: 5, intent: "Safe reposition" },
-  "Logistics Manager": { family: "Utility", rarity: "Common", tier: "Higher", structure: "2+/0−", statMods: { Health: 1, Pickup: 1 }, influence: 3, intent: "Sustain economy" },
-  // Utility Family - Rare
-  "Sustainment Protocol": { family: "Utility", rarity: "Rare", tier: "Lower", structure: "3+/1−", statMods: { Health: 1, Pickup: 1, Movement: 1, Range: -1 }, influence: 3, intent: "Survival specialist" },
-  "Salvage Operations": { family: "Utility", rarity: "Rare", tier: "Lower", structure: "3+/1−", statMods: { Pickup: 1, Movement: 1, Range: 1, Power: -1 }, influence: 2, intent: "Resource mobility" },
-  "Defensive Cycling": { family: "Utility", rarity: "Rare", tier: "Lower", structure: "3+/2−", statMods: { Health: 1, Movement: 1, Intensity: 1, Power: -1, Pickup: -1 }, influence: 3, intent: "Stable tempo" },
-  "Autonomous Repair": { family: "Utility", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Health: 1, Pickup: 1, Movement: 1, Power: -1 }, influence: 1, intent: "Survival engine" },
-  "Operational Efficiency": { family: "Utility", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Movement: 1, Pickup: 1, Range: 1, Intensity: -1 }, influence: 3, intent: "Safe positioning" },
-  "Stabilization Matrix": { family: "Utility", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Health: 1, Movement: 1, Range: 1, Pickup: -1 }, influence: 7, intent: "Defensive control" },
-  "Resource Convergence": { family: "Utility", rarity: "Rare", tier: "Standard", structure: "3+/1−", statMods: { Pickup: 1, Health: 1, Intensity: 1, Range: -1 }, influence: 4, intent: "Sustain combat" },
-  "Guardian Protocol": { family: "Utility", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Health: 1, Movement: 1, Pickup: 1 }, influence: 6, intent: "Maximum stability" },
-  "Adaptive Systems": { family: "Utility", rarity: "Rare", tier: "Higher", structure: "3+/0−", statMods: { Health: 1, Movement: 1, Range: 1 }, influence: 8, intent: "Defensive mastery" }
+  // ── Targeting Common ─── Lower: R@1+X@1 | Standard: R@2+X@1 | Higher: R@2+X@2
+  "LongSight Protocol":       { family: "Targeting", rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Range: 1, Pickup: 1 },            influence: 4,  intent: "Awareness and collection" },
+  "Peripheral Scan":          { family: "Targeting", rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Range: 1, Health: 1 },             influence: 5,  intent: "Safer spacing" },
+  "Narrow Profile":           { family: "Targeting", rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Range: 1, Movement: 1 },           influence: 6,  intent: "Agile positioning" },
+  "Target Lock":              { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Range: 2, Power: 1 },              influence: 11, intent: "Aggressive sniper" },
+  "Optical Stabilization":    { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Range: 2, Intensity: 1 },          influence: 10, intent: "Sustained pressure" },
+  "Sensor Calibration":       { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Range: 2, Movement: 1 },           influence: 9,  intent: "Mobile targeting" },
+  "Sightline Optimization":   { family: "Targeting", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Range: 2, Health: 1 },             influence: 8,  intent: "Defensive spacing" },
+  "Precision Alignment":      { family: "Targeting", rarity: "Common", tier: "Higher",   structure: "2+", statMods: { Range: 2, Power: 2 },              influence: 16, intent: "Pure damage targeting" },
+  "Focus Optimization":       { family: "Targeting", rarity: "Common", tier: "Higher",   structure: "2+", statMods: { Range: 2, Intensity: 2 },          influence: 14, intent: "Tempo ranged combat" },
+  // ── Targeting Rare ─── Lower: R@1+X@1+Y@1 | Standard: R@2+X@1+Y@1 | Higher: R@2+X@2+Y@2
+  "Vector Mapping":           { family: "Targeting", rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Intensity: 1, Health: 1, Pickup: 1 },             influence: 7,  intent: "Control targeting" },
+  "Range Analysis":           { family: "Targeting", rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Range: 1, Health: 1, Pickup: 1 },                influence: 6,  intent: "Defensive targeting" },
+  "Threat Analysis":          { family: "Targeting", rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Range: 2, Intensity: 1, Pickup: 1 },             influence: 11, intent: "Stationary control" },
+  "Ballistic Prediction":     { family: "Targeting", rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Range: 2, Power: 1, Movement: 1 },               influence: 14, intent: "Aggressive sniper" },
+  "Tracking Matrix":          { family: "Targeting", rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Range: 2, Movement: 1, Intensity: 1 },           influence: 13, intent: "Reposition combat" },
+  "Predictive Targeting":     { family: "Targeting", rarity: "Rare",   tier: "Higher",   structure: "3+", statMods: { Range: 2, Power: 2, Intensity: 2 },              influence: 24, intent: "Peak offense targeting" },
+  "Focus Tracking":           { family: "Targeting", rarity: "Rare",   tier: "Higher",   structure: "3+", statMods: { Range: 2, Movement: 2, Power: 2 },               influence: 22, intent: "Precision mobility" },
+
+  // ── Overdrive Common ─── Lower: I@1+X@1 | Standard: I@2+X@1 | Higher: I@2+X@2
+  "Pulse Cycling":            { family: "Overdrive", rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Intensity: 1, Pickup: 1 },         influence: 5,  intent: "Resource tempo" },
+  "Combat Flow":              { family: "Overdrive", rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Intensity: 1, Movement: 1 },        influence: 7,  intent: "Fragile speed" },
+  "Thermal Scaling":          { family: "Overdrive", rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Intensity: 1, Power: 1 },           influence: 9,  intent: "Aggressive tempo" },
+  "Rapid Cycling":            { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Intensity: 2, Movement: 1 },        influence: 11, intent: "Constant motion" },
+  "Pressure Loop":            { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Intensity: 2, Power: 1 },           influence: 13, intent: "Tempo damage" },
+  "Combat Sync":              { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Intensity: 2, Health: 1 },          influence: 10, intent: "Close sustain" },
+  "Kinetic Optimization":     { family: "Overdrive", rarity: "Common", tier: "Standard", structure: "2+", statMods: { Intensity: 2, Range: 1 },           influence: 11, intent: "Engagement uptime" },
+  "Overclock Protocol":       { family: "Overdrive", rarity: "Common", tier: "Higher",   structure: "2+", statMods: { Intensity: 2, Power: 2 },           influence: 18, intent: "Pure aggression" },
+  "Hyper Cycle":              { family: "Overdrive", rarity: "Common", tier: "Higher",   structure: "2+", statMods: { Intensity: 2, Movement: 2 },        influence: 14, intent: "Speed dominance" },
+  // ── Overdrive Rare ─── Lower: I@1+X@1+Y@1 | Standard: I@2+X@1+Y@1 | Higher: I@2+X@2+Y@2
+  "Thermal Spike":            { family: "Overdrive", rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Intensity: 1, Power: 1, Pickup: 1 },             influence: 10, intent: "Aggro farming" },
+  "Combat Cascade":           { family: "Overdrive", rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Intensity: 1, Movement: 1, Pickup: 1 },           influence: 8,  intent: "Mobility tempo" },
+  "Impulse Routine":          { family: "Overdrive", rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Intensity: 1, Range: 1, Movement: 1 },            influence: 10, intent: "Engagement flow" },
+  "Momentum Routine":         { family: "Overdrive", rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Intensity: 2, Movement: 1, Power: 1 },            influence: 16, intent: "High-risk aggression" },
+  "Relentless Cycle":         { family: "Overdrive", rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Intensity: 2, Range: 1, Health: 1 },              influence: 13, intent: "Pressure firing" },
+  "Combat Acceleration":      { family: "Overdrive", rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Intensity: 2, Movement: 1, Range: 1 },            influence: 14, intent: "Chase combat" },
+  "Feedback Loop":            { family: "Overdrive", rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Intensity: 2, Power: 1, Health: 1 },              influence: 15, intent: "Bruiser tempo" },
+  "Infinite Loop":            { family: "Overdrive", rarity: "Rare",   tier: "Higher",   structure: "3+", statMods: { Intensity: 2, Power: 2, Movement: 2 },            influence: 24, intent: "Maximum aggression" },
+  "Overdrive Matrix":         { family: "Overdrive", rarity: "Rare",   tier: "Higher",   structure: "3+", statMods: { Intensity: 2, Range: 2, Movement: 2 },            influence: 20, intent: "Perfect tempo control" },
+
+  // ── Utility Common ─── Lower: X@1+Y@1 | Standard: primary@2+X@1 | Higher: both@2
+  "Recovery Routing":         { family: "Utility",   rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Health: 1, Pickup: 1 },            influence: 3,  intent: "Survival" },
+  "Soft Step Routine":        { family: "Utility",   rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Movement: 1, Pickup: 1 },           influence: 4,  intent: "Mobility learning" },
+  "Buffer Allocation":        { family: "Utility",   rarity: "Common", tier: "Lower",    structure: "2+", statMods: { Health: 1, Movement: 1 },            influence: 5,  intent: "Safe reposition" },
+  "Structural Safeguard":     { family: "Utility",   rarity: "Common", tier: "Standard", structure: "2+", statMods: { Movement: 2, Health: 1 },            influence: 8,  intent: "Durable mobility" },
+  "Collection Protocol":      { family: "Utility",   rarity: "Common", tier: "Standard", structure: "2+", statMods: { Movement: 2, Pickup: 1 },            influence: 7,  intent: "Resource efficiency" },
+  "Adaptive Shielding":       { family: "Utility",   rarity: "Common", tier: "Standard", structure: "2+", statMods: { Health: 2, Pickup: 1 },              influence: 5,  intent: "Sustain focus" },
+  "Stability Control":        { family: "Utility",   rarity: "Common", tier: "Standard", structure: "2+", statMods: { Health: 2, Movement: 1 },            influence: 7,  intent: "Reliable control" },
+  "Mobility Protocol":        { family: "Utility",   rarity: "Common", tier: "Higher",   structure: "2+", statMods: { Movement: 2, Health: 2 },            influence: 10, intent: "Safe reposition" },
+  "Logistics Manager":        { family: "Utility",   rarity: "Common", tier: "Higher",   structure: "2+", statMods: { Health: 2, Pickup: 2 },              influence: 6,  intent: "Sustain economy" },
+  // ── Utility Rare ─── Lower: X@1+Y@1+Z@1 | Standard: primary@2+X@1+Y@1 | Higher: all@2
+  "Sustainment Protocol":     { family: "Utility",   rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Health: 1, Pickup: 1, Movement: 1 },              influence: 6,  intent: "Survival specialist" },
+  "Salvage Operations":       { family: "Utility",   rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Range: 1, Movement: 1, Pickup: 1 },               influence: 7,  intent: "Resource mobility" },
+  "Defensive Cycling":        { family: "Utility",   rarity: "Rare",   tier: "Lower",    structure: "3+", statMods: { Health: 1, Movement: 1, Intensity: 1 },           influence: 9,  intent: "Stable tempo" },
+  "Autonomous Repair":        { family: "Utility",   rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Health: 2, Pickup: 1, Movement: 1 },              influence: 8,  intent: "Survival engine" },
+  "Operational Efficiency":   { family: "Utility",   rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Movement: 2, Pickup: 1, Range: 1 },               influence: 10, intent: "Safe positioning" },
+  "Stabilization Matrix":     { family: "Utility",   rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Health: 2, Movement: 1, Range: 1 },               influence: 10, intent: "Defensive control" },
+  "Resource Convergence":     { family: "Utility",   rarity: "Rare",   tier: "Standard", structure: "3+", statMods: { Health: 2, Pickup: 1, Intensity: 1 },             influence: 9,  intent: "Sustain combat" },
+  "Guardian Protocol":        { family: "Utility",   rarity: "Rare",   tier: "Higher",   structure: "3+", statMods: { Health: 2, Movement: 2, Pickup: 2 },              influence: 12, intent: "Maximum stability" },
+  "Adaptive Systems":         { family: "Utility",   rarity: "Rare",   tier: "Higher",   structure: "3+", statMods: { Health: 2, Movement: 2, Range: 2 },               influence: 16, intent: "Defensive mastery" }
 };
 
 
@@ -271,9 +273,6 @@ const ProtocolSystem = {
   computeEffectiveModForTier: function(baseValue, tierIndex) {
     if (baseValue > 0) {
       return baseValue + tierIndex;
-    }
-    if (baseValue < 0) {
-      return baseValue - Math.floor(tierIndex / 2);
     }
     return 0;
   },
