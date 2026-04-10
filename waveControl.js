@@ -240,7 +240,7 @@ window.SentinelWaveControl = (function () {
     let gruntSpawnInterval = 420;
     let gruntSpawnCount = 1 + Math.floor(Math.random() * 2);
     const { x, y } = randomEdgeSpawn();
-    let radius = 34, collisionRadius = 40, speed = 0.4, health = 300 + (wave * 2), damage = 1, attackRange = 20, color = "magenta";
+    let radius = 34, collisionRadius = 40, speed = 0.4, health = 200 + (wave * 2), damage = 1, attackRange = 20, color = "magenta";
     const spinAngle = Math.random() * Math.PI * 2;
     const spinSpeed = (Math.random() - 0.5) * 0.02;
 
@@ -894,6 +894,12 @@ window.SentinelWaveControl = (function () {
           }
         }
       }
+    }
+
+    // Apocalypse difficulty: spawn 1-3 extra kamikazes alongside each burst event
+    if (anyEventSpawned && window.sentinelDifficulty === "Apocalypse") {
+      const kamikazeCount = 1 + Math.floor(Math.random() * 3);
+      spawnKamikazeBurst(ctx, kamikazeCount);
     }
 
     // Wave complete based on endCondition setting
