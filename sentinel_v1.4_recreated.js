@@ -3145,7 +3145,7 @@ window.onload = function () {
   document.addEventListener("keydown", (e) => {
     const k = e.key.toLowerCase();
     keys[k] = true;
-    if ((k === "escape" || k === "r") && gameStarted && !showMenuScreen) {
+    if (k === "escape" && gameStarted && !showMenuScreen) {
       e.preventDefault();
       showReturnToMenuModal();
       return;
