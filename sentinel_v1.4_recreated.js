@@ -536,16 +536,16 @@ window.onload = function () {
   loadingBg.style.left = "50%";
   loadingBg.style.top = "50%";
   loadingBg.style.transform = "translate(-50%, -50%)";
-  loadingBg.style.width = "1024px";
-  loadingBg.style.height = "768px";
-  loadingBg.style.objectFit = "fill";
+  loadingBg.style.width = "100vw";
+  loadingBg.style.height = "100vh";
+  loadingBg.style.objectFit = "contain";
 
   // Gradient overlay for bottom fade effect
   const loadingGradient = document.createElement("div");
   loadingGradient.style.position = "absolute";
   loadingGradient.style.left = "0";
   loadingGradient.style.bottom = "0";
-  loadingGradient.style.width = "1024px";
+  loadingGradient.style.width = "100vw";
   loadingGradient.style.height = "180px";
   loadingGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
   loadingGradient.style.pointerEvents = "none";
@@ -1632,9 +1632,9 @@ window.onload = function () {
       glossaryBg.style.left = "50%";
       glossaryBg.style.top = "50%";
       glossaryBg.style.transform = "translate(-50%, -50%)";
-      glossaryBg.style.width = "1024px";
-      glossaryBg.style.height = "768px";
-      glossaryBg.style.objectFit = "fill";
+      glossaryBg.style.width = "100vw";
+      glossaryBg.style.height = "100vh";
+      glossaryBg.style.objectFit = "contain";
       glossaryBg.style.zIndex = 0;
       glossaryOverlay.appendChild(glossaryBg);
 
@@ -1796,7 +1796,7 @@ window.onload = function () {
 
       const lbBg = document.createElement("img");
       lbBg.src = "titlescreen.png";
-      lbBg.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:1024px;height:768px;object-fit:fill;z-index:0;";
+      lbBg.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100vw;height:100vh;object-fit:contain;z-index:0;";
       lbOverlay.appendChild(lbBg);
 
       const panel = document.createElement("div");
@@ -1929,16 +1929,16 @@ window.onload = function () {
     menuBg.style.left = "50%";
     menuBg.style.top = "50%";
     menuBg.style.transform = "translate(-50%, -50%)";
-    menuBg.style.width = "1024px";
-    menuBg.style.height = "768px";
-    menuBg.style.objectFit = "fill";
+    menuBg.style.width = "100vw";
+    menuBg.style.height = "100vh";
+    menuBg.style.objectFit = "contain";
 
     // Gradient overlay for bottom fade effect
     const menuGradient = document.createElement("div");
     menuGradient.style.position = "absolute";
     menuGradient.style.left = "0";
     menuGradient.style.bottom = "0";
-    menuGradient.style.width = "1024px";
+    menuGradient.style.width = "100vw";
     menuGradient.style.height = "180px";
     menuGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
     menuGradient.style.pointerEvents = "none";
@@ -2062,16 +2062,16 @@ window.onload = function () {
     diffBg.style.left = "50%";
     diffBg.style.top = "50%";
     diffBg.style.transform = "translate(-50%, -50%)";
-    diffBg.style.width = "1024px";
-    diffBg.style.height = "768px";
-    diffBg.style.objectFit = "fill";
+    diffBg.style.width = "100vw";
+    diffBg.style.height = "100vh";
+    diffBg.style.objectFit = "contain";
 
     // Gradient overlay
     const diffGradient = document.createElement("div");
     diffGradient.style.position = "absolute";
     diffGradient.style.left = "0";
     diffGradient.style.bottom = "0";
-    diffGradient.style.width = "1024px";
+    diffGradient.style.width = "100vw";
     diffGradient.style.height = "180px";
     diffGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
     diffGradient.style.pointerEvents = "none";
@@ -2167,16 +2167,16 @@ window.onload = function () {
       waveBg.style.left = "50%";
       waveBg.style.top = "50%";
       waveBg.style.transform = "translate(-50%, -50%)";
-      waveBg.style.width = "1024px";
-      waveBg.style.height = "768px";
-      waveBg.style.objectFit = "fill";
+      waveBg.style.width = "100vw";
+      waveBg.style.height = "100vh";
+      waveBg.style.objectFit = "contain";
 
       // Gradient overlay
       const waveGradient = document.createElement("div");
       waveGradient.style.position = "absolute";
       waveGradient.style.left = "0";
       waveGradient.style.bottom = "0";
-      waveGradient.style.width = "1024px";
+      waveGradient.style.width = "100vw";
       waveGradient.style.height = "180px";
       waveGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
       waveGradient.style.pointerEvents = "none";
@@ -2492,6 +2492,17 @@ window.onload = function () {
     let playerVisualAngle = Math.PI / 2; // Start facing down
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
+
+  function getCanvasMousePos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+    const offsetX = (rect.width - canvas.width * scale) / 2;
+    const offsetY = (rect.height - canvas.height * scale) / 2;
+    return {
+      x: (e.clientX - rect.left - offsetX) / scale,
+      y: (e.clientY - rect.top - offsetY) / scale
+    };
+  }
 
   let keys = {}, paused = false, gameOver = false;
   // Player sprite
@@ -3162,9 +3173,9 @@ window.onload = function () {
   document.addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
 
   canvas.addEventListener("mousemove", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
+    const pos = getCanvasMousePos(e);
+    mouseX = Math.max(0, Math.min(canvas.width, pos.x));
+    mouseY = Math.max(0, Math.min(canvas.height, pos.y));
   });
   let firstRightClickDone = false;
   // Freeze logic: 2s freeze on right click press (not hold)
@@ -4556,6 +4567,8 @@ const droplifelenght = 280;
         ctx.font = "bold 16px sans-serif";
         ctx.font = "16px sans-serif";
         const totalTextWidth = ctx.measureText(totalText).width;
+        const buttonWidth = 18;
+        const buttonHeight = 16;
         const groupWidth = 18 + 8 + totalTextWidth + 8 + 18;
         // Stat name centered
         ctx.font = "bold 14px sans-serif";
@@ -4596,7 +4609,7 @@ const droplifelenght = 280;
         });
         // + button
         const plusX = panelCenter + (groupWidth / 2) - 18;
-        ctx.fillStyle = statPoints > 0 && stat.base < (level+1) ? "#00ffdd" : "#555";
+        ctx.fillStyle = statPoints > 0 && stat.base < (level + 1) ? "#00ffdd" : "#555";
         ctx.fillRect(plusX, y + 18, 18, 16);
         ctx.fillStyle = "#152c16";
         ctx.font = "bold 16px sans-serif";
@@ -5167,9 +5180,7 @@ const droplifelenght = 280;
       // Stat button click logic for -/+ buttons
       canvas.addEventListener("mousedown", function(e) {
         if (!showStats || e.button === 2) return;
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+        const { x: mx, y: my } = getCanvasMousePos(e);
         // Check minus buttons
         const minusBoxes = window._statMinusButtonBoxes || [];
         for (let box of minusBoxes) {
@@ -5216,9 +5227,7 @@ const droplifelenght = 280;
       // Protocol selector click handler
       canvas.addEventListener("mousedown", function(e) {
         if (!showStats || e.button === 2) return;
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+        const { x: mx, y: my } = getCanvasMousePos(e);
         // Handle replace mode clicks first
         if (window._protocolReplaceMode) {
           const replaceBoxes = window._protocolReplacePanelBoxes || [];
@@ -5285,9 +5294,7 @@ const droplifelenght = 280;
       // Protocol scroll wheel handler
       canvas.addEventListener("wheel", function(e) {
         if (!showStats) return;
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
+        const { x: mx, y: my } = getCanvasMousePos(e);
         // Check if mouse is over protocol panel (right side)
         if (mx > canvas.width - 340 && my > 190 && my < 560) {
           e.preventDefault();
