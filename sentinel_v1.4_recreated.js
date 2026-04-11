@@ -1987,11 +1987,13 @@ window.onload = function () {
     const waveEditorBtn = makeMenuButton("Wave Editor", "#6cf0ff");
     const enemyGlossaryBtn = makeMenuButton("Enemy Glossary", "#ff4444");
     const leaderboardBtn = makeMenuButton("Leaderboards", "#ffdd00");
+    const exitBtn = makeMenuButton("Exit", "#ff5555");
     buttonContainer.appendChild(playBtn);
     buttonContainer.appendChild(protocolBtn);
     buttonContainer.appendChild(leaderboardBtn);
     buttonContainer.appendChild(enemyGlossaryBtn);
     buttonContainer.appendChild(waveEditorBtn);
+    buttonContainer.appendChild(exitBtn);
     menuOverlay.appendChild(buttonContainer);
     document.body.appendChild(menuOverlay);
     playMenuMusic();
@@ -2037,6 +2039,12 @@ window.onload = function () {
     leaderboardBtn.addEventListener("click", function() {
       menuOverlay.remove();
       showLeaderboardOverlay();
+    });
+
+    exitBtn.addEventListener("click", function() {
+      if (typeof window !== 'undefined' && typeof window.close === 'function') {
+        window.close();
+      }
     });
   }
 
