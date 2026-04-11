@@ -29,6 +29,27 @@
       background: #000;
       display: block;
     }
+
+    .scrollbar-themed {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,255,221,0.75) rgba(0,0,0,0.18);
+    }
+    .scrollbar-themed::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    .scrollbar-themed::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.12);
+      border-radius: 999px;
+    }
+    .scrollbar-themed::-webkit-scrollbar-thumb {
+      background: rgba(0,255,221,0.8);
+      border-radius: 999px;
+      border: 2px solid rgba(0,0,0,0.18);
+    }
+    .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,255,221,1);
+    }
   </style>
 </head>
 <body>

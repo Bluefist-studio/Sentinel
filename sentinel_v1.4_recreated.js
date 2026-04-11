@@ -726,6 +726,7 @@ window.onload = function () {
     content.style.border = "1px solid rgba(0,255,221,0.25)";
     content.style.borderRadius = "8px";
     content.style.padding = "12px";
+    content.classList.add("scrollbar-themed");
     panel.appendChild(content);
 
     // Modal helper functions
@@ -1707,6 +1708,7 @@ window.onload = function () {
       listWrap.style.border = "1px solid rgba(0,255,221,0.28)";
       listWrap.style.borderRadius = "8px";
       listWrap.style.padding = "10px";
+      listWrap.classList.add("scrollbar-themed");
       panel.appendChild(listWrap);
 
       ENEMY_GLOSSARY.entries.forEach((entry) => {
@@ -1836,7 +1838,8 @@ window.onload = function () {
       panel.appendChild(lbHeaders);
 
       const lbTable = document.createElement("div");
-      lbTable.style.cssText = "width:100%;display:flex;flex-direction:column;gap:3px;max-height:380px;overflow-y:auto;flex:1;";
+      lbTable.style.cssText = "width:100%;display:flex;flex-direction:column;gap:3px;height:380px;overflow-y:auto;";
+      lbTable.classList.add("scrollbar-themed");
       panel.appendChild(lbTable);
 
       const emptyNote = document.createElement("div");
@@ -2042,10 +2045,96 @@ window.onload = function () {
     });
 
     exitBtn.addEventListener("click", function() {
+      showExitConfirmation();
+    });
+  }
+
+  function showExitConfirmation() {
+    const exitOverlay = document.createElement("div");
+    exitOverlay.style.position = "fixed";
+    exitOverlay.style.left = "0";
+    exitOverlay.style.top = "0";
+    exitOverlay.style.width = "100vw";
+    exitOverlay.style.height = "100vh";
+    exitOverlay.style.background = "rgba(0, 0, 0, 0.75)";
+    exitOverlay.style.display = "flex";
+    exitOverlay.style.alignItems = "center";
+    exitOverlay.style.justifyContent = "center";
+    exitOverlay.style.zIndex = 2000;
+
+    const exitPanel = document.createElement("div");
+    exitPanel.style.width = "min(460px, 90vw)";
+    exitPanel.style.background = "rgba(0, 20, 30, 0.98)";
+    exitPanel.style.border = "2px solid #ff5555";
+    exitPanel.style.borderRadius = "10px";
+    exitPanel.style.boxShadow = "0 0 28px rgba(255, 85, 85, 0.35)";
+    exitPanel.style.padding = "16px";
+    exitPanel.style.color = "#c8ffff";
+    exitPanel.style.fontFamily = "sans-serif";
+    exitOverlay.appendChild(exitPanel);
+
+    const exitTitle = document.createElement("div");
+    exitTitle.textContent = "EXIT APPLICATION";
+    exitTitle.style.color = "#ff5555";
+    exitTitle.style.fontWeight = "bold";
+    exitTitle.style.fontSize = "1.05rem";
+    exitTitle.style.marginBottom = "10px";
+    exitPanel.appendChild(exitTitle);
+
+    const exitMessage = document.createElement("div");
+    exitMessage.textContent = "Are you sure you want to quit?";
+    exitMessage.style.color = "#aaf6ff";
+    exitMessage.style.fontSize = "0.95rem";
+    exitMessage.style.lineHeight = "1.4";
+    exitMessage.style.marginBottom = "14px";
+    exitPanel.appendChild(exitMessage);
+
+    const actionRow = document.createElement("div");
+    actionRow.style.display = "flex";
+    actionRow.style.justifyContent = "flex-end";
+    actionRow.style.gap = "8px";
+    exitPanel.appendChild(actionRow);
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.style.padding = "0.5rem 0.85rem";
+    cancelBtn.style.borderRadius = "6px";
+    cancelBtn.style.border = "1px solid #2f9cad";
+    cancelBtn.style.background = "rgba(0,0,0,0.45)";
+    cancelBtn.style.color = "#c8ffff";
+    cancelBtn.style.cursor = "pointer";
+    actionRow.appendChild(cancelBtn);
+
+    const exitBtnConfirm = document.createElement("button");
+    exitBtnConfirm.type = "button";
+    exitBtnConfirm.textContent = "Exit";
+    exitBtnConfirm.style.padding = "0.5rem 0.85rem";
+    exitBtnConfirm.style.borderRadius = "6px";
+    exitBtnConfirm.style.border = "1px solid #ff5555";
+    exitBtnConfirm.style.background = "rgba(0,0,0,0.55)";
+    exitBtnConfirm.style.color = "#ff5555";
+    exitBtnConfirm.style.cursor = "pointer";
+    actionRow.appendChild(exitBtnConfirm);
+
+    const closeExitModal = () => {
+      exitOverlay.remove();
+    };
+
+    cancelBtn.addEventListener("click", closeExitModal);
+    exitOverlay.addEventListener("click", (evt) => {
+      if (evt.target === exitOverlay) {
+        closeExitModal();
+      }
+    });
+    exitBtnConfirm.addEventListener("click", () => {
+      closeExitModal();
       if (typeof window !== 'undefined' && typeof window.close === 'function') {
         window.close();
       }
     });
+
+    document.body.appendChild(exitOverlay);
   }
 
   // Difficulty selection menu
@@ -4326,19 +4415,21 @@ const droplifelenght = 280;
     for (let i = bruteDrops.length - 1; i >= 0; i--) {
       const d = bruteDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
-        playOrbPickupSound();
+        try {
+          const _hpSfx = new Audio('ribhavagrawal-energy-drink-effect-230559.mp3');
+          _hpSfx.volume = window.sentinelVolume && window.sentinelVolume.healthPickup !== undefined ? window.sentinelVolume.healthPickup : 0.7;
+          _hpSfx.play().catch(() => {});
+        } catch (e) {}
         gainXP(1);
         player.health = Math.min(player.maxHealth, player.health + 1);
-        // XP pickup feedback: explode into persistent red pieces
-        // Brute drop tones
-        const palette = ["#8B0000", "#b22222", "#a52a2a", "#d11717", "#c80000"];
+        // Health pickup feedback: explode into persistent red pieces
         for (let j = 0; j < 18; j++) {
           const angle = Math.random() * Math.PI * 2;
           const speed = 2.5 + Math.random() * 1.8;
           let size = 2;
           if (j < 4) size = 4;
           if (j < 2) size = 7;
-          const color = palette[Math.floor(Math.random() * palette.length)];
+          const color = Math.random() < 0.5 ? "#b11717" : "#d43636";
           spawnParticle(
             d.x,
             d.y,
@@ -4348,7 +4439,7 @@ const droplifelenght = 280;
             color,
             0.88 + Math.random() * 0.04,
             size,
-            "bruteDrop"
+            "healthDrop"
           );
         }
         bruteDrops.splice(i, 1);
@@ -7662,12 +7753,19 @@ const droplifelenght = 280;
       });
       // Brute drop glow
       bruteDrops.forEach(d => {
+        const _hpPulse = 0.85 + Math.sin(Date.now() * 0.006) * 0.15;
+        const _hpRadius = 9 * _hpPulse;
         ctx.save();
         ctx.shadowColor = "#ff4444";
-        ctx.shadowBlur = 18;
+        ctx.shadowBlur = 22 + _hpPulse * 10;
         ctx.fillStyle = "#ff1717";
         ctx.beginPath();
-        ctx.arc(d.x, d.y, 5, 0, Math.PI * 2);
+        ctx.arc(d.x, d.y, _hpRadius, 0, Math.PI * 2);
+        ctx.fill();
+        // bright inner highlight
+        ctx.fillStyle = `rgba(255,120,120,${0.45 + _hpPulse * 0.3})`;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, _hpRadius * 0.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       });
@@ -8861,6 +8959,7 @@ const droplifelenght = 280;
             const resultColor = isVictory ? "#ffd700" : "#ff3c3c";
             const panel = document.createElement("div");
             panel.style.cssText = `width:min(600px,92vw);max-height:92vh;overflow-y:auto;background:rgba(0,10,15,0.97);border:2px solid ${resultColor};border-radius:12px;box-shadow:0 0 32px ${resultColor}55;padding:28px 24px 22px;display:flex;flex-direction:column;align-items:center;gap:10px;`;
+            panel.classList.add("scrollbar-themed");
             overlay.appendChild(panel);
 
             // Result title
@@ -8934,6 +9033,7 @@ const droplifelenght = 280;
             // Leaderboard table
             const lbTable = document.createElement("div");
             lbTable.style.cssText = "width:100%;display:flex;flex-direction:column;gap:3px;max-height:260px;overflow-y:auto;";
+            lbTable.classList.add("scrollbar-themed");
             panel.appendChild(lbTable);
 
             function renderLbRows(cloudEntries, pendingEntry) {
