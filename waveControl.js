@@ -18,6 +18,35 @@ window.SentinelWaveControl = (function () {
   // Timeline wave data storage: { waveNum: { duration, mobs: { mobType: [{time, amount}, ...] } } }
   const timelineWaveData = {};
 
+  // Global per-wave health modifier curve.
+  // 0 at wave 1, 20 at wave 30. Adjust these values directly in the JS file.
+  const GLOBAL_MOB_HEALTH_PER_WAVE_MODIFIER_CURVE_TARGET = 50;
+  const GLOBAL_MOB_HEALTH_PER_WAVE_MODIFIER_CURVE_MAX_WAVE = 100;
+
+  // Enemy health balance settings. Modify these values to tune enemy durability.
+  const ENEMY_HEALTH_SETTINGS = {
+    gruntBoss: { base: 200, perWave: 50 },
+    gruntBossMinor: { base: 120, perWave: 25 },
+    grunt: { base: 6, perWave: 2 },
+    kamikaze: { base: 20, perWave: 10 },
+    slinger: { base: 10, perWave: 10 },
+    slingerBoss: { base: 3000, perWave: 16 },
+    brute: { base: 300, perWave: 50 },
+    bruteBoss: { base: 5000, perWave: 50 },
+    stalker: { base: 75, perWave: 5 },
+    beamer: { base: 150, perWave: 30 },
+    shielder: { base: 75, perWave: 25 },
+    stalkerBoss: { base: 9000, perWave: 50 }
+  };
+
+  function getEnemyHealthForType(type, wave) {
+    const settings = ENEMY_HEALTH_SETTINGS[type];
+    if (!settings) {
+      return getEnemyHealthWithGlobalWaveModifier(100, 2, wave);
+    }
+    return getEnemyHealthWithGlobalWaveModifier(settings.base, settings.perWave, wave);
+  }
+
   function resolveMobIntervalKey(key) {
     if (typeof key !== "string") return key;
     if (MOB_INTERVAL_KEYS.includes(key)) return key;
@@ -41,6 +70,20 @@ window.SentinelWaveControl = (function () {
       }
     }
     return Object.keys(normalized).length ? normalized : null;
+  }
+
+  function getGlobalMobHealthPerWaveModifier(wave) {
+    if (!Number.isFinite(wave) || wave <= 1) return 0;
+    const maxWave = GLOBAL_MOB_HEALTH_PER_WAVE_MODIFIER_CURVE_MAX_WAVE;
+    const target = GLOBAL_MOB_HEALTH_PER_WAVE_MODIFIER_CURVE_TARGET;
+    if (wave >= maxWave) return target;
+    const ratio = (wave - 1) / (maxWave - 1);
+    return target * Math.pow(ratio, 1.5);
+  }
+
+  function getEnemyHealthWithGlobalWaveModifier(baseHealth, perWaveFactor, wave) {
+    const modifier = getGlobalMobHealthPerWaveModifier(wave);
+    return baseHealth + wave * (perWaveFactor + modifier);
   }
 
   // Returns the correct interval for a mob type, using user logic
@@ -116,13 +159,13 @@ window.SentinelWaveControl = (function () {
     27: "SWC3:eyJ2IjozLCJvIjp7IjI3Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJhbGxFbGltaW5hdGVkIiwibSI6eyJnIjpbWzAsM10sWzAuNSwzXSxbMSwzXSxbMS41LDNdLFsyLDNdLFsyLjUsM11dLCJiIjpbWzEuNSwzXV0sInNoIjpbWzIuNSwyXSxbNy41LDJdLFsxMi41LDJdXSwic3QiOltbNCwyXSxbMTMsMV0sWzguNSwxXSxbMTcuNSwxXV0sImdibSI6W1syLDFdXX19fX19",
     28: "SWC3:eyJ2IjozLCJvIjp7IjI4Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl1dLCJrIjpbWzE1LDFdLFsxOCwxXSxbMCwxXSxbMC41LDFdLFsxLDFdLFszLjUsMV0sWzExLjUsMV0sWzE0LjUsMV0sWzE3LjUsMV0sWzE4LjUsMV0sWzQsMV0sWzcsMV0sWzQuNSwxXSxbNy41LDFdLFs4LDFdLFsxMC41LDFdLFsxMSwxXSxbMTQsMV1dLCJzdCI6W1s1LDFdLFsxNSwxXSxbNy41LDFdLFsyLjUsMV0sWzEwLDFdLFsxMi41LDFdXX19fX19",
     29: "SWC3:eyJ2IjozLCJvIjp7IjI5Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwicyI6W1s0LDFdLFs2LDFdLFs4LDFdLFsxMCwxXSxbMTIsMV0sWzE0LDFdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl0sWzUsMV0sWzEwLDFdLFsxNC41LDFdXSwic3QiOltbNSwxXSxbMTUsMV0sWzcuNSwxXSxbMi41LDFdLFsxMCwxXSxbMTIuNSwxXV19fX19fQ==",
-    30: "SWC3:eyJ2IjozLCJvIjp7IjMwIjp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIn19fX0=",
-    31: null,
-    32: null,
-    33: null,
-    34: null,
-    35: null,
-    36: null,
+    30: "SWC3:eyJ2IjozLCJvIjp7IjMwIjp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIiwibSI6eyJzdGIiOltbMCwxXV19fX19fQ==",
+    31: "SWC3:eyJ2IjozLCJvIjp7IjMxIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJnYm0iOltbNCw0XSxbOCw0XSxbMTIsNF0sWzE2LDRdLFsyMCw0XSxbMCw0XV19fX19fQ==",
+    32: "SWC3:eyJ2IjozLCJvIjp7IjMyIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJzaCI6W1sxMCwxXV0sImdibSI6W1s0LDNdLFs4LDNdLFsxMiwzXSxbMTYsM10sWzIwLDNdLFswLDNdXX19fX19",
+    33: "SWC3:eyJ2IjozLCJvIjp7IjMzIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1syLDNdLFs0LDNdLFs2LDNdLFs4LDNdLFsxMCwzXSxbMTIsM10sWzE0LDNdLFsxNiwzXSxbMTgsM10sWzIwLDNdLFswLDNdXSwiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJnYm0iOltbNCwyXSxbOCwyXSxbMTIsMl0sWzE2LDJdLFsyMCwyXSxbMCwyXV19fX19fQ==",
+    34: "SWC3:eyJ2IjozLCJvIjp7IjM0Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1syLDJdLFs0LDJdLFs2LDJdLFs4LDJdLFsxMCwyXSxbMTIsMl0sWzE0LDJdLFsxNiwyXSxbMTgsMl0sWzIwLDJdLFswLDJdXSwiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJiZSI6W1s4LDFdXSwiZ2JtIjpbWzQsMl0sWzgsMl0sWzEyLDJdLFsxNiwyXSxbMjAsMl0sWzAsMl1dfX19fQ==",
+    35: "SWC3:eyJ2IjozLCJvIjp7IjM1Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDFdLFsyLDFdLFszLDFdLFs0LDFdLFs1LDFdLFs2LDFdLFs3LDFdLFs4LDFdLFs5LDFdLFsxMCwxXSxbMTEsMV0sWzEyLDFdLFsxMywxXSxbMTQsMV0sWzE1LDFdLFsxNiwxXSxbMTcsMV0sWzE4LDFdLFsxOSwxXSxbMjAsMV0sWzAsMV1dLCJiIjpbWzUsMl0sWzE0LDJdLFsyLDJdLFs4LDJdLFsxMSwyXSxbMTcsMl1dLCJzaCI6W1s1LDFdLFsxNCwxXV0sImJlIjpbWzgsMl0sWzIsMV1dLCJnYm0iOltbNCwyXSxbOCwyXSxbMTIsMl0sWzE2LDJdLFsyMCwyXSxbMCwyXV19fX19fQ==",
+    36: "SWC3:eyJ2IjozLCJvIjp7IjM2Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMS41LDFdLFs4LjUsMV0sWzEyLDFdLFsxNS41LDFdLFsxOSwxXV0sImJlIjpbWzguNSwyXSxbMy41LDJdLFsxMy41LDJdLFs2LDFdLFsxMSwxXSxbMTYsMV1dfX19fQ==",
     37: null,
     38: null,
     39: null,
@@ -240,7 +283,7 @@ window.SentinelWaveControl = (function () {
     let gruntSpawnInterval = 420;
     let gruntSpawnCount = 1 + Math.floor(Math.random() * 2);
     const { x, y } = randomEdgeSpawn();
-    let radius = 34, collisionRadius = 40, speed = 0.4, health = 200 + (wave * 2), damage = 1, attackRange = 20, color = "magenta";
+    let radius = 34, collisionRadius = 40, speed = 0.4, health = getEnemyHealthForType('gruntBoss', wave), damage = 1, attackRange = 20, color = "magenta";
     const spinAngle = Math.random() * Math.PI * 2;
     const spinSpeed = (Math.random() - 0.5) * 0.02;
 
@@ -289,7 +332,7 @@ window.SentinelWaveControl = (function () {
     let gruntSpawnInterval = 420;
     let gruntSpawnCount = 1 + Math.floor(Math.random() * 2);
     const { x, y } = randomEdgeSpawn();
-    let radius = 28, collisionRadius = 30, speed = 0.32, health = 150 + (wave * 2.5), damage = 1, attackRange = 20, color = "magenta";
+    let radius = 28, collisionRadius = 30, speed = 0.32, health = getEnemyHealthForType('gruntBossMinor', wave), damage = 1, attackRange = 20, color = "magenta";
     const spinAngle = Math.random() * Math.PI * 2;
     const spinSpeed = (Math.random() - 0.5) * 0.02;
 
@@ -321,7 +364,7 @@ window.SentinelWaveControl = (function () {
 
     for (let i = 0; i < count; i++) {
       const { x, y } = randomEdgeSpawn();
-      let radius = 14, collisionRadius = 16, speed = 1.5, health = 6 + (wave * 1.3), damage = 1, attackRange = 22, color = "magenta";
+      let radius = 14, collisionRadius = 16, speed = 1.5, health = getEnemyHealthForType('grunt', wave), damage = 1, attackRange = 22, color = "magenta";
       const spinAngle = Math.random() * Math.PI * 2;
       const spinSpeed = (Math.random() - 0.5) * 0.02;
       const enemy = ctx.spawnEnemy();
@@ -348,7 +391,7 @@ window.SentinelWaveControl = (function () {
 
     for (let i = 0; i < count; i++) {
       const { x, y } = randomEdgeSpawn();
-      let radius = 16, collisionRadius = 18, speed = 2, color = "#ff4444", damage = 3, health = 20 + (wave * 1.2);
+      let radius = 16, collisionRadius = 18, speed = 2, color = "#ff4444", damage = 3, health = getEnemyHealthForType('kamikaze', wave);
       const enemy = ctx.spawnEnemy();
       enemy.x = x;
       enemy.y = y;
@@ -375,7 +418,7 @@ window.SentinelWaveControl = (function () {
 
     for (let i = 0; i < count; i++) {
       const { x, y } = randomEdgeSpawn();
-      let radius = 18, collisionRadius = 20, speed = 0.8, health = 18 + (wave * 1.5), damage = 1, attackRange = 240, color = "orange";
+      let radius = 18, collisionRadius = 20, speed = 0.8, health = getEnemyHealthForType('slinger', wave), damage = 1, attackRange = 240, color = "orange";
       const spinAngle = Math.random() * Math.PI * 2;
       const spinSpeed = (Math.random() - 0.5) * 0.02;
       const enemy = ctx.spawnEnemy();
@@ -407,9 +450,9 @@ window.SentinelWaveControl = (function () {
     enemy.radius = 28;
     enemy.collisionRadius = 30;
     enemy.speed = 0.75;
-    enemy.health = 2600 + (wave * 16);
+    enemy.health = getEnemyHealthForType('slingerBoss', wave);
     // Reduced damage to make the slinger boss less punishing
-    enemy.damage = 1;
+    enemy.damage = 4;
     enemy.attackCooldown = 0;
     enemy.attackRange = 5000;
     enemy.color = "#ff9f1a";
@@ -435,7 +478,7 @@ window.SentinelWaveControl = (function () {
 
     for (let i = 0; i < count; i++) {
       const { x, y } = randomEdgeSpawn();
-      let radius = 24, collisionRadius = 26, speed = 0.62, health = 300 + (wave * 2), damage = 2, attackRange = 28, color = "#ff7a00";
+      let radius = 24, collisionRadius = 26, speed = 0.62, health = getEnemyHealthForType('brute', wave), damage = 2, attackRange = 28, color = "#ff7a00";
       const enemy = ctx.spawnEnemy();
       enemy.x = x;
       enemy.y = y;
@@ -467,7 +510,7 @@ window.SentinelWaveControl = (function () {
     enemy.radius = 34;
     enemy.collisionRadius = 32;
     enemy.speed = 0.48;
-    enemy.health = 3800 + (wave * 16);
+    enemy.health = getEnemyHealthForType('bruteBoss', wave);
     enemy.damage = 4;
     enemy.attackCooldown = 0;
     enemy.attackRange = 34;
@@ -500,7 +543,7 @@ window.SentinelWaveControl = (function () {
     const edgePadding = 150;
 
     for (let i = 0; i < count; i++) {
-      let radius = 18, collisionRadius = 18, speed = 0.75, health = 75 + (wave * 1.9), damage = 1, attackRange = 210, color = "#000000";
+      let radius = 18, collisionRadius = 18, speed = 0.75, health = getEnemyHealthForType('stalker', wave), damage = 1, attackRange = 210, color = "#000000";
       const stalkerPreferredDistance = 160 + Math.random() * 130;
       const { x, y } = randomEdgeSpawn(canvasWidth, canvasHeight, edgePadding);
 
@@ -542,7 +585,7 @@ window.SentinelWaveControl = (function () {
     const edgePaddingY = 120;
 
     for (let i = 0; i < count; i++) {
-      let radius = 19, collisionRadius = 20, speed = 0.68, health = 52 + (wave * 2.2), damage = 1, attackRange = 420, color = "#4bc7ff";
+      let radius = 19, collisionRadius = 20, speed = 0.68, health = getEnemyHealthForType('beamer', wave), damage = 4, attackRange = 420, color = "#4bc7ff";
       const beamerPreferredDistance = 190 + Math.random() * 140;
 
       let x = edgePaddingX + Math.random() * Math.max(1, canvasWidth - edgePaddingX * 2);
@@ -608,7 +651,7 @@ window.SentinelWaveControl = (function () {
     const edgePaddingY = 120;
 
     for (let i = 0; i < count; i++) {
-      let radius = 26, collisionRadius = 17, speed = 0.64, health = 60 + (wave * 1.8), damage = 0, attackRange = 0, color = "#78ffd6";
+      let radius = 26, collisionRadius = 17, speed = 0.64, health = getEnemyHealthForType('shielder', wave), damage = 0, attackRange = 0, color = "#78ffd6";
       const shielderPreferredDistance = 170 + Math.random() * 120;
       const { x, y } = randomEdgeSpawn(canvasWidth, canvasHeight);
 
@@ -646,7 +689,7 @@ window.SentinelWaveControl = (function () {
     enemy.radius = 32;
     enemy.collisionRadius = 32;
     enemy.speed = 0.72;
-    enemy.health = 6600 + (wave * 42);
+    enemy.health = getEnemyHealthForType('stalkerBoss', wave);
     enemy.damage = .5;
     enemy.attackCooldown = 0;
     enemy.attackRange = 280;
@@ -742,14 +785,15 @@ window.SentinelWaveControl = (function () {
     const wave = ctx.getWave();
     ctx.setWaveAnnouncementTimer();
 
-    // If editor override is present and explicitly in preview mode, use it, otherwise always clear it for play mode
+    // If editor override is present and explicitly in preview mode, use it for the preview wave only.
     if (window._editorPreviewOverride && window._editorSessionActive) {
       window._bossMinorCount = 0;
-      return;
+      if (window._editorPreviewWave === wave) {
+        return;
+      }
+      window._editorPreviewOverride = null;
+      window._editorPreviewWave = null;
     }
-
-    window._editorPreviewOverride = null;
-    window._editorPreviewWave = null;
     window._customBursts = null;
     window._customBrutes = null;
     window._customSlingers = null;

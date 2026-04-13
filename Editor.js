@@ -859,6 +859,19 @@
 		if (bridge && typeof bridge.setPaused === "function") {
 			bridge.setPaused(waveEditorWasPaused);
 		}
+		if (window._editorOpenedFromMenuMusic && !keepEditorSession) {
+			window._editorOpenedFromMenuMusic = false;
+			if (window._gameMusicAudio) {
+				if (typeof window.fadeOutGameMusic === "function") {
+					window.fadeOutGameMusic(800, () => {
+						if (typeof window.playMenuMusic === "function") window.playMenuMusic();
+					});
+				} else {
+					if (typeof window.stopGameMusic === "function") window.stopGameMusic();
+					if (typeof window.playMenuMusic === "function") window.playMenuMusic();
+				}
+			}
+		}
 	}
 
 	// Detect and load code waves from waveControl.js
@@ -896,6 +909,16 @@
 			: false;
 
 		waveEditorWasPaused = typeof bridge.getPaused === "function" ? !!bridge.getPaused() : false;
+		if (!window._gameMusicAudio && typeof window.playGameMusic === "function") {
+			window._editorOpenedFromMenuMusic = true;
+			// Start game music IMMEDIATELY (within user gesture context) for autoplay to work
+			window.playGameMusic(1);
+			setTimeout(() => { window.muffleGameMusic && window.muffleGameMusic(); }, 100);
+			// Fade out menu music separately without waiting for callback
+			if (window._menuMusicAudio && !window._menuMusicAudio.paused && typeof window.fadeOutMenuMusic === "function") {
+				window.fadeOutMenuMusic(800);
+			}
+		}
 		if (typeof bridge.setPaused === "function") bridge.setPaused(true);
 		if (typeof bridge.setEditorSessionActive === "function") bridge.setEditorSessionActive(true);
 		if (typeof bridge.setEditorDiscoverAllProtocols === "function") {

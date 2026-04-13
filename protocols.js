@@ -158,6 +158,18 @@ const ProtocolSystem = {
       };
     });
     this.loadPersistentData();
+
+    // Auto-discover all Common Lower protocols permanently
+    let autoDiscovered = false;
+    Object.keys(PROTOCOLS).forEach(name => {
+      const p = PROTOCOLS[name];
+      if (p.rarity === "Common" && p.tier === "Lower" && !this.protocolBoard[name].discovered) {
+        this.protocolBoard[name].discovered = true;
+        this.protocolBoard[name].isNew = true;
+        autoDiscovered = true;
+      }
+    });
+    if (autoDiscovered) this.savePersistentData();
   },
 
   // Save permanent data locally

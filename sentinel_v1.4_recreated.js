@@ -155,6 +155,8 @@
       music.loop = false;
       // Web Audio chain: source → lowpass filter → output (for muffling)
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // Resume the context if suspended (required on some browsers for autoplay)
+      if (ctx.state === 'suspended') ctx.resume();
       const source = ctx.createMediaElementSource(music);
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
@@ -243,6 +245,8 @@
       music.volume = 0;
       music.loop = true;
       const bCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Resume the context if suspended (required on some browsers for autoplay)
+      if (bCtx.state === 'suspended') bCtx.resume();
       const source = bCtx.createMediaElementSource(music);
       const filter = bCtx.createBiquadFilter();
       filter.type = 'lowpass';
@@ -350,10 +354,32 @@
     }
   }
 
-  // Play a fresh Audio instance each time (for overlapping one-shot SFX)
+  // Play a fresh Audio instance each time (for overlapping one-shot SFX).
+  // Uses a small per-filename pool of reusable Audio objects to avoid
+  // allocating a new HTMLAudioElement (and browser media stack entry) on every call.
+  const _freshAudioPool = {};
+  const _FRESH_POOL_MAX = 6;
   function playSoundFresh(filename, volume = 1.0) {
     try {
-      const audio = new Audio(encodeURI(filename));
+      let pool = _freshAudioPool[filename];
+      if (!pool) { pool = []; _freshAudioPool[filename] = pool; }
+      let audio = null;
+      for (let i = 0; i < pool.length; i++) {
+        if (pool[i].ended || pool[i].paused) { audio = pool[i]; break; }
+      }
+      if (!audio) {
+        if (pool.length < _FRESH_POOL_MAX) {
+          audio = new Audio(encodeURI(filename));
+          pool.push(audio);
+        } else {
+          // All slots in use — reuse the oldest one
+          audio = pool[0];
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      } else {
+        audio.currentTime = 0;
+      }
       audio.volume = Math.min(1, Math.max(0, volume));
       const playPromise = audio.play();
       if (playPromise) playPromise.catch(() => {});
@@ -2930,11 +2956,12 @@ window.onload = function () {
   }
 
   const player = {
-    x: 512, y: 425, radius: 20,
+    x: canvas.width / 2, y: 425, radius: 20,
     baseSpeed: 2, speed: 2,
     health: 10, maxHealth: 10,
     damage: 1,
     attackCooldown: 0, cooldownBase: 20,
+    attackAnimationTimer: 0,
     range: 80,
     stats: { Range: 0, Power: 0, AttackSpeed: 0, Movement: 0, Vitality: 0, Pickup: 0 },
     pickupRadius: 48
@@ -3230,13 +3257,13 @@ window.onload = function () {
 
       // Draw soft shadow under mine
       ctx.save();
-      ctx.globalAlpha = 0.38;
+      ctx.globalAlpha = 0.32;
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
       ctx.beginPath();
       ctx.ellipse(m.x, m.y + m.radius * 0.55, m.radius * 1.05, m.radius * 0.45, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(40, 40, 40, 1)';
-      ctx.filter = 'blur(2.5px)';
       ctx.fill();
-      ctx.filter = 'none';
       ctx.restore();
 
       // Draw mine image core (larger)
@@ -3983,6 +4010,41 @@ window.onload = function () {
     }
   }
 
+  // Batched particle draw: single pass over particles[], grouped by color.
+  // Dramatically reduces ctx.save/restore and shadowBlur state changes vs calling
+  // drawParticlesOfType() once per type.
+  const _particleBatchMap = new Map();
+  function drawParticlesBatched(types) {
+    _particleBatchMap.clear();
+    const len = types.length;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      let matched = false;
+      for (let t = 0; t < len; t++) {
+        if (p.type === types[t]) { matched = true; break; }
+      }
+      if (!matched) continue;
+      let arr = _particleBatchMap.get(p.color);
+      if (!arr) { arr = []; _particleBatchMap.set(p.color, arr); }
+      arr.push(p);
+    }
+    for (const [color, pts] of _particleBatchMap) {
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const r = (p.size || 2) / 2;
+        ctx.moveTo(p.x + r, p.y);
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function updatePlayer(delta) {
     if (typeof player._prevX === 'undefined') player._prevX = player.x;
     if (typeof player._prevY === 'undefined') player._prevY = player.y;
@@ -4047,6 +4109,7 @@ window.onload = function () {
     player._prevY = player.y;
     constrainPlayer();
     if (player.attackCooldown > 0) player.attackCooldown -= delta * SPEED_MULTIPLIER;
+    if (player.attackAnimationTimer > 0) player.attackAnimationTimer -= delta * SPEED_MULTIPLIER;
     if (playerLevelUpTimer > 0) playerLevelUpTimer -= delta * SPEED_MULTIPLIER;
     if (player.hitFlashTimer > 0) player.hitFlashTimer -= delta * SPEED_MULTIPLIER;
   }
@@ -4086,7 +4149,7 @@ window.onload = function () {
     gameMusic: 0.5, // in-game playlist volume
     menuMusic: 0.4, // menu chiptune volume
     teleport: 0.7, // yodguard-energy-beam-blast-4-482514.mp3 (intro teleport)
-    continueRevive: 0.7, // dragon-studio-lightning-spell-386163.mp3 (continue after first death)
+    continueRevive: 0.5, // dragon-studio-lightning-spell-386163.mp3 (continue after first death)
     healthPickup: 0.2 // ribhavagrawal-energy-drink-effect-230559.mp3
     // Add more as needed
   };
@@ -4128,7 +4191,7 @@ window.onload = function () {
     playerVisualAngle += angleDiff * (nearest ? 0.15 : 0.32);
     window._playerToEnemyAngle = playerVisualAngle;
 
-    let isAttacking = nearest && minDist < player.range + nearest.radius && player.attackCooldown > 0 && followMouse;
+    let isAttacking = nearest && minDist < player.range + nearest.radius && player.attackAnimationTimer > 0 && followMouse;
     const enemyInRange = nearest && minDist < player.range + nearest.radius;
     if (isAttacking) {
       if (!laserAudio) {
@@ -4157,15 +4220,15 @@ window.onload = function () {
 
       for (let l = 0; l < 3; l++) {
         const color = laserColors[(l + colorShift) % 3];
-        const offX = -offsets[l] * (nearest.y - player.y) / Math.hypot(dx, dy);
-        const offY = offsets[l] * (nearest.x - player.x) / Math.hypot(dx, dy);
+        const offX = -offsets[l] * (nearest.y - player.y) / dist;
+        const offY = offsets[l] * (nearest.x - player.x) / dist;
         ctx.save();
         ctx.lineWidth = 2;
         drawLine(player.x + offX, player.y + offY, edgeX + offX, edgeY + offY, color);
         ctx.restore();
       }
 
-      const sparkCount = 3 + Math.floor(Math.random() * 2);
+      const sparkCount = 1 + Math.floor(Math.random() * 2);
       for (let s = 0; s < sparkCount; s++) {
         const t = 0.2 + Math.random() * 0.6;
         const baseX = player.x + (edgeX - player.x) * t;
@@ -4178,30 +4241,26 @@ window.onload = function () {
         drawLightningBolt(baseX, baseY, endX, endY, sparkColor, 6 + Math.floor(Math.random() * 3), 10 + Math.random() * 10);
       }
 
-      ctx.save();
-      // Removed custom shadow ellipse for mobs
-
+      // Laser volumetric glow — radial gradient blobs along beam create player shadow effect
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const glowSteps = Math.max(8, Math.floor(dist / 18));
-      for (let i = 0; i <= glowSteps; i++) {
-        const t = i / glowSteps;
-        const px = player.x + (edgeX - player.x) * t;
-        const py = player.y + (edgeY - player.y) * t;
-        const glowRadius = 22 + 18 * (1 - Math.abs(t - 0.5) * 1.5);
-        const grad = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
-        grad.addColorStop(0, 'rgba(0, 180, 255, 0.08)');
-        grad.addColorStop(0.4, 'rgba(0, 230, 255, 0.10)');
-        grad.addColorStop(1, 'rgba(0, 120, 255, 0.0)');
-        ctx.beginPath();
-        ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
+      for (let i = 0; i < glowSteps; i++) {
+        const t = i / Math.max(1, glowSteps - 1);
+        const gx = player.x + (edgeX - player.x) * t;
+        const gy = player.y + (edgeY - player.y) * t;
+        const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, 22);
+        grad.addColorStop(0, 'rgba(0, 200, 255, 0.18)');
+        grad.addColorStop(1, 'rgba(0, 200, 255, 0)');
         ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(gx, gy, 22, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
 
-      const steps = Math.floor(Math.hypot(edgeX - player.x, edgeY - player.y) / 65);
+      const steps = Math.max(1, Math.floor(Math.hypot(edgeX - player.x, edgeY - player.y) / 130));
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const px = player.x + (edgeX - player.x) * t;
@@ -4238,7 +4297,7 @@ window.onload = function () {
       const shieldReduction = Math.max(0, Math.min(0.8, Number(nearest.shieldReduction) || 0));
       nearest.health -= player.damage * (1 - shieldReduction);
 
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 4; i++) {
         const angle = Math.random() * Math.PI * 5;
         const speed = 2.2 + Math.random() * 2.2;
         const color = [
@@ -4261,6 +4320,7 @@ window.onload = function () {
       }
 
       player.attackCooldown = player.cooldownBase;
+      player.attackAnimationTimer = 14;
       if (nearest.health <= 0) {
         const noLootDrop = !!(nearest.noLoot || nearest.noXP);
         // Check if wave end condition is "boss" - suppress XP drops in that case
@@ -4293,7 +4353,7 @@ window.onload = function () {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
         if (!noLootDrop && (nearest.type === "brute" || nearest.type === "bruteBoss")) {
-          bruteDrops.push({ x: nearest.x + 3, y: nearest.y + 5 });
+          slingerDrops.push({ x: nearest.x + 3, y: nearest.y + 5 });
         }
         if (!noLootDrop && Math.random() < 0.15 && window.sentinelDifficulty !== "Hardcore" && window.sentinelDifficulty !== "Apocalypse") {
           healthDrops.push({ x: nearest.x + 4, y: nearest.y + 6 });
@@ -4415,11 +4475,7 @@ const droplifelenght = 280;
     for (let i = bruteDrops.length - 1; i >= 0; i--) {
       const d = bruteDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
-        try {
-          const _hpSfx = new Audio('ribhavagrawal-energy-drink-effect-230559.mp3');
-          _hpSfx.volume = window.sentinelVolume && window.sentinelVolume.healthPickup !== undefined ? window.sentinelVolume.healthPickup : 0.7;
-          _hpSfx.play().catch(() => {});
-        } catch (e) {}
+        playSound('ribhavagrawal-energy-drink-effect-230559.mp3', (window.sentinelVolume && window.sentinelVolume.healthPickup !== undefined) ? window.sentinelVolume.healthPickup : 0.7);
         gainXP(1);
         player.health = Math.min(player.maxHealth, player.health + 1);
         // Health pickup feedback: explode into persistent red pieces
@@ -4451,11 +4507,7 @@ const droplifelenght = 280;
     for (let i = healthDrops.length - 1; i >= 0; i--) {
       const d = healthDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
-        try {
-          const _hpSfx = new Audio('ribhavagrawal-energy-drink-effect-230559.mp3');
-          _hpSfx.volume = window.sentinelVolume && window.sentinelVolume.healthPickup !== undefined ? window.sentinelVolume.healthPickup : 0.7;
-          _hpSfx.play().catch(() => {});
-        } catch (e) {}
+        playSound('ribhavagrawal-energy-drink-effect-230559.mp3', (window.sentinelVolume && window.sentinelVolume.healthPickup !== undefined) ? window.sentinelVolume.healthPickup : 0.7);
         player.health = Math.min(player.maxHealth, player.health + 1);
         // Health pickup feedback: explode into persistent green pieces
         for (let j = 0; j < 18; j++) {
@@ -5655,11 +5707,7 @@ const droplifelenght = 280;
                                       "slingerProjectile" // Slinger projectile type
                                     );
                                     // Play laser sound for enemy projectile
-                                    try {
-                                      let enemyLaserSound = new Audio('laser.wav');
-                                      enemyLaserSound.volume = window.sentinelVolume.enemyProjectile;
-                                      enemyLaserSound.play();
-                                    } catch (e) {}
+                                    playSound('laser.wav', (window.sentinelVolume && window.sentinelVolume.enemyProjectile) || 1.0);
                                   }
                                 }
                               } else {
@@ -5860,7 +5908,7 @@ const droplifelenght = 280;
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
           if (e.health <= 0) {
-            const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "brute"].includes(e.type);
+            const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "brute", "shielder"].includes(e.type);
             playSoundFresh(
               isBossType ? 'lumora_studios-pixel-explosion-319166.mp3' : 'freesound_community-8-bit-explosion-95847.mp3',
               (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5
@@ -6080,6 +6128,41 @@ const droplifelenght = 280;
                   warnAudio.play();
                 } catch (e) {}
                 spawnWave();
+              }
+            } else if (e.type === "shielder") {
+              // Shielder death nova — expanding cyan/teal ring + scatter burst, similar to player game start
+              const shielderPalette = ["#78ffd6", "#4be6c3", "#d7fff2", "#00ffdd", "#aaf6ff", "#ffffff"];
+              const novaCount = 40;
+              const novaRadius = e.radius + 18;
+              // Evenly-spaced outer ring
+              for (let j = 0; j < novaCount; j++) {
+                const angle = (Math.PI * 2 * j) / novaCount;
+                const speed = 2.8 + Math.random() * 2.2;
+                const color = shielderPalette[Math.floor(Math.random() * shielderPalette.length)];
+                const size = 5 + Math.random() * 4;
+                const life = 30 + Math.random() * 28;
+                const decay = 0.91 + Math.random() * 0.05;
+                spawnParticle(
+                  e.x + Math.cos(angle) * novaRadius,
+                  e.y + Math.sin(angle) * novaRadius,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
+                  life, color, decay, size, "novaFlare"
+                );
+              }
+              // Inner scattered burst (converge-then-scatter feel)
+              for (let j = 0; j < 28; j++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.2 + Math.random() * 3.5;
+                const color = shielderPalette[Math.floor(Math.random() * shielderPalette.length)];
+                const size = 2.5 + Math.random() * 5;
+                const life = 22 + Math.random() * 40;
+                spawnParticle(
+                  e.x, e.y,
+                  Math.cos(angle) * speed,
+                  Math.sin(angle) * speed,
+                  life, color, 0.93 + Math.random() * 0.04, size, "enemyDeath"
+                );
               }
             } else {
               let palette;
@@ -6416,12 +6499,28 @@ const droplifelenght = 280;
             }
           }
 
-          const alliesInRange = enemies
-            .filter(target => target !== e && target.health > 0 && target.type !== "shielder")
-            .map(target => ({ target, dist: Math.hypot(target.x - e.x, target.y - e.y) }))
-            .filter(entry => entry.dist <= e.shieldRange)
-            .sort((a, b) => a.dist - b.dist)
-            .slice(0, Math.max(0, e.shieldMaxLinks));
+          const alliesInRange = [];
+          const _shieldMaxLinks = Math.max(0, e.shieldMaxLinks);
+          const _shieldRange = e.shieldRange;
+          for (let _si = 0; _si < enemies.length; _si++) {
+            const _st = enemies[_si];
+            if (_st === e || _st.health <= 0 || _st.type === "shielder") continue;
+            const _sd = Math.hypot(_st.x - e.x, _st.y - e.y);
+            if (_sd > _shieldRange) continue;
+            // Insert sorted by distance (ascending), cap at shieldMaxLinks
+            let inserted = false;
+            for (let _si2 = 0; _si2 < alliesInRange.length; _si2++) {
+              if (_sd < alliesInRange[_si2].dist) {
+                alliesInRange.splice(_si2, 0, { target: _st, dist: _sd });
+                inserted = true;
+                break;
+              }
+            }
+            if (!inserted && alliesInRange.length < _shieldMaxLinks) {
+              alliesInRange.push({ target: _st, dist: _sd });
+            }
+            if (alliesInRange.length > _shieldMaxLinks) alliesInRange.length = _shieldMaxLinks;
+          }
 
           for (const entry of alliesInRange) {
             const target = entry.target;
@@ -7021,23 +7120,14 @@ const droplifelenght = 280;
             }
 
             if (firedAny) {
-              try {
-                let enemyLaserSound = new Audio('laser.wav');
-                enemyLaserSound.volume = window.sentinelVolume.enemyProjectile;
-                enemyLaserSound.play();
-              } catch (e) {}
+              playSound('laser.wav', (window.sentinelVolume && window.sentinelVolume.enemyProjectile) || 1.0);
             }
           } else if (e.attackCooldown <= 0) {
             if (isSlinger) {
               const angle = Math.atan2(player.y - e.y, player.x - e.x);
               const speed = 1.5;
               spawnProjectile(e.x, e.y, Math.cos(angle) * speed, Math.sin(angle) * speed, e.damage);
-              // Play laser sound for enemy projectile
-              try {
-                let enemyLaserSound = new Audio('laser.wav');
-                enemyLaserSound.volume = window.sentinelVolume.enemyProjectile;
-                enemyLaserSound.play();
-              } catch (e) {}
+              playSound('laser.wav', (window.sentinelVolume && window.sentinelVolume.enemyProjectile) || 1.0);
               e.attackCooldown = 60;
             } else {
               if (!window.godMode) { player.health -= e.damage; runHealthLost += e.damage; playPlayerHitSound(); }
@@ -7396,7 +7486,9 @@ const droplifelenght = 280;
   }
 
   function updateParticles() {
-    for (let p of particles) {
+    let xpDropParticleCount = 0;
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
       p.x += p.dx;
       p.y += p.dy;
       if (p.decay) {
@@ -7404,15 +7496,10 @@ const droplifelenght = 280;
         p.dy *= p.decay;
       }
       p.life--;
-    }
-    for (let i = particles.length - 1; i >= 0; i--) {
-      if (particles[i].life <= 0) releaseParticleAt(i);
+      if (p.life <= 0) { releaseParticleAt(i); continue; }
+      if (p.type === "xpDrop") xpDropParticleCount++;
     }
 
-    let xpDropParticleCount = 0;
-    for (let i = 0; i < particles.length; i++) {
-      if (particles[i].type === "xpDrop") xpDropParticleCount++;
-    }
     if (xpDropParticleCount > MAX_XPDROP_PARTICLES) {
       let toRemove = xpDropParticleCount - MAX_XPDROP_PARTICLES;
       for (let i = 0; i < particles.length && toRemove > 0; i++) {
@@ -7496,6 +7583,55 @@ const droplifelenght = 280;
 //-==-=-=-=-=-=-=-=-=-=-=-=-=main game loop and drawing=-=-=-=-=-=-=-=-=-=-=-=-=-=- 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
 
+  // --- Cached lights array and pre-rendered glow canvas ---
+  // Lights are static per canvas size, so we only rebuild when dimensions change.
+  let _lights = null;
+  let _lightGlowCanvas = null;
+  let _lightCanvasCachedW = 0;
+  let _lightCanvasCachedH = 0;
+
+  function _buildLightsCache() {
+    const W = canvas.width;
+    const H = canvas.height;
+    _lights = [
+      {x: 115,         y: 220,      w: 8,  h: 45, intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"},
+      {x: 115,         y: H - 310,  w: 8,  h: 45, intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"},
+      {x: 340,         y: H - 130,  w: 45, h: 8,  intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"},
+      {x: W - 390,     y: H - 130,  w: 45, h: 8,  intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"},
+      {x: W - 120,     y: H - 310,  w: 8,  h: 45, intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"},
+      {x: W - 120,     y: 220,      w: 8,  h: 45, intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"},
+      {x: 340,         y: 90,       w: 45, h: 8,  intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"},
+      {x: W - 390,     y: 90,       w: 45, h: 8,  intensity: 0.28, beamColor: "rgba(0,200,255,0.28)"}
+    ];
+    // Pre-render all light glows onto an offscreen canvas once
+    _lightGlowCanvas = document.createElement('canvas');
+    _lightGlowCanvas.width = W;
+    _lightGlowCanvas.height = H;
+    const gc = _lightGlowCanvas.getContext('2d');
+    gc.globalCompositeOperation = "lighter";
+    for (const light of _lights) {
+      const lx = light.x + light.w / 2;
+      const ly = light.y + light.h / 2;
+      const glowRadius = Math.max(light.w, light.h) * 4.2;
+      const grad = gc.createRadialGradient(lx, ly, Math.max(light.w, light.h) * 0.5, lx, ly, glowRadius);
+      grad.addColorStop(0, light.beamColor);
+      grad.addColorStop(0.3, `rgba(0,200,255,${light.intensity * 0.36})`);
+      grad.addColorStop(1, "rgba(0,0,0,0.0)");
+      gc.beginPath();
+      gc.arc(lx, ly, glowRadius, 0, Math.PI * 2);
+      gc.fillStyle = grad;
+      gc.fill();
+    }
+    _lightCanvasCachedW = W;
+    _lightCanvasCachedH = H;
+    // Pre-compute per-light shadow data used every frame in the enemy draw loop
+    for (const light of _lights) {
+      light._lx = light.x + light.w / 2;
+      light._ly = light.y + light.h / 2;
+      light._fadeEnd = Math.max(light.w, light.h) * 6.5;
+      light._fadeStart = Math.max(light.w, light.h) * 1.2;
+    }
+  }
 
   let lastTimestamp = performance.now();
 
@@ -7546,49 +7682,19 @@ const droplifelenght = 280;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Draw 8 small rectangular lights matching the blue panels
-    // Lights configuration: edit each light's properties here
-    const lights = [
-      // Example: {x, y, w, h, color, intensity, border, beamColor}
-      {x: 115, y: 220, w: 8, h: 45, color: "rgba(50, 211, 255, 0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"},
-      {x: 115, y: canvas.height -310, w: 8, h: 45, color: "rgba(0,200,255,0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"},
-      {x: 340, y: canvas.height - 130, w: 45, h: 8, color: "rgba(0,200,255,0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"},
-      {x: canvas.width - 390, y: canvas.height - 130, w: 45, h: 8, color: "rgba(0,200,255,0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"},
-      {x: canvas.width - 120, y: canvas.height -310, w: 8, h: 45, color: "rgba(0,200,255,0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"},
-      {x: canvas.width - 120, y: 220, w: 8, h: 45, color: "rgba(0,200,255,0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"},
-      {x: 340, y: 90, w: 45, h: 8, color: "rgba(0,200,255,0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"},
-      {x: canvas.width - 390, y: 90, w: 45, h: 8, color: "rgba(0,200,255,0)", intensity: 0.28, border: "#00bfff00", beamColor: "rgba(0,200,255,0.28)"}
-    ];
+    // Rebuild lights cache if canvas size changed
+    if (canvas.width !== _lightCanvasCachedW || canvas.height !== _lightCanvasCachedH) {
+      _buildLightsCache();
+    }
+    const lights = _lights;
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    lights.forEach(light => {
-      ctx.save();
-      ctx.globalAlpha = 0.7;
-      ctx.fillStyle = light.color;
-      ctx.fillRect(light.x, light.y, light.w, light.h);
-      ctx.globalAlpha = 1.0;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = light.border;
-      ctx.strokeRect(light.x, light.y, light.w, light.h);
-      ctx.restore();
-
-      // Draw a radial glow centered on the light
-      ctx.save();
-      const lx = light.x + light.w / 2;
-      const ly = light.y + light.h / 2;
-      const glowRadius = Math.max(light.w, light.h) * 4.2;
-      const grad = ctx.createRadialGradient(lx, ly, Math.max(light.w, light.h) * 0.5, lx, ly, glowRadius);
-      grad.addColorStop(0, light.beamColor);
-      grad.addColorStop(0.3, `rgba(0,200,255,${light.intensity * 0.36})`);
-      grad.addColorStop(1, "rgba(0,0,0,0.0)");
-      ctx.globalCompositeOperation = "lighter";
-      ctx.beginPath();
-      ctx.arc(lx, ly, glowRadius, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.globalCompositeOperation = "source-over";
-      ctx.restore();
-    });
+    // Draw pre-rendered light glows (single drawImage vs 8 createRadialGradient per frame)
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.drawImage(_lightGlowCanvas, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.restore();
     if (gameStarted) {
       // ...existing code...
     }
@@ -7762,28 +7868,25 @@ const droplifelenght = 280;
         ctx.beginPath();
         ctx.arc(d.x, d.y, _hpRadius, 0, Math.PI * 2);
         ctx.fill();
-        // bright inner highlight
         ctx.fillStyle = `rgba(255,120,120,${0.45 + _hpPulse * 0.3})`;
         ctx.beginPath();
         ctx.arc(d.x, d.y, _hpRadius * 0.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       });
-      // Health drop glow
+      // Health drop glow (no pulsating)
       healthDrops.forEach(d => {
-        const _hpPulse = 0.85 + Math.sin(Date.now() * 0.006) * 0.15;
-        const _hpRadius = 9 * _hpPulse;
         ctx.save();
         ctx.shadowColor = "#ff4444";
-        ctx.shadowBlur = 22 + _hpPulse * 10;
+        ctx.shadowBlur = 22;
         ctx.fillStyle = "#ff1717";
         ctx.beginPath();
-        ctx.arc(d.x, d.y, _hpRadius, 0, Math.PI * 2);
+        ctx.arc(d.x, d.y, 9, 0, Math.PI * 2);
         ctx.fill();
         // bright inner highlight
-        ctx.fillStyle = `rgba(255,120,120,${0.45 + _hpPulse * 0.3})`;
+        ctx.fillStyle = "rgba(255,120,120,0.6)";
         ctx.beginPath();
-        ctx.arc(d.x, d.y, _hpRadius * 0.5, 0, Math.PI * 2);
+        ctx.arc(d.x, d.y, 4.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       });
@@ -7828,16 +7931,8 @@ const droplifelenght = 280;
       // Draw mines before player/enemies for proper z-index
       drawMines();
 
-      //laser, enemyHit, levelUp, xpDrop, slingerDrop, bruteDrop, healthDrop, enemyDeath, 
-      drawParticlesOfType("xpDrop")
-      drawParticlesOfType("slingerDrop")
-      drawParticlesOfType("bruteDrop")
-      drawParticlesOfType("healthDrop")
-      drawParticlesOfType("enemyDeath")
-      drawParticlesOfType("dust")
-      drawParticlesOfType("novaFlare")
-      drawParticlesOfType("burnZone")
-      drawParticlesOfType("gruntNova")
+      //laser, enemyHit, levelUp, xpDrop, slingerDrop, bruteDrop, healthDrop, enemyDeath,
+      drawParticlesBatched(["xpDrop","slingerDrop","bruteDrop","healthDrop","enemyDeath","dust","novaFlare","burnZone","gruntNova"]);
 
 
 
@@ -8017,18 +8112,19 @@ const droplifelenght = 280;
         // For each light, cast a shadow on the player, fading with distance
         lights.forEach(light => {
           // Calculate direction from light to player
-          const lx = light.x + light.w / 2;
-          const ly = light.y + light.h / 2;
+          const lx = light._lx;
+          const ly = light._ly;
+          const fadeEnd = light._fadeEnd;
           const dx = player.x - lx;
           const dy = player.y - ly;
           const dist = Math.hypot(dx, dy);
+          if (dist >= fadeEnd) return; // outside shadow range, skip
           // Fade shadow: max opacity when close, fades out as distance increases
-          const fadeStart = Math.max(light.w, light.h) * 1.2;
-          const fadeEnd = Math.max(light.w, light.h) * 6.5;
+          const fadeStart = light._fadeStart;
           let shadowAlpha = 0;
           if (dist < fadeStart) {
             shadowAlpha = 0.38;
-          } else if (dist < fadeEnd) {
+          } else {
             shadowAlpha = 0.38 * (1 - (dist - fadeStart) / (fadeEnd - fadeStart));
           }
           if (shadowAlpha > 0.01) {
@@ -8307,17 +8403,18 @@ const droplifelenght = 280;
         ctx.save();
         ctx.translate(e.x, e.y);
         lights.forEach(light => {
-          const lx = light.x + light.w / 2;
-          const ly = light.y + light.h / 2;
+          const lx = light._lx;
+          const ly = light._ly;
+          const fadeEnd = light._fadeEnd;
           const dx = e.x - lx;
           const dy = e.y - ly;
           const dist = Math.hypot(dx, dy);
-          const fadeStart = Math.max(light.w, light.h) * 1.2;
-          const fadeEnd = Math.max(light.w, light.h) * 6.5;
+          if (dist >= fadeEnd) return; // outside shadow range, skip
+          const fadeStart = light._fadeStart;
           let shadowAlpha = 0;
           if (dist < fadeStart) {
             shadowAlpha = 0.38;
-          } else if (dist < fadeEnd) {
+          } else {
             shadowAlpha = 0.38 * (1 - (dist - fadeStart) / (fadeEnd - fadeStart));
           }
           if (shadowAlpha > 0.01) {
@@ -8615,11 +8712,7 @@ const droplifelenght = 280;
       });
 
       //laser, enemyHit, levelUp, xpDrop, slingerDrop, bruteDrop, healthDrop, enemyDeath, 
-      drawParticlesOfType("laser")
-      drawParticlesOfType("enemyHit")
-      drawParticlesOfType("levelUp")
-      drawParticlesOfType("playerRevive")
-      drawParticlesOfType("playerSmoke") // victory pre-smoke visible before gameOver
+      drawParticlesBatched(["laser","enemyHit","levelUp","playerRevive","playerSmoke"]); // victory pre-smoke visible before gameOver
 
       drawProjectiles();
 
@@ -8875,8 +8968,7 @@ const droplifelenght = 280;
         }
 
         // Draw explosion particles during entire game over phase
-        drawParticlesOfType("playerDeath");
-        drawParticlesOfType("playerSmoke");
+        drawParticlesBatched(["playerDeath","playerSmoke"]);
         if (!showFinalScreen) {
           // --- First death: canvas text fades in over the explosion ---
           const fadeAlpha = Math.min(1, elapsedSeconds / 0.8);
@@ -8924,6 +9016,22 @@ const droplifelenght = 280;
           }
 
           if (!window._gameOverOverlay && finalElapsed >= 4) {
+            if (window._editorSessionActive) {
+              if (window._gameOverOverlay) { window._gameOverOverlay.remove(); window._gameOverOverlay = null; }
+              gameOver = false;
+              window._gameOverTime = undefined;
+              window._playerUsedContinue = false;
+              followMouse = false;
+              window._bossMusicallyActive = false;
+              stopBossMusic();
+              stopLowHealthSound();
+              if (typeof window.SentinelEditor !== "undefined" && window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
+                window.SentinelEditor.showWaveEditor();
+              }
+              requestAnimationFrame(gameLoop);
+              return;
+            }
+
             const runScore = Math.max(0, ((runWavesCleared - runStartWaves) * 100) - (Math.floor(runHealthLost) * 2));
             const runDifficulty = window.sentinelDifficulty || "Normal";
 
