@@ -3054,6 +3054,8 @@ window.onload = function () {
       x,
       y,
       radius,
+      _fullRadius: radius,
+      _growRadius: 0,
       timer: duration,
       tickInterval,
       tickTimer: 0,
@@ -3089,7 +3091,11 @@ window.onload = function () {
         m.timer -= delta * SPEED_MULTIPLIER;
         m.tickTimer = (m.tickTimer || 0) - delta * SPEED_MULTIPLIER;
         m.particleTimer = (m.particleTimer || 0) - delta * SPEED_MULTIPLIER;
-        const burnRadius = typeof m.radius === "number" ? m.radius : 72;
+        // Grow radius from 0 to full over ~20 ticks
+        if (typeof m._growRadius === "number" && typeof m._fullRadius === "number" && m._growRadius < m._fullRadius) {
+          m._growRadius = Math.min(m._fullRadius, m._growRadius + m._fullRadius / 10 * delta * SPEED_MULTIPLIER);
+        }
+        const burnRadius = typeof m._growRadius === "number" ? m._growRadius : (typeof m.radius === "number" ? m.radius : 72);
         const tickInterval = typeof m.tickInterval === "number" ? m.tickInterval : 36;
         const burnDamage = typeof m.damagePerTick === "number" ? m.damagePerTick : 1;
         const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
@@ -3213,8 +3219,10 @@ window.onload = function () {
   function drawMines() {
     for (let m of mines) {
       if (m.type === "burn") {
-        const burnRadius = typeof m.radius === "number" ? m.radius : 72;
-        const burnLifeRatio = Math.max(0, Math.min(1, (m.timer || 0) / 360));
+        const burnRadius = typeof m._growRadius === "number" ? m._growRadius : (typeof m.radius === "number" ? m.radius : 72);
+        const burnTimer = m.timer || 0;
+        const fadeWindow = 40; // ticks over which it fades out
+        const burnAlpha = burnTimer < fadeWindow ? burnTimer / fadeWindow : 1;
         ctx.save();
         // Cache the gradient per mine, update if position or radius changes
         if (!m._scorchGradient || m._scorchGradientParams === undefined ||
@@ -3227,13 +3235,13 @@ window.onload = function () {
           m._scorchGradient.addColorStop(1, "rgba(8, 6, 6, 0.08)");
           m._scorchGradientParams = { x: m.x, y: m.y, radius: burnRadius };
         }
-        ctx.globalAlpha = 0.65 * burnLifeRatio;
+        ctx.globalAlpha = 0.65 * burnAlpha;
         ctx.fillStyle = m._scorchGradient;
         ctx.beginPath();
         ctx.arc(m.x, m.y, burnRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.globalAlpha = 0.58 * burnLifeRatio;
+        ctx.globalAlpha = 0.58 * burnAlpha;
         ctx.strokeStyle = "#ff8a00";
         ctx.lineWidth = 3;
         ctx.setLineDash([10, 8]);
@@ -6672,45 +6680,35 @@ const droplifelenght = 280;
         if (e.type === "slingerBoss") {
           const centerX = canvas.width * 0.5;
           const centerY = canvas.height * 0.5;
-          const centerDx = centerX - e.x;
-          const centerDy = centerY - e.y;
-          const centerDist = Math.hypot(centerDx, centerDy);
-          const arrivalThreshold = Math.max(10, e.radius * 0.7);
-          if (e.slingerBossEntering !== false) {
-            const paddingX = typeof e.slingerBossEdgePaddingX === "number" ? e.slingerBossEdgePaddingX : 110;
-            const paddingY = typeof e.slingerBossEdgePaddingY === "number" ? e.slingerBossEdgePaddingY : 150;
-            const minX = paddingX;
-            const maxX = canvas.width - paddingX;
-            const minY = paddingY;
-            const maxY = canvas.height - paddingY;
-            const insidePaddedArea = e.x >= minX && e.x <= maxX && e.y >= minY && e.y <= maxY;
-            if (typeof e.slingerBossEntryStage !== "string") e.slingerBossEntryStage = "padding";
-
-            if (e.slingerBossEntryStage === "padding") {
-              const entrySpeed = typeof e.slingerBossEntrySpeed === "number" ? e.slingerBossEntrySpeed : (e.speed * 1.9);
-              if (centerDist > 0) {
-                e.x += (centerDx / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
-                e.y += (centerDy / centerDist) * entrySpeed * delta * SPEED_MULTIPLIER;
-              }
-              if (insidePaddedArea) {
-                e.slingerBossEntryStage = "center";
-              }
-            } else {
-              if (centerDist > 0) {
-                e.x += (centerDx / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
-                e.y += (centerDy / centerDist) * e.speed * delta * SPEED_MULTIPLIER;
-              }
-              if (centerDist <= arrivalThreshold) {
-                e.slingerBossEntering = false;
-              }
-            }
-          } else {
-            if (centerDist > 0.8) {
-              const settleSpeed = Math.min(0.22, e.speed * 0.2);
-              e.x += (centerDx / centerDist) * settleSpeed * delta * SPEED_MULTIPLIER;
-              e.y += (centerDy / centerDist) * settleSpeed * delta * SPEED_MULTIPLIER;
-            }
+          // Initialise orbit state on first frame
+          if (typeof e._orbitAngle !== "number") {
+            e._orbitAngle = Math.atan2(e.y - centerY, e.x - centerX);
           }
+          if (typeof e._orbitRadius !== "number") {
+            e._orbitRadius = Math.hypot(e.x - centerX, e.y - centerY);
+          }
+          // Slowly advance orbit angle
+          const orbitSpeed = 0.004; // radians per SPEED_MULTIPLIER tick — slow circle
+          e._orbitAngle += orbitSpeed * delta * SPEED_MULTIPLIER;
+          // Gradually shrink the orbit radius toward the target settled radius
+          const orbitTargetRadius = 160;
+          const spiralRate = 0.18; // px per SPEED_MULTIPLIER tick — slow spiral
+          if (e._orbitRadius > orbitTargetRadius) {
+            e._orbitRadius = Math.max(orbitTargetRadius, e._orbitRadius - spiralRate * delta * SPEED_MULTIPLIER);
+          }
+          // Chase the orbit point smoothly
+          const targetOX = centerX + Math.cos(e._orbitAngle) * e._orbitRadius;
+          const targetOY = centerY + Math.sin(e._orbitAngle) * e._orbitRadius;
+          const odx = targetOX - e.x;
+          const ody = targetOY - e.y;
+          const odist = Math.hypot(odx, ody);
+          const trackSpeed = e.speed * 1.4;
+          if (odist > 1) {
+            e.x += (odx / odist) * Math.min(odist, trackSpeed * delta * SPEED_MULTIPLIER);
+            e.y += (ody / odist) * Math.min(odist, trackSpeed * delta * SPEED_MULTIPLIER);
+          }
+          // Keep slingerBossEntering false so firing logic uses the right arm
+          e.slingerBossEntering = false;
         }
         if (e.type === "stalkerBoss") {
           const centerX = canvas.width * 0.5;
@@ -7073,7 +7071,8 @@ const droplifelenght = 280;
               shell.fragmentCount = 8;
               shell.fragmentDamage = Math.max(0.5, e.damage * 0.45);
               shell.fragmentRadius = 5.2;
-              shell.lifeTimer = 170;
+              // Give enough life to always reach the target — distance / speed + 20 tick buffer
+              shell.lifeTimer = Math.ceil(Math.hypot(player.x - e.x, player.y - e.y) / 1.28) + 20;
               e.slingerBossFragCooldown = phase === 1 ? 240 : (phase === 2 ? 190 : 120);
             }
 
@@ -8381,11 +8380,14 @@ const droplifelenght = 280;
                   ctx.stroke();
                   ctx.fillRect(barX, barY, barWidth * bossHealthRatio, barHeight);
                   // Draw boss label
-                  ctx.font = "bold 13px sans-serif";
-                  ctx.fillStyle = "#fff";
-                  ctx.textAlign = "center";
-                  ctx.textBaseline = "bottom";
-                  ctx.fillText(e.type === "bruteBoss" ? "Brute Major" : (e.type === "slingerBoss" ? "Slinger Major" : (e.type === "stalkerBoss" ? "Stalker Major" : "Shard Major")), e.x, barY - 2);
+                  const _showBossName = false;
+                  if (_showBossName) {
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.fillStyle = "#fff";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "bottom";
+                    ctx.fillText(e.type === "bruteBoss" ? "Brute Major" : (e.type === "slingerBoss" ? "Slinger Major" : (e.type === "stalkerBoss" ? "Stalker Major" : "Shard Major")), e.x, barY - 2);
+                  }
                   ctx.restore();
                 }
         // Hover effect (visual only) for slinger and stalker

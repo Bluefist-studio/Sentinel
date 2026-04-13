@@ -25,18 +25,18 @@ window.SentinelWaveControl = (function () {
 
   // Enemy health balance settings. Modify these values to tune enemy durability.
   const ENEMY_HEALTH_SETTINGS = {
-    gruntBoss: { base: 200, perWave: 50 },
+    gruntBoss: { base: 150, perWave: 75 },
     gruntBossMinor: { base: 120, perWave: 25 },
     grunt: { base: 6, perWave: 2 },
     kamikaze: { base: 20, perWave: 10 },
     slinger: { base: 10, perWave: 10 },
-    slingerBoss: { base: 3000, perWave: 16 },
+    slingerBoss: { base: 3000, perWave: 75 },
     brute: { base: 300, perWave: 50 },
-    bruteBoss: { base: 5000, perWave: 50 },
+    bruteBoss: { base: 5000, perWave: 75 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
     shielder: { base: 75, perWave: 25 },
-    stalkerBoss: { base: 9000, perWave: 50 }
+    stalkerBoss: { base: 9000, perWave: 75 }
   };
 
   function getEnemyHealthForType(type, wave) {
@@ -449,10 +449,10 @@ window.SentinelWaveControl = (function () {
     enemy.y = y;
     enemy.radius = 28;
     enemy.collisionRadius = 30;
-    enemy.speed = 0.75;
+    enemy.speed = 0.65;
     enemy.health = getEnemyHealthForType('slingerBoss', wave);
     // Reduced damage to make the slinger boss less punishing
-    enemy.damage = 4;
+    enemy.damage = 1;
     enemy.attackCooldown = 0;
     enemy.attackRange = 5000;
     enemy.color = "#ff9f1a";
@@ -460,15 +460,13 @@ window.SentinelWaveControl = (function () {
     enemy.spinAngle = Math.random() * Math.PI * 2;
     enemy.spinSpeed = (Math.random() - 0.5) * 0.02;
     enemy.sprite = slingerImg;
-    enemy.slingerBossEntering = true;
-    enemy.slingerBossEntryStage = "padding";
-    enemy.slingerBossEntrySpeed = enemy.speed * 1.9;
-    enemy.slingerBossFragCooldown = 150;
+    enemy.slingerBossEntering = false;
+    enemy.slingerBossEntryStage = undefined;
+    enemy.slingerBossFragCooldown = 0;
     enemy.slingerBossEdgePaddingX = 110;
     enemy.slingerBossEdgePaddingY = 150;
     ctx.applyWaveEnemyModifiers(enemy);
-    enemy.slingerBossEntrySpeed = enemy.speed * 1.9;
-    enemy.slingerBossEntryStage = "padding";
+    enemy.slingerBossEntryStage = undefined;
     enemy.maxHealth = enemy.health;
   }
 
