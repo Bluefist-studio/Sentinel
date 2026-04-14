@@ -25,11 +25,11 @@ window.SentinelWaveControl = (function () {
 
   // Enemy health balance settings. Modify these values to tune enemy durability.
   const ENEMY_HEALTH_SETTINGS = {
-    gruntBoss: { base: 150, perWave: 75 },
+    gruntBoss: { base: 150, perWave: 50 },
     gruntBossMinor: { base: 120, perWave: 25 },
-    grunt: { base: 6, perWave: 2 },
+    grunt: { base: 5, perWave: 1 },
     kamikaze: { base: 20, perWave: 10 },
-    slinger: { base: 10, perWave: 10 },
+    slinger: { base: 10, perWave: 5 },
     slingerBoss: { base: 3000, perWave: 75 },
     brute: { base: 300, perWave: 50 },
     bruteBoss: { base: 5000, perWave: 75 },
@@ -130,10 +130,10 @@ window.SentinelWaveControl = (function () {
 
   // Paste future editor code strings into these wave slots (1-50).
   const DEFAULT_WAVE_EDITOR_CODES = {
-    1: "SWC3:eyJ2IjozLCJvIjp7IjEiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzUsMl0sWzEwLDNdLFsxNSw0XSxbMjAsNV0sWzAsMV1dfX19fX0=",
-    2: "SWC3:eyJ2IjozLCJvIjp7IjIiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzUsM10sWzEwLDNdLFsxNSwzXSxbMjAsM10sWzAsM10sWzIuNSwxXSxbNy41LDFdLFsxMi41LDFdLFsxNy41LDFdXX19fX19",
-    3: "SWC3:eyJ2IjozLCJvIjp7IjMiOnsidCI6dHJ1ZSwibCI6eyJkIjoxNiwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzAsM10sWzQsMl0sWzgsMl0sWzEyLDNdLFszLDFdLFs3LDJdLFsxMSwyXSxbMTUuOTksM10sWzE0LDJdLFsxNC41LDJdLFsxMC41LDFdXX19fX19",
-    4: "SWC3:eyJ2IjozLCJvIjp7IjQiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzE1LDFdLFswLDFdLFsyLjUsMV0sWzcuNSwxXSxbMTIuNSwxXSxbMTcuNSwxXSxbMTgsMV0sWzAuNSwxXSxbMTYsMV0sWzE0LjUsMV0sWzQsMV0sWzIsMV0sWzEsMV0sWzExLjUsMV0sWzE4LjUsMV0sWzguNSwxXSxbNiwxXSxbMTMuNSwxXSxbNywxXSxbMywxXSxbMTAuNSwxXSxbMTYuNSwxXSxbNSwxXSxbOS41LDFdLFsxOS45OSwxXSxbMTkuNSwxXV19fX19fQ==",
+    1: "SWC3:eyJ2IjozLCJvIjp7IjEiOnsidCI6dHJ1ZSwibCI6eyJkIjo2LCJlIjoiZHVyYXRpb24iLCJtIjp7ImciOltbMS41LDJdLFszLDNdLFs0LjUsNF0sWzYsNV0sWzAsMV1dfX19fX0=",
+    2: "SWC3:eyJ2IjozLCJvIjp7IjIiOnsidCI6dHJ1ZSwibCI6eyJkIjo4LCJlIjoiZHVyYXRpb24iLCJtIjp7ImciOltbMiwzXSxbNCwzXSxbNiwzXSxbOCwzXSxbMCwzXSxbMSwxXSxbMywxXSxbNSwxXSxbNywxXV19fX19fQ==",
+    3: "SWC3:eyJ2IjozLCJvIjp7IjMiOnsidCI6dHJ1ZSwibCI6eyJkIjo4LCJlIjoiZHVyYXRpb24iLCJtIjp7ImciOltbMC41LDNdLFsxLDJdLFs0LjUsMV0sWzAsMV0sWzcuNSwyXSxbNSwyXSxbNS41LDJdLFsyLDFdLFsyLjUsMl0sWzMsMl0sWzYuNSwxXSxbNywyXSxbOCwyXSxbNCwxXV19fX19fQ==",
+    4: "SWC3:eyJ2IjozLCJvIjp7IjQiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzE1LDFdLFswLDFdLFsyLjUsMV0sWzcuNSwxXSxbMTIuNSwxXSxbMTcuNSwxXSxbMTgsMV0sWzAuNSwxXSxbMTYsMV0sWzE0LjUsMV0sWzQsMV0sWzIsMV0sWzEsMV0sWzExLjUsMV0sWzE4LjUsMV0sWzguNSwxXSxbNiwxXSxbMTMuNSwxXSxbNywxXSxbMywxXSxbMTAuNSwxXSxbMTYuNSwxXSxbNSwxXSxbOS41LDFdLFsxOS45OSwxXSxbMTkuNSwxXSxbNS41LDFdLFsxMiwxXSxbMTEsMV0sWzksMV1dfX19fX0=",
     5: "SWC3:eyJ2IjozLCJvIjp7IjUiOnsidCI6dHJ1ZSwibCI6eyJkIjoxMjAsImUiOiJib3NzIiwibSI6eyJnIjpbWzQsMl0sWzgsMl0sWzEyLDJdLFsxNiwzXSxbMjAsM10sWzI0LDNdLFsyOCwzXSxbMzIsM10sWzM2LDNdLFs0MCwzXSxbNDQsM10sWzQ4LDNdLFs1MiwzXSxbNTYsM10sWzYwLDNdLFs2NCw0XSxbNjgsNF0sWzcyLDRdLFs3Niw0XSxbODAsNV0sWzg0LDVdLFs4OCw2XSxbOTIsNl0sWzk2LDddLFsxMDAsN10sWzEwNCw4XSxbMTA4LDhdLFsxMTIsOV0sWzExNiw5XSxbMTIwLDldLFsxMjQsM10sWzEyOCwzXSxbMTMyLDNdLFsxMzYsM10sWzE0MCwzXSxbMTQ0LDNdLFsxNDgsM10sWzE1MiwzXSxbMTU2LDNdLFsxNjAsM10sWzE2NCwzXSxbMTY4LDNdLFsxNzIsM10sWzE3NiwzXSxbMTgwLDRdLFsxODQsNF0sWzE4OCw0XSxbMTkyLDRdLFsxOTYsNF0sWzIwMCw0XSxbMjA0LDRdLFsyMDgsNF0sWzIxMiw0XSxbMjE2LDRdLFsyMjAsNF0sWzIyNCw0XSxbMjI4LDRdLFsyMzIsNF0sWzIzNiw0XSxbMjQwLDVdLFsyNDQsNV0sWzI0OCw1XSxbMjUyLDVdLFsyNTYsNV0sWzI2MCw1XSxbMjY0LDVdLFsyNjgsNV0sWzI3Miw1XSxbMjc2LDVdLFsyODAsNV0sWzI4NCw1XSxbMjg4LDJdLFsyOTIsMl0sWzI5NiwyXSxbMzAwLDJdLFswLDJdLFsyODksMV0sWzI4OC41LDFdLFsyODcuNSw1XV0sImdiIjpbWzAsMV1dfX19fX0=",
     6: "SWC3:eyJ2IjozLCJvIjp7IjYiOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJzIjpbWzMsMV0sWzYsMl0sWzEyLDNdLFsxOCwzXSxbMCwxXV19fX19fQ==",
     7: "SWC3:eyJ2IjozLCJvIjp7IjciOnsidCI6dHJ1ZSwibCI6eyJkIjoyMCwiZSI6ImR1cmF0aW9uIiwibSI6eyJnIjpbWzIsMV0sWzQsMV0sWzYsMV0sWzgsMV0sWzEwLDFdLFsxMiwxXSxbMTQsMV0sWzE2LDFdLFsxOCwxXSxbMjAsMV0sWzAsMV1dLCJzIjpbWzMsMV0sWzYsMl0sWzEyLDNdLFsxOCwzXSxbMCwxXV19fX19fQ==",
