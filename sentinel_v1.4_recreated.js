@@ -677,6 +677,36 @@ window.onload = function () {
       _introSfx.play().catch(() => {});
     } catch (e) {}
   }
+  function getProtocolRarityColor(rarity, tier) {
+    if (rarity === "Common") {
+      if (tier === "Lower")    return "#55e87a";
+      if (tier === "Standard") return "#00d4a0";
+      if (tier === "Higher")   return "#00c2c2";
+      return "#00d4a0";
+    }
+    if (rarity === "Rare") {
+      if (tier === "Lower")    return "#00aaee";
+      if (tier === "Standard") return "#7a7aff";
+      if (tier === "Higher")   return "#cc55ff";
+      return "#7a7aff";
+    }
+    return "#00ffdd";
+  }
+  function getProtocolRarityEdgeColor(rarity, tier) {
+    if (rarity === "Common") {
+      if (tier === "Lower")    return "#1a7a3a";
+      if (tier === "Standard") return "#006644";
+      if (tier === "Higher")   return "#006666";
+      return "#006644";
+    }
+    if (rarity === "Rare") {
+      if (tier === "Lower")    return "#004488";
+      if (tier === "Standard") return "#2a2a99";
+      if (tier === "Higher")   return "#6622aa";
+      return "#2a2a99";
+    }
+    return "#008ea8";
+  }
   function showStarterProtocolModal(difficulty, startStatPoints, startHealth, source = "wave") {
     const discoveredProtocols = ProtocolSystem.getDiscovered();
     const starterOverlay = document.createElement("div");
@@ -1005,9 +1035,9 @@ window.onload = function () {
           card.style.textAlign = "left";
           card.style.padding = "8px";
           card.style.borderRadius = "8px";
-          card.style.border = "2px solid #00ffdd";
+          card.style.border = "2px solid " + getProtocolRarityColor(proto.rarity, proto.tier);
           card.style.background = "rgba(0, 77, 92, 0.7)";
-          card.style.color = "#00ffdd";
+          card.style.color = getProtocolRarityColor(proto.rarity, proto.tier);
           card.style.cursor = "pointer";
           card.style.transition = "all 0.15s";
           card.style.minHeight = "200px";
@@ -1043,8 +1073,8 @@ window.onload = function () {
             .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k}`)
             .join(", ");
 
-          card.innerHTML = `<div style="font-weight:bold; margin-bottom:8px; color:#00ffdd; font-size:1rem;">${protocolName}</div>
-                            <div style="color:#aaf6ff; font-size:0.85rem; margin-bottom:8px;">${proto.rarity} ${proto.tier}</div>
+          card.innerHTML = `<div style="font-weight:bold; margin-bottom:8px; color:${getProtocolRarityColor(proto.rarity, proto.tier)}; font-size:1rem;">${protocolName}</div>
+                            <div style="color:${getProtocolRarityColor(proto.rarity, proto.tier)}; font-size:0.85rem; margin-bottom:8px;">${proto.rarity} ${proto.tier}</div>
                             <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:8px;">${proto.intent || "Unknown"}</div>
                             <div style="color:#00ff88; font-size:0.8rem; margin-bottom:8px; line-height:1; min-height:2.1em; overflow:hidden;" data-mods>${mods || "No mods"}</div>
                             <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:0px;" data-tier-info>${upgradeTier} (${currentTierIndex + 1}/${totalTierCount})</div>
@@ -3878,7 +3908,7 @@ window.onload = function () {
           Math.cos(angle) * speed,
           Math.sin(angle) * speed,
           35 + Math.floor(Math.random() * 35),
-          orb.rarity === "Rare" ? "#d896ff" : "#7bf4ff",
+          getProtocolRarityColor(orb.rarity, (PROTOCOLS[orb.protocolName] && PROTOCOLS[orb.protocolName].tier) || "Standard"),
           0.9 + Math.random() * 0.05,
           2 + Math.random() * 2,
           "enemyDeath"
@@ -3891,7 +3921,7 @@ window.onload = function () {
         protocolWarnings.push({
           text: `NEW PROTOCOL ACQUIRED: ${orb.protocolName}`,
           favorite: isFavoriteProtocol,
-          color: isFavoriteProtocol ? favoriteWarningColor : "#7bf4ff",
+          color: isFavoriteProtocol ? favoriteWarningColor : getProtocolRarityColor(PROTOCOLS[orb.protocolName]?.rarity || "Common", PROTOCOLS[orb.protocolName]?.tier || "Standard"),
           timer: 210
         });
       }
@@ -3899,7 +3929,7 @@ window.onload = function () {
         protocolWarnings.push({
           text: `NEW PROTOCOL UNLOCKED (DISCOVERED): ${orb.protocolName}`,
           favorite: isFavoriteProtocol,
-          color: isFavoriteProtocol ? favoriteWarningColor : "#00ff88",
+          color: isFavoriteProtocol ? favoriteWarningColor : getProtocolRarityColor(PROTOCOLS[orb.protocolName]?.rarity || "Common", PROTOCOLS[orb.protocolName]?.tier || "Standard"),
           timer: 230
         });
       }
@@ -4891,16 +4921,19 @@ const droplifelenght = 280;
           const isFavorite = typeof ProtocolSystem.isFavorite === "function"
             ? ProtocolSystem.isFavorite(protocolName)
             : false;
+          const _prc = PROTOCOLS[protocolName] && (isDiscovered || isActive)
+            ? getProtocolRarityColor(PROTOCOLS[protocolName].rarity, PROTOCOLS[protocolName].tier)
+            : "#4a5a56";
           ctx.save();
           ctx.globalAlpha = 0.92;
-          ctx.fillStyle = isActive ? "#00ffdd" : (isDiscovered ? "#222" : "#1a1a1a");
+          ctx.fillStyle = isActive ? _prc : (isDiscovered ? "#222" : "#1a1a1a");
           ctx.fillRect(cardX, y, cardWidth, 26);
-          ctx.strokeStyle = isActive ? "#00ffdd" : (isDiscovered ? "#00ffdd" : "#4a5a56");
+          ctx.strokeStyle = isActive ? _prc : (isDiscovered ? _prc : "#4a5a56");
           ctx.lineWidth = 2;
           ctx.strokeRect(cardX, y, cardWidth, 26);
           
           ctx.font = "bold 12px sans-serif";
-          ctx.fillStyle = isActive ? "#152c16" : (isDiscovered ? "#00ffdd" : "#7f8f8b");
+          ctx.fillStyle = isActive ? "#152c16" : (isDiscovered ? _prc : "#7f8f8b");
           ctx.textAlign = "center";
           ctx.fillText(protocolName.substr(0, 28), cardX + cardWidth / 2, y + 16);
 
@@ -5115,7 +5148,7 @@ const droplifelenght = 280;
           ctx.globalAlpha = 0.93;
           ctx.fillStyle = '#152c16';
           ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
-          ctx.strokeStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
+          ctx.strokeStyle = hoveredBox.discovered ? getProtocolRarityColor(proto.rarity, proto.tier) : "#7f8f8b";
           ctx.lineWidth = 2.5;
           ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
           // Reinforce tooltip z-index by drawing last and using a high overlay
@@ -5124,7 +5157,7 @@ const droplifelenght = 280;
           }
           
           ctx.font = "900 14px sans-serif";
-          ctx.fillStyle = hoveredBox.discovered ? "#00ff88" : "#7f8f8b";
+          ctx.fillStyle = hoveredBox.discovered ? getProtocolRarityColor(proto.rarity, proto.tier) : "#7f8f8b";
           ctx.textAlign = "center";
           let textY = tooltipY + 18;
           titleLines.forEach(line => {
@@ -5273,7 +5306,7 @@ const droplifelenght = 280;
       // Candidate name & family
       ctx.font = "900 14px sans-serif"; ctx.fillStyle = "#00ff88"; ctx.textAlign = "center";
       titleLines.forEach(line => { ctx.fillText(line, centerX, ty); ty += titleLineHeight; });
-      ctx.font = "bold 11px sans-serif"; ctx.fillStyle = "#aaf6ff";
+      ctx.font = "bold 11px sans-serif"; ctx.fillStyle = candProto ? getProtocolRarityColor(candProto.rarity, candProto.tier) : "#aaf6ff";
       ctx.fillText(familyLine, centerX, ty); ty += bodyLineHeight;
 
       // Candidate stat tokens
@@ -7896,8 +7929,9 @@ const droplifelenght = 280;
         const progress = orb.requiredFrames > 0 ? Math.min(1, orb.progressFrames / orb.requiredFrames) : 0;
         const coreRadius = orb.radius * pulse;
         const outerRadius = orb.radius * (1.9 + progress * 0.5);
-        const coreColor = orb.rarity === "Rare" ? "#c87cff" : "#63f0ff";
-        const edgeColor = orb.rarity === "Rare" ? "#7a2bbd" : "#008ea8";
+        const _orbTier = (PROTOCOLS[orb.protocolName] && PROTOCOLS[orb.protocolName].tier) || "Standard";
+        const coreColor = getProtocolRarityColor(orb.rarity, _orbTier);
+        const edgeColor = getProtocolRarityEdgeColor(orb.rarity, _orbTier);
 
         ctx.save();
         ctx.shadowColor = coreColor;
