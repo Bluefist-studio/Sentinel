@@ -30,13 +30,13 @@ window.SentinelWaveControl = (function () {
     grunt: { base: 5, perWave: 1 },
     kamikaze: { base: 20, perWave: 10 },
     slinger: { base: 10, perWave: 1 },
-    slingerBoss: { base: 3000, perWave: 75 },
-    brute: { base: 200, perWave: 50 },
-    bruteBoss: { base: 5000, perWave: 75 },
+    slingerBoss: { base: 4000, perWave: 75 },
+    brute: { base: 200, perWave: 25 },
+    bruteBoss: { base: 6000, perWave: 75 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
     shielder: { base: 75, perWave: 25 },
-    stalkerBoss: { base: 9000, perWave: 75 }
+    stalkerBoss: { base: 10000, perWave: 75 }
   };
 
   function getEnemyHealthForType(type, wave) {
@@ -164,16 +164,16 @@ window.SentinelWaveControl = (function () {
     32: "SWC3:eyJ2IjozLCJvIjp7IjMyIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJhbGxFbGltaW5hdGVkIiwibSI6eyJnIjpbWzAsM10sWzAuNSwzXSxbMSwzXSxbMS41LDNdLFsyLDNdLFsyLjUsM11dLCJiIjpbWzEuNSwzXV0sInNoIjpbWzIuNSwyXSxbNy41LDJdLFsxMi41LDJdXSwic3QiOltbNCwyXSxbMTMsMV0sWzguNSwxXSxbMTcuNSwxXV0sImdibSI6W1syLDFdXX19fX19",
     33: "SWC3:eyJ2IjozLCJvIjp7IjMzIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl1dLCJrIjpbWzE1LDFdLFsxOCwxXSxbMCwxXSxbMC41LDFdLFsxLDFdLFszLjUsMV0sWzExLjUsMV0sWzE0LjUsMV0sWzE3LjUsMV0sWzE4LjUsMV0sWzQsMV0sWzcsMV0sWzQuNSwxXSxbNy41LDFdLFs4LDFdLFsxMC41LDFdLFsxMSwxXSxbMTQsMV1dLCJzdCI6W1s1LDFdLFsxNSwxXSxbNy41LDFdLFsyLjUsMV0sWzEwLDFdLFsxMi41LDFdXX19fX19",
     34: "SWC3:eyJ2IjozLCJvIjp7IjM0Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwicyI6W1s0LDFdLFs2LDFdLFs4LDFdLFsxMCwxXSxbMTIsMV0sWzE0LDFdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl0sWzUsMV0sWzEwLDFdLFsxNC41LDFdXSwic3QiOltbNSwxXSxbMTUsMV0sWzcuNSwxXSxbMi41LDFdLFsxMCwxXSxbMTIuNSwxXV19fX19fQ==",
-    35: "SWC3:eyJ2IjozLCJvIjp7IjM1Ijp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIiwibSI6eyJzdGIiOltbMCwxXV19fX19fQ==",
+    35: "SWC3:eyJ2IjozLCJvIjp7IjM1Ijp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIn19fX0=",
     36: "SWC3:eyJ2IjozLCJvIjp7IjM2Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJnYm0iOltbNCw0XSxbOCw0XSxbMTIsNF0sWzE2LDRdLFsyMCw0XSxbMCw0XV19fX19fQ==",
     37: "SWC3:eyJ2IjozLCJvIjp7IjM3Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJzaCI6W1sxMCwxXV0sImdibSI6W1s0LDNdLFs4LDNdLFsxMiwzXSxbMTYsM10sWzIwLDNdLFswLDNdXX19fX19",
     38: "SWC3:eyJ2IjozLCJvIjp7IjM4Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1syLDNdLFs0LDNdLFs2LDNdLFs4LDNdLFsxMCwzXSxbMTIsM10sWzE0LDNdLFsxNiwzXSxbMTgsM10sWzIwLDNdLFswLDNdXSwiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJnYm0iOltbNCwyXSxbOCwyXSxbMTIsMl0sWzE2LDJdLFsyMCwyXSxbMCwyXV19fX19fQ==",
-    39: null,
+    39: "SWC3:eyJ2IjozLCJvIjp7IjM5Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJiZSI6W1szLDFdLFs2LjUsMV0sWzEwLjUsMV0sWzE1LDFdXSwiZ2JtIjpbWzQsMl0sWzgsMl0sWzEyLDJdLFsxNiwyXSxbMjAsMl0sWzAsMl1dfX19fX0=",
     40: "SWC3:eyJ2IjozLCJvIjp7IjQwIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDFdLFsyLDFdLFszLDFdLFs0LDFdLFs1LDFdLFs2LDFdLFs3LDFdLFs4LDFdLFs5LDFdLFsxMCwxXSxbMTEsMV0sWzEyLDFdLFsxMywxXSxbMTQsMV0sWzE1LDFdLFsxNiwxXSxbMTcsMV0sWzE4LDFdLFsxOSwxXSxbMjAsMV0sWzAsMV1dLCJiIjpbWzUsMl0sWzE0LDJdLFsyLDJdLFs4LDJdLFsxMSwyXSxbMTcsMl1dLCJzaCI6W1s1LDFdLFsxNCwxXV0sImJlIjpbWzgsMl0sWzIsMV1dLCJnYm0iOltbNCwyXSxbOCwyXSxbMTIsMl0sWzE2LDJdLFsyMCwyXSxbMCwyXV19fX19fQ==",
-    41: null,
-    42: null,
-    43: null,
-    44: null,
+    41: "SWC3:eyJ2IjozLCJvIjp7IjQxIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdLFswLDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJiZSI6W1s4LDJdLFsyLDJdLFsxMy41LDJdLFs1LDFdLFsxMSwxXV19fX19fQ==",
+    42: "SWC3:eyJ2IjozLCJvIjp7IjQyIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdLFswLjUsMl0sWzYuNSwxXSxbMy41LDFdLFs5LjUsMV0sWzEyLjUsMV0sWzE1LjUsMV0sWzE4LjUsMV0sWzIwLDJdXSwic2giOltbNSwxXSxbMTYsMV0sWzEwLjUsMV0sWzAsMV1dLCJiZSI6W1syLDFdLFs0LDFdLFs2LDFdLFs4LDFdLFsxMCwxXSxbMTIsMV0sWzE0LDFdLFsxNiwxXSxbMTgsMV0sWzIwLDFdLFswLDFdXX19fX19",
+    43: "SWC3:eyJ2IjozLCJvIjp7IjQzIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsic2giOltbMiwxXSxbNCwxXSxbNiwxXSxbOCwxXSxbMTAsMV0sWzEyLDFdLFsxNCwxXSxbMTYsMV0sWzE4LDFdLFsyMCwxXSxbMCwxXV0sImJlIjpbWzIsMV0sWzQsMV0sWzYsMV0sWzgsMV0sWzEwLDFdLFsxMiwxXSxbMTQsMV0sWzE2LDFdLFsxOCwxXSxbMjAsMV0sWzAsMV1dfX19fX0=",
+    44: "SWC3:eyJ2IjozLCJvIjp7IjQ0Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsicyI6W1swLDJdLFs0LDJdLFs4LDJdLFsxMiwyXSxbMTYsMl0sWzIwLDJdXSwic2giOltbMiwxXSxbNCwxXSxbNiwxXSxbOCwxXSxbMTAsMV0sWzEyLDFdLFsxNCwxXSxbMTYsMV0sWzE4LDFdLFsyMCwxXSxbMCwxXV0sImJlIjpbWzEwLDFdLFsxNCwxXSxbMTgsMV0sWzIsMV0sWzYsMV1dfX19fX0=",
     45: null,
     46: null,
     47: null,
@@ -809,7 +809,7 @@ window.SentinelWaveControl = (function () {
     window._mobBurstElapsed = null;
     window._mobBurstElapsedWave = null;
 
-    if (wave !== 10) {
+    if (wave !== 15) {
       window._wave10MinorsSpawned = false;
     }
 

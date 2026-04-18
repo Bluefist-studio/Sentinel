@@ -6,6 +6,11 @@
     console.log("All progression reset: bytes, protocols, and milestones cleared.");
   };
 
+  window.resetTutorial = function() {
+    localStorage.removeItem('sentinel_tutorialDone');
+    console.log("Tutorial reset. Refresh to run it again.");
+  };
+
   // Expose byte reset and set to console
   window.resetBytes = function() {
     window.totalCollectedBytes = 0;
@@ -37,7 +42,7 @@
   };
 
   // Milestone wave controls (independent of difficulty)
-  const MILESTONE_WAVES = [1, 5, 10, 20, 30, 40];
+  const MILESTONE_WAVES = [1, 5, 15, 25, 35, 45];
 
   window.unlockAllMilestones = function() {
     MILESTONE_WAVES.forEach(wave => {
@@ -606,7 +611,15 @@ window.onload = function () {
   });
   // Menu screen
   function startGame(difficulty, startStatPoints, startHealth) {
+    window._editorSessionActive = false;
     window.sentinelDifficulty = difficulty;
+    // Reset tutorial in-game hooks so they re-fire on each new run
+    window._tutFirstLevelUpFired = false;
+    window._tutFirstProtPickupFired = false;
+    window._tutStatPanelAutoOpened = false;
+    window._tutFirstProtActivatedFired = false;
+    window._newlyPickedProtocols = new Set();
+    window._seenProtocols = new Set();
     const isRestrictedDifficulty = difficulty === "Hardcore" || difficulty === "Apocalypse";
     if (!isRestrictedDifficulty) {
       ProtocolSystem.setStarters(window._pendingStarterProtocols || []);
@@ -679,33 +692,33 @@ window.onload = function () {
   }
   function getProtocolRarityColor(rarity, tier) {
     if (rarity === "Common") {
-      if (tier === "Lower")    return "#55e87a";
-      if (tier === "Standard") return "#00d4a0";
-      if (tier === "Higher")   return "#00c2c2";
-      return "#00d4a0";
+      if (tier === "Lower")    return "#c8c8c8";
+      if (tier === "Standard") return "#44ee66";
+      if (tier === "Higher")   return "#4499ff";
+      return "#44ee66";
     }
     if (rarity === "Rare") {
-      if (tier === "Lower")    return "#00aaee";
-      if (tier === "Standard") return "#7a7aff";
-      if (tier === "Higher")   return "#cc55ff";
-      return "#7a7aff";
+      if (tier === "Lower")    return "#4499ff";
+      if (tier === "Standard") return "#aa44ff";
+      if (tier === "Higher")   return "#ff8833";
+      return "#aa44ff";
     }
-    return "#00ffdd";
+    return "#c8c8c8";
   }
   function getProtocolRarityEdgeColor(rarity, tier) {
     if (rarity === "Common") {
-      if (tier === "Lower")    return "#1a7a3a";
-      if (tier === "Standard") return "#006644";
-      if (tier === "Higher")   return "#006666";
-      return "#006644";
+      if (tier === "Lower")    return "#666666";
+      if (tier === "Standard") return "#1a6630";
+      if (tier === "Higher")   return "#1a3388";
+      return "#1a6630";
     }
     if (rarity === "Rare") {
-      if (tier === "Lower")    return "#004488";
-      if (tier === "Standard") return "#2a2a99";
-      if (tier === "Higher")   return "#6622aa";
-      return "#2a2a99";
+      if (tier === "Lower")    return "#1a3388";
+      if (tier === "Standard") return "#551188";
+      if (tier === "Higher")   return "#884400";
+      return "#551188";
     }
-    return "#008ea8";
+    return "#666666";
   }
   function showStarterProtocolModal(difficulty, startStatPoints, startHealth, source = "wave") {
     const discoveredProtocols = ProtocolSystem.getDiscovered();
@@ -745,6 +758,7 @@ window.onload = function () {
 
     const subtitle = document.createElement("div");
     subtitle.textContent = "Choose up to 2 discovered protocols to start your run with.";
+    subtitle.setAttribute('data-protocol-subtitle', 'true');
     subtitle.style.color = "#aaf6ff";
     subtitle.style.fontSize = "0.95rem";
     subtitle.style.textAlign = "center";
@@ -960,6 +974,9 @@ window.onload = function () {
       : [];
     const refreshCount = () => {
       selectionCount.textContent = `Selected: ${selected.length}/2`;
+      // Hide subtitle once 2 protocols are selected (unless tutorial forces it visible)
+      const subtitleEl = panel.querySelector('[data-protocol-subtitle]');
+      if (subtitleEl) subtitleEl.style.visibility = (selected.length >= 2 && !window._tutSubtitleForce) ? 'hidden' : 'visible';
       // Calculate and display total stat change for selected starters, with color
       const statTotals = { Range: 0, Power: 0, Intensity: 0, Movement: 0, Health: 0, Pickup: 0 };
       selected.forEach(protocolName => {
@@ -1106,6 +1123,7 @@ window.onload = function () {
                   if (result.success) {
                     totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
                     saveCollectedBytes();
+                    window.dispatchEvent(new CustomEvent('tut:protocolUpgraded'));
                     bytesDisplay.textContent = `Bytes: ${totalCollectedBytes}`;
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
@@ -2698,15 +2716,14 @@ window.onload = function () {
   let runStartWaves = 0;
   const bytePickupNotifications = [];
 
-  // Milestone waves available across all difficulties: 1, 5, 10, 20, 30, 40
+  // Milestone waves available across all difficulties: 1, 5, 15, 25, 35, 45
   const MILESTONE_WAVES = [
     { wave: 1, level: 1 },
     { wave: 5, level: 5 },
-    { wave: 10, level: 9 },
-    // Wave 15 is level 11
-    { wave: 20, level: 13 },
-    { wave: 30, level: 17 },
-    { wave: 40, level: 21 }
+    { wave: 15, level: 9 },
+    { wave: 25, level: 13 },
+    { wave: 35, level: 17 },
+    { wave: 45, level: 21 }
   ];
 
   function getUnlockedWaves() {
@@ -2820,6 +2837,14 @@ window.onload = function () {
   let returnToMenuModalOpen = false;
   window._editorSessionActive = false;
   const protocolWarnings = [];
+  // Tutorial hook: expose warnings array so tutorial.js can inject persistent entries
+  window._tutProtocolWarningsRef = protocolWarnings;
+  // Tutorial hook: push a warning into the in-game warning system
+  window._tutPushWarning = (text, color, timer) => {
+    protocolWarnings.push({ text: text, color: color || '#00ffdd', timer: timer || 180 });
+    while (protocolWarnings.length > 4) protocolWarnings.shift();
+  };
+  window._getTotalBytes = () => totalCollectedBytes;
   let selectedProtocol = -1;
   let hoveredProtocol = -1;
   // Block game loop if loading/menu is active
@@ -2952,7 +2977,7 @@ window.onload = function () {
   // Burst interval in frames (higher = longer pause between bursts)
   let burstInterval = 120; // Increased for bigger cooldown
   const INTER_WAVE_DELAY_SECONDS = 8;
-  const VICTORY_WAVE = 30; // Set to desired victory wave (change for final version)
+  const VICTORY_WAVE = 40; // Set to desired victory wave (change for final version)
   let interWaveDelayTimer = 0;
   let interWavePending = false;
   // For future: burstInterval can be scaled for difficulty
@@ -3113,6 +3138,47 @@ window.onload = function () {
     const particle = removeAtSwap(particles, index);
     particlePool.push(particle);
   }
+
+  function detonateMine(m, playSound = true) {
+    if (!m) return;
+    if (playSound) {
+      playSoundFresh('u_b32baquv5u-explosion-9-340460.mp3', (window.sentinelVolume && window.sentinelVolume.mineExplosion) || 0.8);
+    }
+    const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
+    if (distToPlayer < 52 + player.radius) {
+      if (!window.godMode) { player.health -= 2; runHealthLost += 2; playPlayerHitSound(); }
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255, 187, 0, 0.55)";
+    ctx.lineWidth = 8;
+    ctx.shadowColor = "#ffbb00";
+    ctx.shadowBlur = 32;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    for (let j = 0; j < KAMIKAZE_MINE_PARTICLE_COUNT; j++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2.1 + Math.random() * 1.5;
+      const color = ["#ffbb00","#fff200","#ff4444"][Math.floor(Math.random()*3)];
+      const size = 2 + Math.random() * 2.5;
+      const life = 20 + Math.random() * 14;
+      const decay = 0.89 + Math.random() * 0.04;
+      spawnParticle(
+        m.x,
+        m.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        life,
+        color,
+        decay,
+        size,
+        "enemyDeath"
+      );
+    }
+  }
+
   // Update mines: explode when player enters zone, remove after explosion
   function updateMines(delta) {
     for (let i = mines.length - 1; i >= 0; i--) {
@@ -3161,86 +3227,26 @@ window.onload = function () {
         }
         continue;
       }
+      if (typeof m.vx === 'number' || typeof m.vy === 'number') {
+        m.vx = typeof m.vx === 'number' ? m.vx * 0.96 : 0;
+        m.vy = typeof m.vy === 'number' ? m.vy * 0.96 : 0;
+        m.x += (m.vx || 0) * delta * SPEED_MULTIPLIER;
+        m.y += (m.vy || 0) * delta * SPEED_MULTIPLIER;
+      }
       // Check if player is in explosion zone
       const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
-      if (!m.exploded && distToPlayer < 52 + player.radius) {
-        m.exploded = true;
-        playSoundFresh('u_b32baquv5u-explosion-9-340460.mp3', (window.sentinelVolume && window.sentinelVolume.mineExplosion) || 0.8);
-        // Damage player
-        if (!window.godMode) { player.health -= 2; runHealthLost += 2; playPlayerHitSound(); }
-        // Draw explosion ring
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(255, 187, 0, 0.55)";
-        ctx.lineWidth = 8;
-        // Removed shadowColor and shadowBlur for mobs
-        ctx.stroke();
-        ctx.restore();
-        // Dramatic explosion particles (like kamikaze)
-        for (let j = 0; j < KAMIKAZE_MINE_PARTICLE_COUNT; j++) {
-          const angle = Math.random() * Math.PI * 2;
-          const speed = 2.1 + Math.random() * 1.5;
-          const color = ["#ffbb00","#fff200","#ff4444"][Math.floor(Math.random()*3)];
-          const size = 2 + Math.random() * 2.5;
-          const life = 20 + Math.random() * 14;
-          const decay = 0.89 + Math.random() * 0.04;
-          spawnParticle(
-            m.x,
-            m.y,
-            Math.cos(angle) * speed,
-            Math.sin(angle) * speed,
-            life,
-            color,
-            decay,
-            size,
-            "enemyDeath"
-          );
-        }
+      if (distToPlayer < 52 + player.radius) {
+        detonateMine(m);
         mines.splice(i, 1);
         continue;
       }
-      // Remove mine after timer expires
-      m.timer -= delta * SPEED_MULTIPLIER;
-      if (m.timer <= 0) {
-        playSoundFresh('u_b32baquv5u-explosion-9-340460.mp3', (window.sentinelVolume && window.sentinelVolume.mineExplosion) || 0.8);
-        // Mine explodes visually and damages player if in range
-        const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
-        if (distToPlayer < 52 + player.radius) {
-          if (!window.godMode) { player.health -= 2; runHealthLost += 2; playPlayerHitSound(); }
+      if (!m.contactOnly) {
+        m.timer = (typeof m.timer === 'number' ? m.timer : 0) - delta * SPEED_MULTIPLIER;
+        if (m.timer <= 0) {
+          detonateMine(m);
+          mines.splice(i, 1);
+          continue;
         }
-        // Draw explosion ring
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(255, 187, 0, 0.55)";
-        ctx.lineWidth = 8;
-        ctx.shadowColor = "#ffbb00";
-        ctx.shadowBlur = 32;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.restore();
-        // Dramatic explosion particles (like kamikaze)
-        for (let j = 0; j < KAMIKAZE_MINE_PARTICLE_COUNT; j++) {
-          const angle = Math.random() * Math.PI * 2;
-          const speed = 2.1 + Math.random() * 1.5;
-          const color = ["#ffbb00","#fff200","#ff4444"][Math.floor(Math.random()*3)];
-          const size = 2 + Math.random() * 2.5;
-          const life = 20 + Math.random() * 14;
-          const decay = 0.89 + Math.random() * 0.04;
-          spawnParticle(
-            m.x,
-            m.y,
-            Math.cos(angle) * speed,
-            Math.sin(angle) * speed,
-            life,
-            color,
-            decay,
-            size,
-            "enemyDeath"
-          );
-        }
-        mines.splice(i, 1);
       }
     }
   }
@@ -3390,6 +3396,12 @@ window.onload = function () {
       window._activateUnpauseStart = null;
     }
     followMouse = false;
+    // Tutorial: auto-open stat panel on first release after gaining a level
+    if (window._tutFirstLevelUpFired && !window._tutStatPanelAutoOpened && statPoints > 0) {
+      window._tutStatPanelAutoOpened = true;
+      showStats = true;
+      paused = true;
+    }
     muffleGameMusic();
     mufleBossMusic();
     if (window.laserAudio && !window.laserAudio.paused) {
@@ -3866,7 +3878,13 @@ window.onload = function () {
     if (!droppedProtocol) return;
 
     const rarity = PROTOCOLS[droppedProtocol].rarity;
-    const requiredSeconds = rarity === "Rare" ? 4 : 3;
+    const tier = PROTOCOLS[droppedProtocol].tier;
+    const requiredSeconds =
+      rarity === "Rare"   && tier === "Higher"   ? 5 :
+      rarity === "Rare"   && tier === "Standard" ? 4 :
+      rarity === "Rare"   && tier === "Lower"    ? 3.5 :
+      rarity === "Common" && tier === "Higher"   ? 3 :
+      rarity === "Common" && tier === "Standard" ? 2.5 : 2;
     protocolOrbs.push({
       x,
       y,
@@ -3898,6 +3916,24 @@ window.onload = function () {
       ? ProtocolSystem.discoverRunOnly(orb.protocolName)
       : ProtocolSystem.discover(orb.protocolName);
     playProtocolPickupSound();
+    // Tutorial hook: first in-game protocol orb pickup
+    // Track newly picked protocol for persistent card highlight
+    if (!window._newlyPickedProtocols) window._newlyPickedProtocols = new Set();
+    if (!window._seenProtocols) window._seenProtocols = new Set();
+    const alreadyActive0 = ProtocolSystem.activeProtocols.includes(orb.protocolName);
+    if (!alreadyActive0 && !window._seenProtocols.has(orb.protocolName)) window._newlyPickedProtocols.add(orb.protocolName);
+    if (!window._tutFirstProtPickupFired) {
+      const alreadyActive = ProtocolSystem.activeProtocols.includes(orb.protocolName);
+      if (!alreadyActive) {
+        window._tutFirstProtPickupFired = true;
+        window._tutLastPickedProtocol = orb.protocolName;
+        window.dispatchEvent(new CustomEvent('tut:firstProtocolPickup'));
+        // Tutorial bonus: reward the player for picking up their first protocol
+        runCollectedBytes += 35;
+        protocolWarnings.push({ text: '+35 BYTES — FIRST PROTOCOL BONUS', color: '#00ffaa', timer: 240 });
+        while (protocolWarnings.length > 4) protocolWarnings.shift();
+      }
+    }
     if (discovered) {
       for (let i = 0; i < 18; i++) {
         const angle = Math.random() * Math.PI * 2;
@@ -3946,7 +3982,7 @@ window.onload = function () {
 
     for (let i = protocolWarnings.length - 1; i >= 0; i--) {
       const warning = protocolWarnings[i];
-      if (!paused) warning.timer -= 1;
+      if (!paused && warning.timer !== Infinity) warning.timer -= 1;
       if (warning.timer <= 0) {
         protocolWarnings.splice(i, 1);
       }
@@ -4413,6 +4449,11 @@ window.onload = function () {
       // XP curve: fast early, slow late (quadratic scaling)
       xpToLevel = Math.floor(10 + Math.pow(level, 1.8));
       playerLevelUpTimer = 300; // 300 frames (~5 seconds) of level up blink
+      // Tutorial hook: first level-up
+      if (!window._tutFirstLevelUpFired) {
+        window._tutFirstLevelUpFired = true;
+        window.dispatchEvent(new CustomEvent('tut:firstLevelUp'));
+      }
       playSoundFresh('floraphonic-classic-game-action-positive-13-224394.mp3', (window.sentinelVolume && window.sentinelVolume.levelUp) || 0.7);
       // Level up particles: denser close, looser far, more total
       const total = 68;
@@ -4812,6 +4853,25 @@ const droplifelenght = 280;
           stat: stat.stat
         });
       }
+      // Tutorial draw hook — draws directly on the game ctx in the same coordinate space
+      if (typeof window._tutDrawOnStats === 'function') {
+        window._tutDrawOnStats(ctx, window._statPlusButtonBoxes, statPoints,
+          statsPanelX, statsPanelY, statsPanelWidth);
+      }
+      // Persistent: pulse + buttons whenever stat points are available
+      if (statPoints > 0 && window._tutDrawOnStats === null || (statPoints > 0 && typeof window._tutDrawOnStats !== 'function')) {
+        const pulse = 0.35 + 0.55 * Math.abs(Math.sin(Date.now() / 400));
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.shadowColor = '#00ffdd';
+        ctx.shadowBlur = 14;
+        ctx.strokeStyle = '#00ffdd';
+        ctx.lineWidth = 2;
+        for (const box of window._statPlusButtonBoxes) {
+          ctx.strokeRect(box.x - 4, box.y - 4, box.w + 8, box.h + 8);
+        }
+        ctx.restore();
+      }
       ctx.font = "12px sans-serif";
       ctx.fillStyle = "#aaf6ff";
       ctx.textAlign = "center";
@@ -4909,11 +4969,6 @@ const droplifelenght = 280;
         
         // Protocol boxes for this family
         protocols.forEach(protocolName => {
-          if (y + 26 < contentY || y > contentY + contentHeight) {
-            y += 27;
-            return;
-          }
-          
           const cardWidth = 240;
           const cardX = panelX + (panelWidth - cardWidth) / 2;
           const isDiscovered = discoveredSet.has(protocolName);
@@ -4921,6 +4976,19 @@ const droplifelenght = 280;
           const isFavorite = typeof ProtocolSystem.isFavorite === "function"
             ? ProtocolSystem.isFavorite(protocolName)
             : false;
+
+          const inView = !(y + 26 < contentY || y > contentY + contentHeight);
+          if (!inView) {
+            // Still register the box for scroll targeting and click detection
+            window._protocolSelectorBoxes.push({
+              x: cardX, y: y, w: cardWidth, h: 26,
+              index: globalIndex[protocolName], name: protocolName,
+              discovered: isDiscovered,
+              favoriteX: cardX + cardWidth - 20, favoriteY: y, favoriteW: 20, favoriteH: 14
+            });
+            y += 27;
+            return;
+          }
           const _prc = PROTOCOLS[protocolName] && (isDiscovered || isActive)
             ? getProtocolRarityColor(PROTOCOLS[protocolName].rarity, PROTOCOLS[protocolName].tier)
             : "#4a5a56";
@@ -4966,7 +5034,27 @@ const droplifelenght = 280;
       
       // Restore from clipping
       ctx.restore();
-      
+
+      // Draw newly-picked protocol highlights ON TOP of all cards
+      if (window._newlyPickedProtocols && window._newlyPickedProtocols.size > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(panelX, contentY, panelWidth, contentHeight);
+        ctx.clip();
+        (window._protocolSelectorBoxes || []).forEach(box => {
+          if (window._newlyPickedProtocols.has(box.name)) {
+            const np = 0.4 + 0.5 * Math.abs(Math.sin(Date.now() / 450));
+            ctx.globalAlpha = np;
+            ctx.shadowColor = '#00ffdd';
+            ctx.shadowBlur = 18;
+            ctx.strokeStyle = '#00ffdd';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(box.x - 4, box.y - 4, box.w + 8, box.h + 8);
+          }
+        });
+        ctx.restore();
+      }
+
       // Scrollbar indicator
       const totalContentHeight = Object.values(familyGroups).reduce((sum, arr) => sum + (arr.length > 0 ? 22 + arr.length * 27 + 6 : 0), 0);
       const maxProtocolScroll = Math.max(0, totalContentHeight - contentHeight);
@@ -4978,6 +5066,44 @@ const droplifelenght = 280;
         
         ctx.fillStyle = "rgba(0, 255, 221, 0.5)";
         ctx.fillRect(panelX + 2, scrollbarY, 6, scrollbarHeight);
+      }
+
+      // Tutorial protocol panel draw hook
+      if (typeof window._tutDrawOnProtocols === 'function') {
+        window._tutDrawOnProtocols(ctx, window._protocolSelectorBoxes, panelX, panelY, panelWidth, panelHeight, contentY, contentHeight);
+      }
+      // Persistent: pulse panel outline whenever there are unread new protocols
+      if (window._newlyPickedProtocols && window._newlyPickedProtocols.size > 0 && typeof window._tutDrawOnProtocols !== 'function') {
+        const pulse = 0.35 + 0.55 * Math.abs(Math.sin(Date.now() / 500));
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.shadowColor = '#00ffdd';
+        ctx.shadowBlur = 20;
+        ctx.strokeStyle = '#00ffdd';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(panelX + 2, panelY + 2, panelWidth - 4, panelHeight - 4);
+        ctx.restore();
+      }
+      // Tutorial auto-scroll: bring the picked-up protocol card into view
+      if (window._tutScrollToProtocol) {
+        const targetName = window._tutScrollToProtocol;
+        const box = (window._protocolSelectorBoxes || []).find(b => b.name === targetName);
+        if (box) {
+          // Target: card centered in the visible area
+          // box.y is relative to the unclipped canvas, so offset within total content
+          // = box.y - contentY + _protocolScrollOffset
+          const cardOffsetInContent = box.y - contentY + window._protocolScrollOffset;
+          const targetScroll = cardOffsetInContent - (contentHeight / 2) + (box.h / 2);
+          const clampedTarget = Math.max(0, Math.min(maxProtocolScroll, targetScroll));
+          const diff = clampedTarget - window._protocolScrollOffset;
+          if (Math.abs(diff) < 1) {
+            window._protocolScrollOffset = clampedTarget;
+            window._tutScrollToProtocol = null;
+          } else {
+            // Smooth step toward target
+            window._protocolScrollOffset += diff * 0.18;
+          }
+        }
       }
       
       // Display hovered protocol details following mouse cursor
@@ -5115,7 +5241,7 @@ const droplifelenght = 280;
               : activeProto.statMods;
             const nameLines = wrapText(`${activeName}`, contentWidth, "900 12px sans-serif");
             const diffTokens = formatDiffTokens(hoveredEffectiveMods, activeEffectiveMods);
-            compareRows.push({ nameLines, diffTokens });
+            compareRows.push({ nameLines, diffTokens, activeName, activeProto });
           });
 
           const titleLineHeight = 17;
@@ -5166,6 +5292,7 @@ const droplifelenght = 280;
           });
 
           ctx.font = "bold 11px sans-serif";
+          ctx.fillStyle = hoveredBox.discovered ? getProtocolRarityColor(proto.rarity, proto.tier) : "#7f8f8b";
           ctx.fillText(familyLine, tooltipX + tooltipWidth / 2, textY);
           textY += bodyLineHeight;
           
@@ -5186,7 +5313,10 @@ const droplifelenght = 280;
 
             compareRows.forEach(row => {
               ctx.font = "900 12px sans-serif";
-              ctx.fillStyle = hoveredBox.discovered ? "#9fffe0" : "#8ea6a0";
+              const nameColor = row.activeProto
+                ? getProtocolRarityColor(row.activeProto.rarity, row.activeProto.tier)
+                : (hoveredBox.discovered ? "#9fffe0" : "#8ea6a0");
+              ctx.fillStyle = hoveredBox.discovered ? nameColor : "#8ea6a0";
               row.nameLines.forEach(line => {
                 ctx.fillText(line, tooltipX + tooltipWidth / 2, textY);
                 textY += bodyLineHeight;
@@ -5476,6 +5606,15 @@ const droplifelenght = 280;
                   selectedProtocol = box.index;
                   applyStats();
                   playProtocolPickupSound();
+                  // Remove new-protocol highlight on activation
+                  if (window._newlyPickedProtocols) {
+                    window._newlyPickedProtocols.delete(box.name);
+                  }
+                  // Tutorial hook: first protocol activation
+                  if (!window._tutFirstProtActivatedFired) {
+                    window._tutFirstProtActivatedFired = true;
+                    window.dispatchEvent(new CustomEvent('tut:firstProtocolActivated'));
+                  }
                 }
               }
             }
@@ -5814,17 +5953,17 @@ const droplifelenght = 280;
                 // Brute nova visual particles
                 for (let e of enemies) {
                   if (e.type === "brute" || e.type === "bruteBoss") {
-                    if (typeof e.fxCooldown !== "number") e.fxCooldown = Math.floor(Math.random() * 2);
+                    if (typeof e.fxCooldown !== "number") e.fxCooldown = Math.floor(Math.random() * 3);
                     if (e.fxCooldown > 0) {
                       e.fxCooldown--;
                       continue;
                     }
                     const isActiveNova = e.novaState === "growing" || e.novaState === "shrinking";
                     if (!isActiveNova && e.type !== "bruteBoss") continue;
-                    e.fxCooldown = 1;
-                    let particleCount = isActiveNova ? 2 : 0;
+                    e.fxCooldown = e.type === "bruteBoss" ? 2 : 3;
+                    let particleCount = isActiveNova ? 1 : 0;
                     if (e.type === "bruteBoss") {
-                      particleCount = isActiveNova ? 10 : 4;
+                      particleCount = isActiveNova ? 4 : 2;
                     }
                     for (let p = 0; p < particleCount; p++) {
                       const angle = Math.random() * Math.PI * 2;
@@ -6054,6 +6193,15 @@ const droplifelenght = 280;
             } else if (e.type === "brute" || e.type === "bruteBoss" || e.type === "slingerBoss") {
               // Brute death burst: mimic nova 'growing' burst
               const burstCount = e.type === "bruteBoss" ? 24 : 12;
+              if (e.type === "slingerBoss" && mines.length > 0) {
+                playSoundFresh('u_b32baquv5u-explosion-9-340460.mp3', (window.sentinelVolume && window.sentinelVolume.mineExplosion) || 0.8);
+                for (let mi = mines.length - 1; mi >= 0; mi--) {
+                  if (mines[mi].contactOnly) {
+                    detonateMine(mines[mi], false);
+                    mines.splice(mi, 1);
+                  }
+                }
+              }
               for (let j = 0; j < burstCount; j++) {
                 const angle = Math.random() * Math.PI * 2;
                 const speed = 2.2 + Math.random() * 1.2;
@@ -6074,8 +6222,8 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
-              if (e.type === "bruteBoss" && wave === 20) {
-                unlockWave(20);
+              if (e.type === "bruteBoss" && wave === 25) {
+                unlockWave(25);
                 wave++;
                 runWavesCleared++;
                 if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
@@ -6153,9 +6301,9 @@ const droplifelenght = 280;
                   }
                 }
               }
-              // Wave 30 boss gate
-              if (wave === 30) {
-                unlockWave(30);
+              // Wave 35 boss gate
+              if (wave === 35) {
+                unlockWave(35);
                 wave++;
                 runWavesCleared++;
                 if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
@@ -7075,9 +7223,33 @@ const droplifelenght = 280;
             const maxHealth = Math.max(1, typeof e.maxHealth === "number" ? e.maxHealth : e.health);
             const healthRatio = Math.max(0, Math.min(1, e.health / maxHealth));
             let phase = 1;
-            if (healthRatio <= 0.34) phase = 3;
-            else if (healthRatio <= 0.67) phase = 2;
+            if (healthRatio <= 0.30) phase = 3;
+            else if (healthRatio <= 0.80) phase = 2;
+            const previousPhase = typeof e._prevSlingerBossPhase === 'number' ? e._prevSlingerBossPhase : phase;
+            if (phase !== previousPhase) {
+              const burstCount = 24;
+              const burstColors = ["#ffbb00", "#fff200", "#ff4444"];
+              const burstColor = burstColors[Math.floor(Math.random() * burstColors.length)];
+              for (let bi = 0; bi < burstCount; bi++) {
+                const burstAngle = Math.random() * Math.PI * 2;
+                const burstSpeed = 2.1 + Math.random() * 1.5;
+                spawnParticle(
+                  e.x,
+                  e.y,
+                  Math.cos(burstAngle) * burstSpeed,
+                  Math.sin(burstAngle) * burstSpeed,
+                  20 + Math.floor(Math.random() * 14),
+                  burstColor,
+                  0.89 + Math.random() * 0.05,
+                  2 + Math.random() * 2.5,
+                  "enemyDeath"
+                );
+              }
+              e._phaseBurstTimer = 12;
+              e._phaseBurstColor = burstColor;
+            }
             e.slingerBossPhase = phase;
+            e._prevSlingerBossPhase = phase;
 
             let firedAny = false;
             const fireShot = (shotAngle, shotSpeed, shotDamage, shotRadius, shotType, shotColor) => {
@@ -7106,47 +7278,41 @@ const droplifelenght = 280;
               shell.fragmentRadius = 5.2;
               // Give enough life to always reach the target — distance / speed + 20 tick buffer
               shell.lifeTimer = Math.ceil(Math.hypot(player.x - e.x, player.y - e.y) / 1.28) + 20;
-              e.slingerBossFragCooldown = phase === 1 ? 240 : (phase === 2 ? 190 : 120);
+              e.slingerBossFragCooldown = phase === 1 ? 160 : (phase === 2 ? 190 : 120);
             }
 
-            if (phase !== 3 && e.attackCooldown <= 0) {
-              if (phase === 1) {
-                fireShot(angleToPlayer, 1.62, e.damage, 7, "slingerBossProjectile", "#ffb347");
-                e.attackCooldown = 34;
-              } else if (phase === 2) {
-                const hasActiveAutoBurst = typeof e.slingerBossAutoShotsLeft === "number" && e.slingerBossAutoShotsLeft > 0;
-                if (!hasActiveAutoBurst) {
-                  e.slingerBossAutoShotsLeft = 10;
-                  e.slingerBossAutoShotTimer = 0;
-                  e.attackCooldown = 1;
-                }
-              }
+            if (phase === 3 && e.attackCooldown <= 0) {
+              fireShot(angleToPlayer, 1.62, e.damage, 7, "slingerBossProjectile", "#ffb347");
+              e.attackCooldown = 34;
             }
 
             if (phase === 2) {
-              if (typeof e.slingerBossAutoShotsLeft !== "number") e.slingerBossAutoShotsLeft = 0;
-              if (typeof e.slingerBossAutoShotTimer !== "number") e.slingerBossAutoShotTimer = 0;
+              if (typeof e.mineInterval !== 'number') e.mineInterval = 120;
+              if (typeof e.nextMineTime !== 'number') e.nextMineTime = e.mineInterval;
 
-              if (e.slingerBossAutoShotsLeft > 0) {
-                e.slingerBossAutoShotTimer -= cooldownStep;
-                while (e.slingerBossAutoShotsLeft > 0 && e.slingerBossAutoShotTimer <= 0) {
-                  const sprayOffset = (Math.random() - 0.5) * 0.09;
-                  fireShot(
-                    angleToPlayer + sprayOffset,
-                    0.35,
-                    Math.max(1, e.damage - 0.3),
-                    6.3,
-                    "slingerBossProjectile",
-                    "#ffb347"
-                  );
-                  e.slingerBossAutoShotsLeft -= 1;
-                  e.slingerBossAutoShotTimer += 5;
-                }
-                if (e.slingerBossAutoShotsLeft <= 0) {
-                  e.attackCooldown = Math.max(e.attackCooldown, 84);
-                }
+              e.nextMineTime -= cooldownStep;
+              if (e.nextMineTime <= 0) {
+                const mineLaunchAngle = Math.random() * Math.PI * 2;
+                const mineSpeed = 2.2 + Math.random() * 1.0;
+                mines.push({
+                  x: e.x,
+                  y: e.y,
+                  radius: 18,
+                  timer: 360,
+                  color: '#ffbb00',
+                  active: true,
+                  contactOnly: true,
+                  vx: Math.cos(mineLaunchAngle) * mineSpeed,
+                  vy: Math.sin(mineLaunchAngle) * mineSpeed
+                });
+                e.nextMineTime = e.mineInterval;
               }
             } else {
+              if (typeof e.mineInterval !== 'number') e.mineInterval = 120;
+              e.nextMineTime = e.mineInterval;
+            }
+
+            if (phase !== 2) {
               e.slingerBossAutoShotsLeft = 0;
               e.slingerBossAutoShotTimer = 0;
             }
@@ -7262,12 +7428,9 @@ const droplifelenght = 280;
               ctx.arc(e.x, e.y, e.radius + 52, 0, Math.PI * 2);
               ctx.strokeStyle = "rgba(255, 68, 68, 0.35)";
               ctx.lineWidth = 3;
-              ctx.setLineDash([8, 8]);
               ctx.shadowColor = "#ff4444";
-              ctx.shadowBlur = 12;
+              ctx.shadowBlur = 8;
               ctx.stroke();
-              ctx.setLineDash([]);
-              ctx.shadowBlur = 0;
               ctx.restore();
 
               // Move toward player
@@ -7347,14 +7510,18 @@ const droplifelenght = 280;
       for (let j = 0; j < enemies.length; j++) {
         if (i === j) continue;
         const o = enemies[j];
+        // Fast early-out: skip if clearly too far apart (max radius is ~60)
+        const _quickDx = e.x - o.x;
+        const _quickDy = e.y - o.y;
+        if (_quickDx * _quickDx + _quickDy * _quickDy > 36000) continue;
         if (
           (e.type === "grunt" && o.type === "gruntBoss" && e.noBossCollision > 0) ||
           (o.type === "grunt" && e.type === "gruntBoss" && o.noBossCollision > 0)
         ) {
           continue;
         }
-        const ox = e.x - o.x;
-        const oy = e.y - o.y;
+        const ox = _quickDx;
+        const oy = _quickDy;
         const d = Math.hypot(ox, oy);
         const r1 = typeof e.collisionRadius === 'number' ? e.collisionRadius : e.radius;
         const r2 = typeof o.collisionRadius === 'number' ? o.collisionRadius : o.radius;
@@ -7847,8 +8014,8 @@ const droplifelenght = 280;
               window._victoryTriggered = true;
               window._victoryTime = Date.now();
             }
-            // Auto-unlock the next wave for future runs (for waves 1-40)
-            if (wave <= 40 && typeof unlockWave === "function") {
+            // Auto-unlock the next wave for future runs (for waves 1-50)
+            if (wave <= 50 && typeof unlockWave === "function") {
               unlockWave(wave);
             }
             
@@ -8808,8 +8975,26 @@ const droplifelenght = 280;
             mouseY <= box.y + box.h
           ) {
             hoveredProtocol = box.index;
+            // Clear new-pickup highlight after 1s of continuous hover
+            if (window._newlyPickedProtocols && window._newlyPickedProtocols.has(box.name)) {
+              if (!window._newPickHoverStart) window._newPickHoverStart = {};
+              if (!window._newPickHoverStart[box.name]) {
+                window._newPickHoverStart[box.name] = Date.now();
+              } else if (Date.now() - window._newPickHoverStart[box.name] >= 250) {
+                window._newlyPickedProtocols.delete(box.name);
+                if (!window._seenProtocols) window._seenProtocols = new Set();
+                window._seenProtocols.add(box.name);
+                delete window._newPickHoverStart[box.name];
+              }
+            } else if (window._newPickHoverStart) {
+              delete window._newPickHoverStart[box.name];
+            }
             break;
           }
+        }
+        // Reset hover timer for any card no longer being hovered
+        if (hoveredProtocol < 0 && window._newPickHoverStart) {
+          window._newPickHoverStart = {};
         }
       }
       // Update hovered replace card
