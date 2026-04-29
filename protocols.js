@@ -115,6 +115,10 @@ const ProtocolSystem = {
     return !!this.editorDiscoverAllEnabled && !!window._editorSessionActive;
   },
 
+  isHardcoreRun: function() {
+    return typeof window !== 'undefined' && window.sentinelDifficulty === "Hardcore";
+  },
+
   setEditorDiscoverAllEnabled: function(enabled) {
     this.editorDiscoverAllEnabled = !!enabled;
     return this.editorDiscoverAllEnabled;
@@ -292,7 +296,9 @@ const ProtocolSystem = {
   // Get numeric upgrade multiplier for protocol
   getUpgradeMultiplier: function(protocolName) {
     const state = this.protocolBoard[protocolName];
-    const idx = this.getUpgradeTierIndex(state?.upgradeTier || this.getDefaultUpgradeTier());
+    const idx = this.isHardcoreRun()
+      ? 0
+      : this.getUpgradeTierIndex(state?.upgradeTier || this.getDefaultUpgradeTier());
     return this.upgradeMultipliers[idx] || 1;
   },
 
@@ -305,7 +311,9 @@ const ProtocolSystem = {
     if (!protocol || !protocol.statMods) return result;
 
     const state = this.protocolBoard[protocolName];
-    const tierIndex = this.getUpgradeTierIndex(state?.upgradeTier || this.getDefaultUpgradeTier());
+    const tierIndex = this.isHardcoreRun()
+      ? 0
+      : this.getUpgradeTierIndex(state?.upgradeTier || this.getDefaultUpgradeTier());
     Object.keys(protocol.statMods).forEach(stat => {
       const base = protocol.statMods[stat] || 0;
       result[stat] = this.computeEffectiveModForTier(base, tierIndex);
@@ -321,7 +329,9 @@ const ProtocolSystem = {
     if (!protocol || !protocol.statMods) return result;
 
     const state = this.protocolBoard[protocolName];
-    const currentTierIndex = this.getUpgradeTierIndex(state?.upgradeTier || this.getDefaultUpgradeTier());
+    const currentTierIndex = this.isHardcoreRun()
+      ? 0
+      : this.getUpgradeTierIndex(state?.upgradeTier || this.getDefaultUpgradeTier());
     const maxTierIndex = this.upgradeTiers.length - 1;
     const nextTierIndex = Math.min(currentTierIndex + 1, maxTierIndex);
 

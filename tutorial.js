@@ -2,13 +2,16 @@
  * tutorial.js — First-time player tutorial for Sentinel
  *
  * Guides the player through: Main Menu → Difficulty → Wave Selection → Protocol Database
- * Only runs once; completion is stored in localStorage under 'sentinel_tutorialDone'.
+ * Only runs once; completion is stored in localStorage under a versioned key.
  */
 (function () {
   'use strict';
 
   const TUTORIAL_TEST_MODE = false; // set true to always run tutorial on refresh while testing
-  if (!TUTORIAL_TEST_MODE && localStorage.getItem('sentinel_tutorialDone')) return;
+  const TUTORIAL_VERSION = 2;
+  const TUTORIAL_STORAGE_KEY = `sentinel_tutorialDone_v${TUTORIAL_VERSION}`;
+
+  if (!TUTORIAL_TEST_MODE && localStorage.getItem(TUTORIAL_STORAGE_KEY)) return;
 
   // ─── Inject tutorial CSS ───────────────────────────────────────────────────
   const styleEl = document.createElement('style');
@@ -263,7 +266,7 @@
   // ─── Completion ────────────────────────────────────────────────────────────
   function completeTutorial() {
     stage = 'done';
-    localStorage.setItem('sentinel_tutorialDone', '1');
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, '1');
     bodyObserver.disconnect();
     window._tutDrawOnStats = null;
   }

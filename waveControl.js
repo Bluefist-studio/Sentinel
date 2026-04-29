@@ -873,7 +873,8 @@ window.SentinelWaveControl = (function () {
         wave,
         elapsedTime: 0,
         spawnedEventKeys: new Set(),  // Track spawned events by mobType_index key
-        endCondition: timeline.endCondition || 'duration'  // Store end condition for access in main loop
+        endCondition: timeline.endCondition || 'duration',  // Store end condition for access in main loop
+        nextApocalypseKamikazeTime: window.sentinelDifficulty === "Apocalypse" ? 2 + Math.random() * 3 : Infinity
       };
     } else if (!window._timelineWaveState) {
       // State was cleared but we're still on same wave - this wave is done
@@ -938,10 +939,12 @@ window.SentinelWaveControl = (function () {
       }
     }
 
-    // Apocalypse difficulty: spawn 1-3 extra kamikazes alongside each burst event
-    if (anyEventSpawned && window.sentinelDifficulty === "Apocalypse") {
-      const kamikazeCount = 1 + Math.floor(Math.random() * 3);
-      spawnKamikazeBurst(ctx, kamikazeCount);
+    if (window.sentinelDifficulty === "Apocalypse") {
+      if (state.elapsedTime >= state.nextApocalypseKamikazeTime) {
+        const kamikazeCount = 1 + Math.floor(Math.random() * 3);
+        spawnKamikazeBurst(ctx, kamikazeCount);
+        state.nextApocalypseKamikazeTime = state.elapsedTime + 2 + Math.random();
+      }
     }
 
     // Wave complete based on endCondition setting

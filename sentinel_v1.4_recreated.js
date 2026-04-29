@@ -8,6 +8,7 @@
 
   window.resetTutorial = function() {
     localStorage.removeItem('sentinel_tutorialDone');
+    localStorage.removeItem('sentinel_tutorialDone_v2');
     console.log("Tutorial reset. Refresh to run it again.");
   };
 
@@ -593,7 +594,7 @@ window.onload = function () {
   continueBtn.style.transform = "translateX(-50%)";
   continueBtn.style.fontSize = "1.2rem";
   continueBtn.style.padding = "0.5rem 1.5rem";
-  continueBtn.style.background = "rgba(0,0,0,0.35)";
+  continueBtn.style.background = "transparent";
   continueBtn.style.color = "#fff";
   continueBtn.style.borderRadius = "8px";
   continueBtn.style.opacity = "0.7";
@@ -620,7 +621,7 @@ window.onload = function () {
     window._tutFirstProtActivatedFired = false;
     window._newlyPickedProtocols = new Set();
     window._seenProtocols = new Set();
-    const isRestrictedDifficulty = difficulty === "Hardcore" || difficulty === "Apocalypse";
+    const isRestrictedDifficulty = difficulty === "Hardcore";
     if (!isRestrictedDifficulty) {
       ProtocolSystem.setStarters(window._pendingStarterProtocols || []);
     }
@@ -1461,6 +1462,7 @@ window.onload = function () {
               } else {
                 ProtocolSystem.starterProtocols = [...selected];
               }
+              playProtocolPickupSound();
               renderCardState();
               refreshCount();
               return;
@@ -2447,13 +2449,13 @@ window.onload = function () {
     function showDifficultyConfirmModal(difficulty, onConfirm) {
       const descriptions = {
         Hardcore: [
-          "No health drops — enemies will never drop health pickups.",
-          "No starter protocols — you begin every run with empty protocol slots.",
+          "All protocols are at Trivial quality.",
+          "No Starter Protocols.",
+          "Skips wave selection and starts directly at wave 1.",
         ],
         Apocalypse: [
-          "No health drops — enemies will never drop health pickups.",
-          "No starter protocols — you begin every run with empty protocol slots.",
-          "Kamikaze surge — every spawn burst adds 1 to 3 extra Kamikazes.",
+          "Skips wave selection and starts directly at wave 1.",
+          "Kamikaze surge — spawn 1 to 3 extra Kamikazes every 2 to 3 seconds.",
         ]
       };
 
@@ -2530,13 +2532,18 @@ window.onload = function () {
     hardcoreBtn.addEventListener("click", () => {
       showDifficultyConfirmModal("Hardcore", () => {
         diffOverlay.remove();
-        showWaveSelectionMenu("Hardcore", 0, 15);
+        window._selectedStartWave = 1;
+        window._selectedStartLevel = 1;
+        startGame("Hardcore", 0, 15);
       });
     });
     apocalypseBtn.addEventListener("click", () => {
       showDifficultyConfirmModal("Apocalypse", () => {
         diffOverlay.remove();
-        showWaveSelectionMenu("Apocalypse", 0, 15);
+        window._selectedStartWave = 1;
+        window._selectedStartLevel = 1;
+        window._pendingStarterProtocols = [];
+        showStarterProtocolModal("Apocalypse", 0, 15);
       });
     });
 
@@ -4429,7 +4436,7 @@ window.onload = function () {
         if (!noLootDrop && (nearest.type === "brute" || nearest.type === "bruteBoss")) {
           slingerDrops.push({ x: nearest.x + 3, y: nearest.y + 5 });
         }
-        if (!noLootDrop && Math.random() < 0.15 && window.sentinelDifficulty !== "Hardcore" && window.sentinelDifficulty !== "Apocalypse") {
+        if (!noLootDrop && Math.random() < 0.15) {
           healthDrops.push({ x: nearest.x + 4, y: nearest.y + 6 });
         }
       }
@@ -5693,7 +5700,7 @@ const droplifelenght = 280;
     player.hitFlashTimer = 0;
     player._scanTargetAngle = Math.PI / 2;
     player._scanSnapCooldown = 0;
-    if (window.sentinelDifficulty === "Hardcore" || window.sentinelDifficulty === "Apocalypse") {
+    if (window.sentinelDifficulty === "Hardcore") {
       const savedStarters = ProtocolSystem.starterProtocols;
       ProtocolSystem.starterProtocols = [];
       ProtocolSystem.initializeRun();
@@ -9129,6 +9136,7 @@ const droplifelenght = 280;
         // When transition to final screen happens, fire the explosion burst
         if (showFinalScreen && !window._gameOverBurstDone && window._gameOverDeathPos) {
           window._gameOverBurstDone = true;
+          playSoundFresh('lumora_studios-pixel-explosion-319166.mp3', (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5);
           const px = window._gameOverDeathPos.x, py = window._gameOverDeathPos.y;
           // Kill existing smoke
           for (let i = particles.length - 1; i >= 0; i--) {
