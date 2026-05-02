@@ -738,7 +738,7 @@ window.onload = function () {
     starterOverlay.style.zIndex = 1002;
 
     const panel = document.createElement("div");
-    panel.style.width = "90vw";
+    panel.style.width = "min(1100px, 95vw)";
     panel.style.maxWidth = "1100px";
     panel.style.maxHeight = "85vh";
     panel.style.background = "rgba(0, 20, 30, 0.98)";
@@ -793,6 +793,7 @@ window.onload = function () {
 
     const content = document.createElement("div");
     content.style.flex = "1";
+    content.style.minWidth = "0";
     content.style.overflowY = "auto";
     content.style.border = "1px solid rgba(0,255,221,0.25)";
     content.style.borderRadius = "8px";
@@ -1030,7 +1031,12 @@ window.onload = function () {
 
         const grid = document.createElement("div");
         grid.style.display = "grid";
+        grid.style.width = "100%";
         grid.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
+        grid.style.gridAutoRows = "auto";
+        grid.style.alignItems = "stretch";
+        grid.style.justifyContent = "stretch";
+        grid.style.boxSizing = "border-box";
         grid.style.gap = "32px";
         grid.style.marginBottom = "24px";
         grid.style.paddingLeft = "24px";
@@ -1059,8 +1065,11 @@ window.onload = function () {
           card.style.cursor = "pointer";
           card.style.transition = "all 0.15s";
           card.style.minHeight = "200px";
+          card.style.minWidth = "0";
           card.style.display = "flex";
           card.style.flexDirection = "column";
+          card.style.width = "100%";
+          card.style.boxSizing = "border-box";
 
           const currentTierIndex = (typeof ProtocolSystem.getUpgradeTierIndex === "function")
             ? ProtocolSystem.getUpgradeTierIndex(upgradeTier)
@@ -3359,7 +3368,7 @@ window.onload = function () {
 
   function activateAttack() {
     if (window._introPhase === "animating") return; // block input until animation finishes
-    if (window._secondDeathPending) return; // block during second death smoke
+    if (window._secondDeathPending || gameOver) return; // block during second death smoke or game over
     if (window._activateUnpauseTimeout) clearTimeout(window._activateUnpauseTimeout);
     window._activateUnpauseStart = performance.now();
     window._activateUnpauseTimeout = setTimeout(() => {
@@ -3395,13 +3404,21 @@ window.onload = function () {
     }, 500);
   }
 
+  function stopAttackSound() {
+    if (window.laserAudio && !window.laserAudio.paused) {
+      window.laserAudio.pause();
+      window.laserAudio.currentTime = 0;
+    }
+  }
+
   function deactivateAttack() {
-    if (window._secondDeathPending) return; // block during second death smoke
     if (window._activateUnpauseTimeout) {
       clearTimeout(window._activateUnpauseTimeout);
       window._activateUnpauseTimeout = null;
       window._activateUnpauseStart = null;
     }
+    stopAttackSound();
+    if (window._secondDeathPending || gameOver) return; // block during second death smoke or game over
     followMouse = false;
     // Tutorial: auto-open stat panel on first release after gaining a level
     if (window._tutFirstLevelUpFired && !window._tutStatPanelAutoOpened && statPoints > 0) {
@@ -3411,41 +3428,57 @@ window.onload = function () {
     }
     muffleGameMusic();
     mufleBossMusic();
-    if (window.laserAudio && !window.laserAudio.paused) {
-      window.laserAudio.pause();
-      window.laserAudio.currentTime = 0;
+  }
+
+  let attackHeld = false;
+  let rightMouseHeld = false;
+  let spaceHeld = false;
+
+  function updateAttackHold() {
+    const desiredHold = rightMouseHeld || spaceHeld;
+    if (desiredHold === attackHeld) return;
+    attackHeld = desiredHold;
+    if (attackHeld) {
+      activateAttack();
+    } else {
+      deactivateAttack();
     }
   }
 
   canvas.addEventListener("mousedown", (e) => {
     if (e.button === 2) {
-      activateAttack();
+      rightMouseHeld = true;
+      updateAttackHold();
     } else if (e.button === 0) {
       playSoundFresh('47313572-8-bit-game-sfx-sound-6-269965.mp3', window.sentinelVolume.click || 1.0);
     }
   });
   canvas.addEventListener("mouseup", (e) => {
     if (e.button === 2) {
-      deactivateAttack();
+      if (window._secondDeathPending || gameOver) return;
+      rightMouseHeld = false;
+      updateAttackHold();
     }
   });
 
   // Spacebar as alternative to right-click
-  let spaceHeld = false;
   window.addEventListener("keydown", (e) => {
     if (e.code === "Space") {
       e.preventDefault();
       if (!spaceHeld) {
         spaceHeld = true;
-        activateAttack();
+        updateAttackHold();
       }
     }
   });
   window.addEventListener("keyup", (e) => {
     if (e.code === "Space") {
       e.preventDefault();
-      spaceHeld = false;
-      deactivateAttack();
+      if (window._secondDeathPending || gameOver) return;
+      if (spaceHeld) {
+        spaceHeld = false;
+        updateAttackHold();
+      }
     }
   });
 
@@ -7870,6 +7903,10 @@ const droplifelenght = 280;
     if (window._introPhase) {
       paused = true;
       showStats = false;
+    } else if (window._secondDeathPending) {
+      // During second-death smoke, keep the game running and suppress the stats panel.
+      paused = false;
+      showStats = false;
     } else if (window._activateUnpauseTimeout) {
       paused = true;
       showStats = false;
@@ -9076,12 +9113,18 @@ const droplifelenght = 280;
         if (_sdElapsed >= 4000) {
           window._secondDeathPending = false;
           window._gameOverDeathPos = { x: player.x, y: player.y };
-          window._gameOverExplosionDone = true;
+          window._gameOverExplosionDone = false;
           window._gameOverBurstDone = false;
           window._playerUsedContinue = true;
           gameOver = true;
           stopLowHealthSound();
           deactivateAttack();
+          showStats = false;
+          rightMouseHeld = false;
+          spaceHeld = false;
+          attackHeld = false;
+          if (window._gameMusicAudio) muffleGameMusic();
+          if (window._bossMusicAudio) mufleBossMusic();
           playSoundFresh('lumora_studios-pixel-explosion-319166.mp3', (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5);
         }
       }
@@ -9089,8 +9132,14 @@ const droplifelenght = 280;
       if (player.health <= 0 && !gameOver && !window._secondDeathPending) {
         if (window._playerUsedContinue) {
           // Second death — delayed sequence
+          stopAttackSound();
           window._secondDeathPending = true;
           window._secondDeathTime = Date.now();
+          if (window._activateUnpauseTimeout) {
+            clearTimeout(window._activateUnpauseTimeout);
+            window._activateUnpauseTimeout = null;
+            window._activateUnpauseStart = null;
+          }
           player.health = 0;
           stopLowHealthSound();
           followMouse = true;
