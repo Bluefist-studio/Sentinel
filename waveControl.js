@@ -4,7 +4,8 @@ window.printWaveDebug = function() {
 window.SentinelWaveControl = (function () {
   const CODE_WAVE_MIN = 1;
   const CODE_WAVE_MAX = 50;
-  const MOB_INTERVAL_KEYS = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss"];
+  const MOB_INTERVAL_KEYS = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss", "beamerBoss"];
+  const BOSS_MOB_TYPES = new Set(["gruntBossMinor", "gruntBoss", "slingerBoss", "bruteBoss", "stalkerBoss", "beamerBoss", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss"]);
   const MOB_INTERVAL_KEY_ALIASES = {
     bossMinors: "gruntbossminor",
     bosses: "gruntboss",
@@ -12,7 +13,9 @@ window.SentinelWaveControl = (function () {
     gruntBoss: "gruntboss",
     slingerBoss: "slingerboss",
     bruteBoss: "bruteboss",
-    stalkerBoss: "stalkerBoss"
+    stalkerBoss: "stalkerBoss",
+    beamerBoss: "beamerBoss",
+    beamerboss: "beamerBoss"
   };
 
   // Timeline wave data storage: { waveNum: { duration, mobs: { mobType: [{time, amount}, ...] } } }
@@ -35,6 +38,7 @@ window.SentinelWaveControl = (function () {
     bruteBoss: { base: 6000, perWave: 75 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
+    beamerBoss: { base: 250000, perWave: 100 },
     shielder: { base: 75, perWave: 25 },
     stalkerBoss: { base: 10000, perWave: 75 }
   };
@@ -114,7 +118,8 @@ window.SentinelWaveControl = (function () {
         gruntboss: 0,
         slingerboss: 0,
         bruteboss: 0,
-        stalkerBoss: 0
+        stalkerBoss: 0,
+        beamerBoss: 0
       };
     }
     return window._mobBurstElapsed;
@@ -164,7 +169,7 @@ window.SentinelWaveControl = (function () {
     32: "SWC3:eyJ2IjozLCJvIjp7IjMyIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJhbGxFbGltaW5hdGVkIiwibSI6eyJnIjpbWzAsM10sWzAuNSwzXSxbMSwzXSxbMS41LDNdLFsyLDNdLFsyLjUsM11dLCJiIjpbWzEuNSwzXV0sInNoIjpbWzIuNSwyXSxbNy41LDJdLFsxMi41LDJdXSwic3QiOltbNCwyXSxbMTMsMV0sWzguNSwxXSxbMTcuNSwxXV0sImdibSI6W1syLDFdXX19fX19",
     33: "SWC3:eyJ2IjozLCJvIjp7IjMzIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl1dLCJrIjpbWzE1LDFdLFsxOCwxXSxbMCwxXSxbMC41LDFdLFsxLDFdLFszLjUsMV0sWzExLjUsMV0sWzE0LjUsMV0sWzE3LjUsMV0sWzE4LjUsMV0sWzQsMV0sWzcsMV0sWzQuNSwxXSxbNy41LDFdLFs4LDFdLFsxMC41LDFdLFsxMSwxXSxbMTQsMV1dLCJzdCI6W1s1LDFdLFsxNSwxXSxbNy41LDFdLFsyLjUsMV0sWzEwLDFdLFsxMi41LDFdXX19fX19",
     34: "SWC3:eyJ2IjozLCJvIjp7IjM0Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwicyI6W1s0LDFdLFs2LDFdLFs4LDFdLFsxMCwxXSxbMTIsMV0sWzE0LDFdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl0sWzUsMV0sWzEwLDFdLFsxNC41LDFdXSwic3QiOltbNSwxXSxbMTUsMV0sWzcuNSwxXSxbMi41LDFdLFsxMCwxXSxbMTIuNSwxXV19fX19fQ==",
-    35: "SWC3:eyJ2IjozLCJvIjp7IjM1Ijp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIn19fX0=",
+    35: "SWC3:eyJ2IjozLCJvIjp7IjM1Ijp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIiwibSI6eyJzdGIiOltbMCwxXV19fX19fQ==",
     36: "SWC3:eyJ2IjozLCJvIjp7IjM2Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJnYm0iOltbNCw0XSxbOCw0XSxbMTIsNF0sWzE2LDRdLFsyMCw0XSxbMCw0XV19fX19fQ==",
     37: "SWC3:eyJ2IjozLCJvIjp7IjM3Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJzaCI6W1sxMCwxXV0sImdibSI6W1s0LDNdLFs4LDNdLFsxMiwzXSxbMTYsM10sWzIwLDNdLFswLDNdXX19fX19",
     38: "SWC3:eyJ2IjozLCJvIjp7IjM4Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1syLDNdLFs0LDNdLFs2LDNdLFs4LDNdLFsxMCwzXSxbMTIsM10sWzE0LDNdLFsxNiwzXSxbMTgsM10sWzIwLDNdLFswLDNdXSwiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJnYm0iOltbNCwyXSxbOCwyXSxbMTIsMl0sWzE2LDJdLFsyMCwyXSxbMCwyXV19fX19fQ==",
@@ -641,6 +646,81 @@ window.SentinelWaveControl = (function () {
     }
   }
 
+  function spawnBeamerBoss(ctx) {
+    const wave = ctx.getWave();
+    const canvasWidth = (ctx && typeof ctx.getCanvasWidth === "function") ? ctx.getCanvasWidth() : 1024;
+    const canvasHeight = (ctx && typeof ctx.getCanvasHeight === "function") ? ctx.getCanvasHeight() : 768;
+    const orbitRadius = 220;
+    const { x, y } = randomEdgeSpawn(canvasWidth, canvasHeight, 50);
+    const enemy = ctx.spawnEnemy();
+
+    enemy.x = x;
+    enemy.y = y;
+    enemy.radius = 46;
+    enemy.collisionRadius = 50;
+    enemy.speed = 0.58;
+    enemy.health = getEnemyHealthForType("beamerBoss", wave);
+    enemy.damage = 2;
+    enemy.attackCooldown = 0;
+    enemy.attackRange = 0;
+    enemy.color = "#4bc7ff";
+    enemy.type = "beamerBoss";
+    enemy.beamerBossPhase = "entry";
+    enemy.beamerBossEntering = true;
+    enemy.beamerBossEntrySpeed = enemy.speed * 2.1;
+    enemy.beamerBossSpinAngle = Math.random() * Math.PI * 2;
+    enemy.beamerBossFacingAngle = enemy.beamerBossSpinAngle;
+    enemy.beamerBossOrbitAngle = Math.random() * Math.PI * 2;
+    enemy.beamerBossOrbitRadius = orbitRadius;
+    enemy.beamerBossAimAngle = 0;
+    enemy.beamerBossSpinTimer = 600;
+    enemy.beamerBossSpinChargeTimer = 0;
+    enemy.beamerBossSpinChargeDuration = 60;
+    enemy.beamerBossChargeTimer = 0;
+    enemy.beamerBossChargeDuration = 75;
+    enemy.beamerBossBeamTickTimer = 0;
+    enemy.beamerBossTransitionTimer = 0;
+    enemy.beamerBossNextPhase = "";
+    enemy.beamerBossAimShotsRemaining = 0;
+    enemy.beamerBossPhaseEffectStage = null;
+    enemy.beamerBossPhaseEffectTimer = 0;
+    enemy.beamerBossPhaseEffectSmokeCount = 0;
+    enemy.beamerBossStunTimer = 0;
+    enemy.beamerBossStunDuration = 180;
+    enemy.beamerBossContinuousSmokeTimer = 0;
+    enemy.beamerBossNovaChargeTimer = 0;
+    enemy.beamerBossNovaChargeDuration = 150;
+    enemy.beamerBossNovaRadius = 0;
+    enemy.beamerBossNovaPreviousRadius = 0;
+    enemy.beamerBossNovaHitPlayer = false;
+    enemy.beamerBossNovaBurstsRemaining = 0;
+    enemy.beamerBossNovaBurstsPerSequence = 0;
+    enemy.beamerBossNovaGapCount = 8;
+    enemy.beamerBossNovaArcFraction = 0.68;
+    enemy.beamerBossNovaGapOffset = 0;
+    enemy.beamerBossNovaGapHasPrevious = false;
+    enemy.beamerBossBeamLength = Math.hypot(canvasWidth, canvasHeight) + 120;
+    enemy.beamerBossSpinBeamReach = 0;
+    enemy.beamerBossSpinBeamExtendSpeed = enemy.beamerBossBeamLength / 240;
+    enemy.beamerBossNovaMaxRadius = Math.hypot(canvasWidth / 2, canvasHeight / 2) + orbitRadius;
+    enemy.beamerBossShotHead = 0;
+    enemy.beamerBossShotTail = 0;
+    enemy.beamerBossShotSpeed = enemy.beamerBossBeamLength / 32;
+    enemy.beamerBossShotSegmentLength = Math.max(120, enemy.beamerBossBeamLength * 0.32);
+    enemy.beamerBossShotTickTimer = 0;
+    ctx.applyWaveEnemyModifiers(enemy);
+    enemy.beamerBossBeamDamage = enemy.damage;
+    enemy.beamerBossShotDamage = enemy.damage * 3;
+    enemy.beamerBossContactDamageTimer = 0;
+    enemy.maxHealth = enemy.health;
+  }
+
+  function spawnBeamerBossBurst(ctx, count) {
+    for (let i = 0; i < count; i++) {
+      spawnBeamerBoss(ctx);
+    }
+  }
+
   function spawnShielderBurst(ctx, count) {
     const wave = ctx.getWave();
     const canvasWidth = (ctx && typeof ctx.getCanvasWidth === "function") ? ctx.getCanvasWidth() : 1024;
@@ -874,6 +954,7 @@ window.SentinelWaveControl = (function () {
         elapsedTime: 0,
         spawnedEventKeys: new Set(),  // Track spawned events by mobType_index key
         endCondition: timeline.endCondition || 'duration',  // Store end condition for access in main loop
+        sawBoss: false,
         nextApocalypseKamikazeTime: window.sentinelDifficulty === "Apocalypse" ? 2 + Math.random() * 3 : Infinity
       };
     } else if (!window._timelineWaveState) {
@@ -902,11 +983,13 @@ window.SentinelWaveControl = (function () {
       gruntboss: spawnBossBurst,
       slingerboss: spawnSlingerBossBurst,
       bruteboss: spawnBruteBossBurst,
-      stalkerBoss: spawnStalkerBossBurst
+      stalkerBoss: spawnStalkerBossBurst,
+      beamerBoss: spawnBeamerBossBurst
     };
 
     // Process spawn events for each mob type
     let anyEventRemaining = false;
+    let anyBossEventRemaining = false;
     let anyEventSpawned = false;
 
     if (timeline.mobs) {
@@ -929,11 +1012,13 @@ window.SentinelWaveControl = (function () {
             spawnFn(ctx, evt.amount);
             state.spawnedEventKeys.add(eventKey);
             anyEventSpawned = true;
+            if (evt.amount > 0 && BOSS_MOB_TYPES.has(mobType)) state.sawBoss = true;
           }
 
           // Track if there are pending events
           if (!hasSpawned && state.elapsedTime < timeline.duration) {
             anyEventRemaining = true;
+            if (BOSS_MOB_TYPES.has(mobType)) anyBossEventRemaining = true;
           }
         }
       }
@@ -966,19 +1051,15 @@ window.SentinelWaveControl = (function () {
     } else if (endCondition === 'boss') {
       // Wave ends when all boss-type enemies are eliminated (no XP drops on completion)
       const enemies = ctx.getEnemies();
-      // Boss types: gruntBossMinor, gruntBoss, slingerBoss, bruteBoss, stalkerBoss
-      const bossTypes = ['gruntBossMinor', 'gruntBoss', 'slingerBoss', 'bruteBoss', 'stalkerBoss'];
-      
       // Find all boss enemies
-      const bossEnemies = enemies.filter(e => bossTypes.includes(e.type));
-      
-      // Wave is complete if:
-      // 1. There are/were boss enemies AND all are dead, OR
-      // 2. Events have all spawned and no bosses were ever spawned (shouldn't happen in practice)
+      const bossEnemies = enemies.filter(e => BOSS_MOB_TYPES.has(e.type));
+
       if (bossEnemies.length > 0) {
         waveComplete = bossEnemies.every(e => e.health <= 0);
-        if (waveComplete) {
-        }
+      } else if (state.sawBoss && !anyBossEventRemaining) {
+        waveComplete = true;
+      } else if (!state.sawBoss && !anyEventRemaining && state.elapsedTime >= timeline.duration) {
+        waveComplete = true;
       }
     }
 

@@ -3,12 +3,12 @@
 
 function createNewTimelineWaveEditor(waveSection, selectedWaveState) {
 	const MOB_TYPES = [
-		"grunts", "brutes", "slingers", "shielders", "beamers", "kamikazes", "stalkers", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss"
+		"grunts", "brutes", "slingers", "shielders", "beamers", "kamikazes", "stalkers", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss", "beamerBoss"
 	];
 	const MOB_LABELS = {
 		"grunts": "Grunts", "brutes": "Brutes", "slingers": "Slingers", "shielders": "Shielders",
 		"beamers": "Beamers", "kamikazes": "Kamikazes", "stalkers": "Stalkers",
-		"gruntbossminor": "Grunt Heavy", "gruntboss": "Grunt Boss", "slingerboss": "Slinger Boss", "bruteboss": "Brute Boss", "stalkerBoss": "Stalker Boss"
+		"gruntbossminor": "Grunt Heavy", "gruntboss": "Grunt Boss", "slingerboss": "Slinger Boss", "bruteboss": "Brute Boss", "stalkerBoss": "Stalker Boss", "beamerBoss": "Beamer Boss"
 	};
 
 	// Timeline data: waveNum -> { duration, mobs: { mobType: [{time, amount}, ...] } }

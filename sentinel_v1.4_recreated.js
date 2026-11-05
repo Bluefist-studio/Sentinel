@@ -237,9 +237,13 @@
   // back to the playlist when the boss is defeated.
   // ============================================================
   const BOSS_MUSIC_FILE = 'nickpanekaiassets-fast-paced-chiptune-song-for-video-games-227123.mp3';
+  const BEAMER_BOSS_MUSIC_FILE = 'nickpanek-chiptune-hard-boss-mode-218071.mp3';
+  const BEAMER_BOSS_BEAM_SOUND_FILE = 'fronbondi_skegs-sfx-alien-spaceship-tractor-beam-excitor-sound-effect-358492.mp3';
   window._bossMusicallyActive = false;
+  window._beamerBossMusicActive = false;
+  window._bossSoundsStoppedForEndState = false;
 
-  function playBossMusic() {
+  function playBossMusic(filename = BOSS_MUSIC_FILE, targetVolume = 0.45) {
     try {
       // Game music keeps playing (already silenced by _silenceGameMusicForBoss)
       if (window._bossMusicContext) {
@@ -247,7 +251,7 @@
         window._bossMusicContext = null;
         window._bossMusicFilter = null;
       }
-      const music = new Audio(encodeURI(BOSS_MUSIC_FILE));
+      const music = new Audio(encodeURI(filename));
       music.volume = 0;
       music.loop = true;
       const bCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -265,7 +269,7 @@
       const playPromise = music.play();
       if (playPromise !== undefined) playPromise.catch(() => {});
       // Fade in over 1.5s
-      const target = 0.45;
+      const target = Math.min(1, Math.max(0, targetVolume));
       const duration = 1500;
       const start = Date.now();
       function fadeIn() {
@@ -321,6 +325,44 @@
       window._bossMusicContext = null;
       window._bossMusicFilter = null;
     }
+  }
+
+  function stopAllMusic() {
+    const menuMusic = window._menuMusicAudio;
+    if (menuMusic) {
+      menuMusic.pause();
+      menuMusic.currentTime = 0;
+      window._menuMusicAudio = null;
+    }
+    stopGameMusic();
+    stopBossMusic();
+  }
+
+  const BEAMER_BOSS_SFX_FILES = [
+    "freesound_community-rikochet-v1-light-2-47347.mp3",
+    "yodguard-energy-beam-blast-4-482514.mp3",
+    "freesound_community-057967_power-charge-88127.mp3",
+    "freesound_community-beam-8-43831.mp3",
+    "sparky_laser.wav"
+  ];
+
+  function stopBossSounds() {
+    if (window._bossSoundsStoppedForEndState) return;
+    window._bossSoundsStoppedForEndState = true;
+    const beamLoop = window._audioPool && window._audioPool[BEAMER_BOSS_BEAM_SOUND_FILE];
+    if (beamLoop) {
+      beamLoop.pause();
+    }
+    for (const filename of BEAMER_BOSS_SFX_FILES) {
+      const pool = _freshAudioPool[filename];
+      if (!pool) continue;
+      for (const audio of pool) {
+        audio.pause();
+      }
+    }
+    window._bossMusicallyActive = false;
+    window._beamerBossMusicActive = false;
+    stopAllMusic();
   }
 
   function fadeOutBossMusic(duration = 1200, callback) {
@@ -628,6 +670,7 @@ window.onload = function () {
     showMenuScreen = false;
     fadeOutMenuMusic();
     window._bossMusicallyActive = false;
+    window._beamerBossMusicActive = false;
     stopBossMusic();
     stopLowHealthSound();
     playGameMusic();
@@ -1687,6 +1730,7 @@ window.onload = function () {
         { name: "Slinger", role: "Ranged Harasser", image: "slinger.png", description: "Maintains distance and fires projectile shots at medium-to-long range." },
         { name: "Shielder", role: "Support", image: "shielder.png", description: "Defensive support unit that protects nearby enemies with shielding links." },
         { name: "Beamer", role: "Artillery", image: "beamer.png", description: "Charges and fires sweeping beam attacks while holding preferred spacing." },
+        { name: "Beamer Major", role: "Boss", image: "Beamer boss .png", description: "Slowly orbits while sweeping twin beams, then locks on and charges a traveling beam shot." },
         { name: "Stalker", role: "Skirmisher", image: "stalker.png", description: "Disruptive mobile attacker that repositions aggressively around the player." },
         { name: "Brute", role: "Heavy", image: "brute.png", description: "Durable close-range unit with high pressure in short-to-mid range fights." },
         { name: "Shard Heavy", role: "Mini-Boss", image: "grunt heavy.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
@@ -2710,6 +2754,8 @@ window.onload = function () {
   stalkerImg.src = "stalker.png";
   const stalkerBossImg = new window.Image();
   stalkerBossImg.src = encodeURI("stalker boss.png");
+  const beamerBossImg = new window.Image();
+  beamerBossImg.src = encodeURI("Beamer boss .png");
   const beamerImg = new window.Image();
   beamerImg.src = "beamer.png";
   const shielderImg = new window.Image();
@@ -2840,6 +2886,7 @@ window.onload = function () {
     showMenuScreen = true;
     showMenu();
     window._bossMusicallyActive = false;
+    window._beamerBossMusicActive = false;
     stopBossMusic();
     stopLowHealthSound();
     fadeOutGameMusic(1200, () => {
@@ -2993,9 +3040,16 @@ window.onload = function () {
   // Burst interval in frames (higher = longer pause between bursts)
   let burstInterval = 120; // Increased for bigger cooldown
   const INTER_WAVE_DELAY_SECONDS = 8;
-  const VICTORY_WAVE = 40; // Set to desired victory wave (change for final version)
+  const FINAL_CAMPAIGN_WAVE = 45;
   let interWaveDelayTimer = 0;
   let interWavePending = false;
+  function triggerVictoryIfFinalWaveCleared() {
+    if (!window._victoryTriggered && !gameOver && wave > FINAL_CAMPAIGN_WAVE) {
+      window._victoryTriggered = true;
+      window._victoryTime = Date.now();
+    }
+    return !!window._victoryTriggered;
+  }
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
@@ -3040,6 +3094,8 @@ window.onload = function () {
   window.player = player;
 
   const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], slingerDrops = [], bruteDrops = [], protocolOrbs = [], particles = [], mines = [];
+  const protocolOrbSpawnQueue = [];
+  let protocolOrbSpawnTimer = 0;
   const enemyPool = [], projectilePool = [], particlePool = [];
 
   function clearPooledObject(obj) {
@@ -3148,6 +3204,61 @@ window.onload = function () {
     particle.type = type || "generic";
     particles.push(particle);
     return particle;
+  }
+
+  function spawnPlayerDeathSmoke(x, y, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+      const speed = 0.15 + Math.random() * 0.5;
+      const offsetX = (Math.random() - 0.5) * 18;
+      const offsetY = (Math.random() - 0.5) * 18;
+      const grey = Math.floor(80 + Math.random() * 100);
+      spawnParticle(
+        x + offsetX,
+        y + offsetY,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        60 + Math.random() * 90,
+        `rgba(${grey},${grey},${grey},0.55)`,
+        0.992 + Math.random() * 0.006,
+        6 + Math.random() * 18,
+        "playerSmoke"
+      );
+    }
+  }
+
+  function spawnPlayerDeathBurst(x, y, particleType = "playerDeath") {
+    for (let i = 0; i < 70; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.4 + Math.random() * 2.2;
+      const colors = ["#ff3c3c", "#ff8800", "#ffdd00", "#ffffff", "#ff4466"];
+      spawnParticle(
+        x,
+        y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        90 + Math.random() * 120,
+        colors[Math.floor(Math.random() * colors.length)],
+        0.97 + Math.random() * 0.025,
+        2 + Math.random() * 6,
+        particleType
+      );
+    }
+    for (let i = 0; i < 50; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.1 + Math.random() * 0.9;
+      spawnParticle(
+        x,
+        y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        150 + Math.random() * 180,
+        ["#ff6600", "#ff3300", "#ffaa00", "#ff2200"][Math.floor(Math.random() * 4)],
+        0.985 + Math.random() * 0.012,
+        2 + Math.random() * 8,
+        particleType
+      );
+    }
   }
 
   function releaseParticleAt(index) {
@@ -3537,6 +3648,7 @@ window.onload = function () {
         window._playerUsedContinue = false;
         followMouse = false;
         window._bossMusicallyActive = false;
+        window._beamerBossMusicActive = false;
         stopBossMusic();
         stopLowHealthSound();
         fadeOutGameMusic(1200, () => { playMenuMusic(); });
@@ -3564,6 +3676,7 @@ window.onload = function () {
         player.health = player.maxHealth;
         stopLowHealthSound();
         gameOver = false;
+        window._bossSoundsStoppedForEndState = false;
         window._gameOverTime = undefined;
         window._playerUsedContinue = true;
         window._playContinueReviveSound = true;
@@ -3780,6 +3893,8 @@ window.onload = function () {
       bruteDrops.length = 0;
       healthDrops.length = 0;
       protocolOrbs.length = 0;
+      protocolOrbSpawnQueue.length = 0;
+      protocolOrbSpawnTimer = 0;
     },
     applyStats,
     spawnWaveNow: (targetWave, previewOverride) => {
@@ -3794,6 +3909,7 @@ window.onload = function () {
       }
 
       gameOver = false;
+      window._bossSoundsStoppedForEndState = false;
       window._gameOverTime = undefined;
       window._playerUsedContinue = false;
       followMouse = false;
@@ -3834,6 +3950,14 @@ window.onload = function () {
   function tryDiscoverProtocolFromEnemy(enemyType, x, y, options = {}) {
     const forceDrop = !!(options && options.forceDrop);
     const forcedRarity = options && typeof options.rarity === "string" ? options.rarity : null;
+    const waveProgress = Number.isFinite(wave) ? Math.max(0, wave - 1) : 0;
+    const waveDropBonus = Math.min(0.15, waveProgress * 0.003);
+    const specialPoolBaseChance = Math.min(0.2, 0.05 + waveProgress * 0.0025);
+    const specialPoolEnemyMultipliers = {
+      stalker: 1.5,
+      shielder: 1.5,
+      beamer: 2
+    };
     const dropRules = {
       grunt: { chance: 0.08 },
       kamikaze: { chance: 0.1 },
@@ -3848,7 +3972,8 @@ window.onload = function () {
     };
 
     const rule = dropRules[enemyType] || { chance: 0.1 };
-    if (!forceDrop && Math.random() > rule.chance) return;
+    const dropChance = Math.min(1, rule.chance + waveDropBonus);
+    if (!forceDrop && Math.random() > dropChance) return;
 
     // Allow duplicates: protocols can drop even if another orb of the same protocol is already on-screen.
     const droppableProtocols = Object.keys(PROTOCOLS);
@@ -3865,9 +3990,21 @@ window.onload = function () {
 
     const chooseRandom = (pool) => pool[Math.floor(Math.random() * pool.length)];
 
+    const targetedPools = [
+      getPool("Common", ["Higher"]),
+      getPool("Rare", ["Lower"]),
+      getPool("Rare", ["Standard"])
+    ].filter(pool => pool.length > 0);
+    const specialPoolChance = Math.min(
+      0.3,
+      specialPoolBaseChance * (specialPoolEnemyMultipliers[enemyType] || 1)
+    );
+
     let pool = [];
     if (forcedRarity === "Rare" || forcedRarity === "Common") {
       pool = getPool(forcedRarity);
+    } else if (targetedPools.length > 0 && Math.random() < specialPoolChance) {
+      pool = chooseRandom(targetedPools);
     } else if (enemyType === "grunt") {
       // Common lower only
       pool = getPool("Common", ["Lower"]);
@@ -3912,7 +4049,11 @@ window.onload = function () {
       pool = getPool("Rare");
     }
 
-    if (pool.length === 0) pool = droppableProtocols;
+    if (pool.length === 0) {
+      if (forcedRarity) return;
+      pool = getPool("Common");
+    }
+    if (pool.length === 0) return;
 
     const droppedProtocol = chooseRandom(pool);
     if (!droppedProtocol) return;
@@ -3925,16 +4066,44 @@ window.onload = function () {
       rarity === "Rare"   && tier === "Lower"    ? 3.5 :
       rarity === "Common" && tier === "Higher"   ? 3 :
       rarity === "Common" && tier === "Standard" ? 2.5 : 2;
-    protocolOrbs.push({
-      x,
-      y,
-      radius: rarity === "Rare" ? 12 : 10,
+    const radius = rarity === "Rare" ? 12 : 10;
+    const spawnPosition = findProtocolOrbSpawnPosition(x, y, radius);
+    protocolOrbSpawnQueue.push({
+      ...spawnPosition,
+      radius,
       type: "protocolOrb",
       protocolName: droppedProtocol,
       rarity,
       requiredFrames: requiredSeconds * 60,
-      progressFrames: 0
+      progressFrames: 0,
+      spawnAge: 0
     });
+  }
+
+  function findProtocolOrbSpawnPosition(x, y, radius) {
+    const minX = Math.min(radius + 8, canvas.width / 2);
+    const maxX = Math.max(canvas.width - radius - 8, canvas.width / 2);
+    const minY = Math.min(radius + 8, canvas.height / 2);
+    const maxY = Math.max(canvas.height - radius - 8, canvas.height / 2);
+    const originX = Math.max(minX, Math.min(maxX, x));
+    const originY = Math.max(minY, Math.min(maxY, y));
+    const existingOrbs = protocolOrbs.concat(protocolOrbSpawnQueue);
+
+    for (let ring = 0; ring <= 12; ring++) {
+      const positionsInRing = ring === 0 ? 1 : ring * 12;
+      const distance = ring * (radius * 2 + 20);
+      for (let i = 0; i < positionsInRing; i++) {
+        const angle = (Math.PI * 2 * i) / positionsInRing;
+        const candidateX = Math.max(minX, Math.min(maxX, originX + Math.cos(angle) * distance));
+        const candidateY = Math.max(minY, Math.min(maxY, originY + Math.sin(angle) * distance));
+        const hasSpace = existingOrbs.every(orb =>
+          Math.hypot(candidateX - orb.x, candidateY - orb.y) >= radius + orb.radius + 20
+        );
+        if (hasSpace) return { x: candidateX, y: candidateY };
+      }
+    }
+
+    return { x: originX, y: originY };
   }
 
   function completeProtocolOrb(orb) {
@@ -4257,10 +4426,14 @@ window.onload = function () {
     mineExplosion: 0.25, // u_b32baquv5u-explosion-9-340460.mp3
     stalkerWarp: 0.6, // u_wzgyzo3pae-warp-306033.mp3
     bruteNova: 0.3, // djartmusic-short-fire-whoosh_1-317280.mp3
+    beamerBossBeam: 1.0, // looping Beamer Boss beam sound
+    beamerBossBeamStart: .15, // one-shot when the Beamer Boss beams start
+    beamerBossNova: 1, // yodguard-energy-beam-blast-4-482514.mp3
     kamikazeCharge: 0.15, // dragon-studio-fire-spell-impact-393921.mp3
     shielderShield: 0.6, // freesound_community-energy-90321.mp3
     beamerShot: 0.7, // freesound_community-beam-8-43831.mp3
     gameMusic: 0.5, // in-game playlist volume
+    beamerBossMusic: 0.5, // nickpanek-chiptune-hard-boss-mode-218071.mp3
     menuMusic: 0.4, // menu chiptune volume
     teleport: 0.7, // yodguard-energy-beam-blast-4-482514.mp3 (intro teleport)
     continueRevive: 0.5, // dragon-studio-lightning-spell-386163.mp3 (continue after first death)
@@ -4407,7 +4580,12 @@ window.onload = function () {
 
     let isAttackFrame = nearest && minDist < player.range + nearest.radius && player.attackCooldown <= 0 && followMouse;
     if (isAttackFrame) {
-      drawLine(player.x, player.y, nearest.x, nearest.y, "LightBlue");
+      const attackDx = nearest.x - player.x;
+      const attackDy = nearest.y - player.y;
+      const attackDist = Math.hypot(attackDx, attackDy) || 1;
+      const impactX = nearest.x - (attackDx / attackDist) * nearest.radius;
+      const impactY = nearest.y - (attackDy / attackDist) * nearest.radius;
+      drawLine(player.x, player.y, impactX, impactY, "LightBlue");
       const shieldReduction = Math.max(0, Math.min(0.8, Number(nearest.shieldReduction) || 0));
       nearest.health -= player.damage * (1 - shieldReduction);
 
@@ -4421,8 +4599,8 @@ window.onload = function () {
           "rgb(248, 144, 144)"
         ][Math.floor(Math.random() * 4)];
         spawnParticle(
-          nearest.x,
-          nearest.y,
+          impactX,
+          impactY,
           Math.cos(angle) * speed,
           Math.sin(angle) * speed,
           18 + Math.floor(Math.random() * 32),
@@ -4650,6 +4828,14 @@ const droplifelenght = 280;
   }
 
   function updateProtocolOrbs(delta) {
+    if (protocolOrbSpawnQueue.length > 0) {
+      protocolOrbSpawnTimer = Math.max(0, protocolOrbSpawnTimer - delta);
+      if (protocolOrbSpawnTimer === 0) {
+        protocolOrbs.push(protocolOrbSpawnQueue.shift());
+        protocolOrbSpawnTimer = protocolOrbSpawnQueue.length > 0 ? 0.5 : 0;
+      }
+    }
+
     const regressRate = 0.35;
     const pickupMod = (typeof ProtocolSystem !== "undefined" && ProtocolSystem.getStatMods)
       ? (ProtocolSystem.getStatMods().Pickup || 0)
@@ -4659,6 +4845,7 @@ const droplifelenght = 280;
 
     for (let i = protocolOrbs.length - 1; i >= 0; i--) {
       const orb = protocolOrbs[i];
+      orb.spawnAge = Math.min(0.28, (orb.spawnAge || 0) + delta);
       const distToPlayer = Math.hypot(player.x - orb.x, player.y - orb.y);
       if (distToPlayer <= player.pickupRadius) {
         orb.progressFrames = Math.min(orb.requiredFrames, orb.progressFrames + (delta * SPEED_MULTIPLIER * pickupCaptureRate));
@@ -5719,6 +5906,7 @@ const droplifelenght = 280;
   
 
   function restartGame() {
+    window._bossSoundsStoppedForEndState = false;
       waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
     Object.assign(player, {
       x: 500, y: 430, health: 10, attackCooldown: 0,
@@ -5772,6 +5960,8 @@ const droplifelenght = 280;
     slingerDrops.length = 0;
     bruteDrops.length = 0;
     protocolOrbs.length = 0;
+    protocolOrbSpawnQueue.length = 0;
+    protocolOrbSpawnTimer = 0;
     particles.length = 0;
     projectiles.length = 0;
     mines.length = 0;
@@ -6128,7 +6318,7 @@ const droplifelenght = 280;
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
           if (e.health <= 0) {
-            const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "brute", "shielder"].includes(e.type);
+            const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss", "brute", "shielder"].includes(e.type);
             playSoundFresh(
               isBossType ? 'lumora_studios-pixel-explosion-319166.mp3' : 'freesound_community-8-bit-explosion-95847.mp3',
               (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5
@@ -6157,43 +6347,20 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
-              // Don't drop XP if wave end condition is "boss"
-              const isBossWaveEndCondition1 = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
-              // Drop the same rewards for all boss types (rare + 2 common protocols, plus 25 XP drops)
-              if (!(e.noLoot || e.noXP) && !isBossWaveEndCondition1) {
-                tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
-                for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
-                  const spread = 16;
-                  tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
-                    forceDrop: true,
-                    rarity: "Common"
-                  });
-                }
-                for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
-                  const xpAngle = Math.random() * Math.PI * 2;
-                  const xpDist = 14 + Math.random() * 34;
-                  xpDrops.push({
-                    x: e.x + Math.cos(xpAngle) * xpDist,
-                    y: e.y + Math.sin(xpAngle) * xpDist
-                  });
-                }
-              }
               // Boss-gated waves use direct completion; other waves use standard burst progression
               if (wave === 5) {
                 unlockWave(5);
                 wave++;
                 runWavesCleared++;
-                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-                  window._victoryTriggered = true;
-                  window._victoryTime = Date.now();
+                if (!triggerVictoryIfFinalWaveCleared()) {
+                  try {
+                    let warnAudio = new Audio('warning.wav');
+                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                    warnAudio.playbackRate = 0.7;
+                    warnAudio.play();
+                  } catch (e) {}
+                  spawnWave();
                 }
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
               }
             } else if (e.type === "gruntBossMinor") {
               // Grunt boss minor is not a true boss; keep its special death visuals + small XP payout
@@ -6266,17 +6433,15 @@ const droplifelenght = 280;
                 unlockWave(25);
                 wave++;
                 runWavesCleared++;
-                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-                  window._victoryTriggered = true;
-                  window._victoryTime = Date.now();
+                if (!triggerVictoryIfFinalWaveCleared()) {
+                  try {
+                    let warnAudio = new Audio('warning.wav');
+                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                    warnAudio.playbackRate = 0.7;
+                    warnAudio.play();
+                  } catch (e) {}
+                  spawnWave();
                 }
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
               }
             } else if (e.type === "stalker") {
               const stalkerPalette = ["#57e7ff", "#7fdfff", "#a7f3ff", "#3ec6ff"];
@@ -6320,43 +6485,50 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
-              if (!(e.noLoot || e.noXP)) {
-                const isBossWaveEndConditionStalker = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
-                if (!isBossWaveEndConditionStalker) {
-                  tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
-                  for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
-                    const spread = 16;
-                    tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
-                      forceDrop: true,
-                      rarity: "Common"
-                    });
-                  }
-                  for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
-                    const xpAngle = Math.random() * Math.PI * 2;
-                    const xpDist = 14 + Math.random() * 34;
-                    xpDrops.push({
-                      x: e.x + Math.cos(xpAngle) * xpDist,
-                      y: e.y + Math.sin(xpAngle) * xpDist
-                    });
-                  }
-                }
-              }
               // Wave 35 boss gate
               if (wave === 35) {
                 unlockWave(35);
                 wave++;
                 runWavesCleared++;
-                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-                  window._victoryTriggered = true;
-                  window._victoryTime = Date.now();
+                if (!triggerVictoryIfFinalWaveCleared()) {
+                  try {
+                    let warnAudio = new Audio('warning.wav');
+                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                    warnAudio.playbackRate = 0.7;
+                    warnAudio.play();
+                  } catch (e) {}
+                  spawnWave();
                 }
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
+              }
+            } else if (e.type === "beamerBoss") {
+              const deathPalette = ["#00bfff", "#69eaff", "#d4f7ff", "#ffffff"];
+              const beamCount = Math.max(2, e.beamerBossSpinBeamCount || 8);
+              const beamAngle = typeof e.beamerBossSpinAngle === "number" ? e.beamerBossSpinAngle : 0;
+              if (e.beamerBossBeamAudio) {
+                e.beamerBossBeamAudio.pause();
+                e.beamerBossBeamAudio.currentTime = 0;
+                e.beamerBossBeamAudio = null;
+              }
+              spawnPlayerDeathSmoke(e.x, e.y, 8);
+              spawnPlayerDeathBurst(e.x, e.y, "enemyDeath");
+              for (let beamIndex = 0; beamIndex < beamCount; beamIndex++) {
+                const angle = beamAngle + (Math.PI * 2 * beamIndex) / beamCount;
+                for (let segment = 0; segment < 8; segment++) {
+                  const distance = e.radius + segment * 7;
+                  const speed = 2.5 + Math.random() * 2;
+                  const color = deathPalette[Math.floor(Math.random() * deathPalette.length)];
+                  spawnParticle(
+                    e.x + Math.cos(angle) * distance,
+                    e.y + Math.sin(angle) * distance,
+                    Math.cos(angle) * speed,
+                    Math.sin(angle) * speed,
+                    36 + Math.random() * 24,
+                    color,
+                    0.9 + Math.random() * 0.05,
+                    3 + Math.random() * 3,
+                    "enemyDeath"
+                  );
+                }
               }
             } else if (e.type === "shielder") {
               // Shielder death nova — expanding cyan/teal ring + scatter burst, similar to player game start
@@ -6426,24 +6598,33 @@ const droplifelenght = 280;
               }
             }
             if (!(e.noLoot || e.noXP)) {
-              const isBoss = ["gruntBoss", "bruteBoss", "slingerBoss", "stalkerBoss"].includes(e.type);
+              const isBoss = ["gruntBoss", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss"].includes(e.type);
               if (isBoss) {
-                // Bosses always drop 1 rare + 2 common protocols, plus 25 XP drops.
-                tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
+                // Bosses always drop 2 rare + 3 common protocols.
                 for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
+                  const spread = 16;
+                  tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
+                    forceDrop: true,
+                    rarity: "Rare"
+                  });
+                }
+                for (let dropIndex = 0; dropIndex < 3; dropIndex++) {
                   const spread = 16;
                   tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
                     forceDrop: true,
                     rarity: "Common"
                   });
                 }
-                for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
-                  const xpAngle = Math.random() * Math.PI * 2;
-                  const xpDist = 14 + Math.random() * 34;
-                  xpDrops.push({
-                    x: e.x + Math.cos(xpAngle) * xpDist,
-                    y: e.y + Math.sin(xpAngle) * xpDist
-                  });
+                const isBossWaveEndCondition = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+                if (!isBossWaveEndCondition) {
+                  for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                    const xpAngle = Math.random() * Math.PI * 2;
+                    const xpDist = 14 + Math.random() * 34;
+                    xpDrops.push({
+                      x: e.x + Math.cos(xpAngle) * xpDist,
+                      y: e.y + Math.sin(xpAngle) * xpDist
+                    });
+                  }
                 }
               } else {
                 tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
@@ -6769,6 +6950,374 @@ const droplifelenght = 280;
           e.shielderAlpha = Math.min(1, e.shielderAlpha + (0.035 * delta * SPEED_MULTIPLIER));
           continue;
         }
+        if (e.type === "beamerBoss") {
+          const step = delta * SPEED_MULTIPLIER;
+          const beamAudioVolume = window.sentinelVolume && window.sentinelVolume.beamerBossBeam !== undefined
+            ? window.sentinelVolume.beamerBossBeam
+            : 1;
+          const beamStartAudioVolume = window.sentinelVolume && window.sentinelVolume.beamerBossBeamStart !== undefined
+            ? window.sentinelVolume.beamerBossBeamStart
+            : 1;
+          const stopBeamAudio = () => {
+            if (!e.beamerBossBeamAudio) return;
+            e.beamerBossBeamAudio.pause();
+            e.beamerBossBeamAudio.currentTime = 0;
+            e.beamerBossBeamAudio = null;
+          };
+          const beamLength = typeof e.beamerBossBeamLength === "number"
+            ? e.beamerBossBeamLength
+            : Math.hypot(canvas.width, canvas.height) + 120;
+          const emitterOffset = e.radius * 1.8;
+          const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
+          const distanceToSegment = (x1, y1, x2, y2) => {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const lengthSquared = dx * dx + dy * dy;
+            if (lengthSquared === 0) return Math.hypot(player.x - x1, player.y - y1);
+            const t = Math.max(0, Math.min(1, ((player.x - x1) * dx + (player.y - y1) * dy) / lengthSquared));
+            return Math.hypot(player.x - (x1 + dx * t), player.y - (y1 + dy * t));
+          };
+          const damagePlayer = amount => {
+            if (!window.godMode) {
+              player.health -= amount;
+              runHealthLost += amount;
+              playPlayerHitSound();
+            }
+          };
+          e.beamerBossContactDamageTimer = Math.max(
+            0,
+            (typeof e.beamerBossContactDamageTimer === "number" ? e.beamerBossContactDamageTimer : 0) - step
+          );
+          const contactDistance = Math.hypot(player.x - e.x, player.y - e.y);
+          if (contactDistance < e.radius + player.radius && e.beamerBossContactDamageTimer <= 0) {
+            damagePlayer(e.damage);
+            e.beamerBossContactDamageTimer = 60;
+          }
+          const randomizeNovaGapOffset = () => {
+            const fullTurn = Math.PI * 2;
+            const gapCount = Math.max(1, e.beamerBossNovaGapCount || 8);
+            const sectorAngle = fullTurn / gapCount;
+            if (!e.beamerBossNovaGapHasPrevious) {
+              e.beamerBossNovaGapOffset = Math.random() * fullTurn;
+              e.beamerBossNovaGapHasPrevious = true;
+              return;
+            }
+            let candidateOffset;
+            let sectorDelta;
+            do {
+              candidateOffset = Math.random() * fullTurn;
+              sectorDelta = ((candidateOffset - e.beamerBossNovaGapOffset) % sectorAngle + sectorAngle) % sectorAngle;
+              sectorDelta = Math.min(sectorDelta, sectorAngle - sectorDelta);
+            } while (sectorDelta < sectorAngle * 0.3);
+            e.beamerBossNovaGapOffset = candidateOffset;
+          };
+
+          const healthRatio = e.maxHealth > 0 ? e.health / e.maxHealth : 1;
+          const healthPhase = healthRatio <= 0.2 ? 4 : healthRatio <= 0.33 ? 3 : healthRatio <= 0.67 ? 2 : 1;
+          const spinBeamCount = healthPhase === 1 ? 2 : healthPhase === 2 ? 4 : 8;
+          e.beamerBossNovaArcFraction = Math.min(0.86, 0.68 + (healthPhase - 1) * 0.06);
+          const phaseSmokeCount = Math.max(0, healthPhase - 1);
+          const phaseSmokeInterval = healthPhase === 2 ? 90 : healthPhase === 3 ? 60 : 30;
+          const previousHealthPhase = e.beamerBossHealthPhase;
+          if (typeof previousHealthPhase === "number" && healthPhase > previousHealthPhase) {
+            e.beamerBossPhaseEffectStage = "smoke";
+            e.beamerBossPhaseEffectTimer = 12;
+            e.beamerBossPhaseEffectSmokeCount = phaseSmokeCount;
+            e.beamerBossPhaseEffectX = e.x;
+            e.beamerBossPhaseEffectY = e.y;
+            e.beamerBossStunTimer = e.beamerBossStunDuration || 180;
+            e.beamerBossContinuousSmokeTimer = phaseSmokeInterval;
+            e.beamerBossPhase = "stunned";
+            e.beamerBossSpinTimer = 600;
+            e.beamerBossBeamTickTimer = 0;
+            e.beamerBossSpinBeamReach = 0;
+            e.beamerBossAimShotsRemaining = 0;
+            e.beamerBossNovaBurstsRemaining = 0;
+            e.beamerBossChargeTimer = 0;
+            e.beamerBossNovaChargeTimer = 0;
+            e.beamerBossNovaRadius = 0;
+            e.beamerBossNovaPreviousRadius = 0;
+            playSoundFresh("sparky_laser.wav", (window.sentinelVolume && window.sentinelVolume.laser) || 0.3);
+            for (let i = 0; i < 12; i++) {
+              const angle = Math.random() * Math.PI * 2;
+              const speed = 0.8 + Math.random() * 2;
+              const color = ["#8deaff", "#c9f8ff", "#ffffff"][Math.floor(Math.random() * 3)];
+              spawnParticle(
+                e.x,
+                e.y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                8 + Math.random() * 12,
+                color,
+                0.88,
+                1.5 + Math.random() * 2,
+                "enemyHit"
+              );
+            }
+          }
+          e.beamerBossHealthPhase = healthPhase;
+          e.beamerBossSpinBeamCount = spinBeamCount;
+          if (e.beamerBossPhase !== "spin") stopBeamAudio();
+          if (e.beamerBossPhaseEffectStage === "smoke" || e.beamerBossPhaseEffectStage === "deathBurst") {
+            e.beamerBossPhaseEffectTimer -= step;
+            if (e.beamerBossPhaseEffectTimer <= 0) {
+              if (e.beamerBossPhaseEffectStage === "smoke") {
+                spawnPlayerDeathSmoke(e.beamerBossPhaseEffectX, e.beamerBossPhaseEffectY, e.beamerBossPhaseEffectSmokeCount);
+                e.beamerBossPhaseEffectStage = "deathBurst";
+                e.beamerBossPhaseEffectTimer = 10;
+              } else {
+                playSoundFresh('lumora_studios-pixel-explosion-319166.mp3', (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5);
+                spawnPlayerDeathBurst(e.beamerBossPhaseEffectX, e.beamerBossPhaseEffectY, "enemyHit");
+                e.beamerBossPhaseEffectStage = null;
+                e.beamerBossPhaseEffectTimer = 0;
+              }
+            }
+          }
+          if (healthPhase >= 2) {
+            e.beamerBossContinuousSmokeTimer = (typeof e.beamerBossContinuousSmokeTimer === "number"
+              ? e.beamerBossContinuousSmokeTimer
+              : phaseSmokeInterval) - step;
+            if (e.beamerBossContinuousSmokeTimer <= 0) {
+              spawnPlayerDeathSmoke(e.x, e.y, phaseSmokeCount);
+              e.beamerBossContinuousSmokeTimer = phaseSmokeInterval;
+            }
+          } else {
+            e.beamerBossContinuousSmokeTimer = 0;
+          }
+          if (e.beamerBossStunTimer > 0) {
+            e.beamerBossStunTimer = Math.max(0, e.beamerBossStunTimer - step);
+            if (e.beamerBossStunTimer > 0) {
+              e.beamerBossPhase = "stunned";
+              continue;
+            }
+            e.beamerBossSpinAngle = typeof e.beamerBossFacingAngle === "number"
+              ? e.beamerBossFacingAngle
+              : e.beamerBossSpinAngle;
+            e.beamerBossPhase = "spinCharge";
+            e.beamerBossSpinChargeTimer = e.beamerBossSpinChargeDuration || 60;
+            e.beamerBossSpinTimer = 600;
+            e.beamerBossBeamTickTimer = 0;
+            e.beamerBossSpinBeamReach = 0;
+          }
+          const beginTransition = (nextPhase, duration = 36) => {
+            e.beamerBossPhase = "transition";
+            e.beamerBossNextPhase = nextPhase;
+            e.beamerBossTransitionTimer = duration;
+          };
+
+          if (e.beamerBossEntering !== false) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const centerDx = centerX - e.x;
+            const centerDy = centerY - e.y;
+            const centerDistance = Math.hypot(centerDx, centerDy);
+            const arrivalThreshold = Math.max(12, e.radius * 0.7);
+            if (centerDistance > arrivalThreshold && centerDistance > 0) {
+              const entrySpeed = typeof e.beamerBossEntrySpeed === "number" ? e.beamerBossEntrySpeed : e.speed * 2.1;
+              e.x += (centerDx / centerDistance) * entrySpeed * step;
+              e.y += (centerDy / centerDistance) * entrySpeed * step;
+              e.beamerBossFacingAngle = Math.atan2(centerDy, centerDx);
+            }
+            if (centerDistance <= arrivalThreshold) {
+              e.x = centerX;
+              e.y = centerY;
+              e.beamerBossEntering = false;
+              beginTransition("spin", 48);
+            }
+          } else if (e.beamerBossPhase === "transition") {
+            e.beamerBossTransitionTimer -= step;
+            e.beamerBossFacingAngle = angleToPlayer;
+            if (e.beamerBossTransitionTimer <= 0) {
+              e.beamerBossPhase = e.beamerBossNextPhase;
+              if (e.beamerBossPhase === "spin") {
+                e.beamerBossPhase = "spinCharge";
+                e.beamerBossSpinAngle = e.beamerBossFacingAngle;
+                e.beamerBossSpinChargeTimer = e.beamerBossSpinChargeDuration || 60;
+                e.beamerBossSpinTimer = 600;
+                e.beamerBossBeamTickTimer = 0;
+                e.beamerBossSpinBeamReach = 0;
+              } else if (e.beamerBossPhase === "aimCharge") {
+                e.beamerBossChargeDuration = 75 - (healthPhase - 1) * 15;
+                e.beamerBossChargeTimer = e.beamerBossChargeDuration;
+                e.beamerBossAimAngle = angleToPlayer;
+                playSoundFresh("freesound_community-057967_power-charge-88127.mp3", 0.6);
+              } else if (e.beamerBossPhase === "novaCharge") {
+                e.beamerBossNovaChargeDuration = 150 - (healthPhase - 1) * 30;
+                e.beamerBossNovaChargeTimer = e.beamerBossNovaChargeDuration;
+                e.beamerBossNovaRadius = 0;
+                e.beamerBossNovaPreviousRadius = 0;
+                e.beamerBossNovaHitPlayer = false;
+                randomizeNovaGapOffset();
+                playSoundFresh(
+                  'yodguard-energy-beam-blast-4-482514.mp3',
+                  window.sentinelVolume && window.sentinelVolume.beamerBossNova !== undefined
+                    ? window.sentinelVolume.beamerBossNova
+                    : 0.3
+                );
+              }
+            }
+          } else if (e.beamerBossPhase === "spinCharge") {
+            const spinSpeedMultiplier = healthPhase >= 4 ? 1.25 : 1;
+            e.beamerBossSpinAngle += 0.0065 * 0.35 * spinSpeedMultiplier * step;
+            e.beamerBossFacingAngle = e.beamerBossSpinAngle;
+            e.beamerBossSpinChargeTimer -= step;
+            if (e.beamerBossSpinChargeTimer <= 0) {
+              e.beamerBossPhase = "spin";
+              e.beamerBossBeamTickTimer = 0;
+              e.beamerBossSpinBeamReach = 0;
+              playSoundFresh("freesound_community-rikochet-v1-light-2-47347.mp3", beamStartAudioVolume);
+            }
+          } else if (e.beamerBossPhase === "spin") {
+            if (!e.beamerBossBeamAudio || e.beamerBossBeamAudio.paused) {
+              e.beamerBossBeamAudio = playSound(BEAMER_BOSS_BEAM_SOUND_FILE, beamAudioVolume, true);
+            }
+            e.beamerBossSpinTimer -= step;
+            const spinSpeedMultiplier = healthPhase >= 4 ? 1.25 : 1;
+            e.beamerBossSpinAngle += 0.0065 * spinSpeedMultiplier * step;
+            e.beamerBossFacingAngle = e.beamerBossSpinAngle;
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            if (typeof e.beamerBossOrbitAngle === "number" && typeof e.beamerBossOrbitRadius === "number") {
+              e.beamerBossOrbitAngle += 0.0025 * spinSpeedMultiplier * step;
+              const orbitTargetX = centerX + Math.cos(e.beamerBossOrbitAngle) * e.beamerBossOrbitRadius;
+              const orbitTargetY = centerY + Math.sin(e.beamerBossOrbitAngle) * e.beamerBossOrbitRadius;
+              const orbitDx = orbitTargetX - e.x;
+              const orbitDy = orbitTargetY - e.y;
+              const orbitDistance = Math.hypot(orbitDx, orbitDy);
+              const moveDistance = Math.min(orbitDistance, e.speed * step);
+              if (orbitDistance > 0) {
+                e.x += (orbitDx / orbitDistance) * moveDistance;
+                e.y += (orbitDy / orbitDistance) * moveDistance;
+              }
+            }
+
+            const beamExtendSpeed = typeof e.beamerBossSpinBeamExtendSpeed === "number"
+              ? e.beamerBossSpinBeamExtendSpeed
+              : beamLength / 240;
+            const currentBeamReach = typeof e.beamerBossSpinBeamReach === "number" ? e.beamerBossSpinBeamReach : 0;
+            e.beamerBossSpinBeamReach = Math.min(beamLength, currentBeamReach + beamExtendSpeed * step);
+            const spinBeamReach = Math.max(emitterOffset, e.beamerBossSpinBeamReach);
+            e.beamerBossBeamTickTimer -= step;
+            if (e.beamerBossBeamTickTimer <= 0) {
+              let hitBySpinBeam = false;
+              for (let beamIndex = 0; beamIndex < spinBeamCount; beamIndex++) {
+                const beamAngle = e.beamerBossSpinAngle + (Math.PI * 2 * beamIndex) / spinBeamCount;
+                const beamX = Math.cos(beamAngle);
+                const beamY = Math.sin(beamAngle);
+                const startX = e.x + beamX * emitterOffset;
+                const startY = e.y + beamY * emitterOffset;
+                const endX = e.x + beamX * spinBeamReach;
+                const endY = e.y + beamY * spinBeamReach;
+                if (distanceToSegment(startX, startY, endX, endY) <= player.radius + 8) {
+                  hitBySpinBeam = true;
+                  break;
+                }
+              }
+              if (hitBySpinBeam) {
+                damagePlayer(e.beamerBossBeamDamage);
+              }
+              e.beamerBossBeamTickTimer = 10;
+            }
+            if (e.beamerBossSpinTimer <= 0) {
+              e.beamerBossAimShotsRemaining = healthPhase;
+              e.beamerBossAimShotsPerVolley = healthPhase;
+              beginTransition("aimCharge");
+            }
+          } else if (e.beamerBossPhase === "aimCharge") {
+            e.beamerBossAimAngle = angleToPlayer;
+            e.beamerBossFacingAngle = e.beamerBossAimAngle;
+            e.beamerBossChargeTimer -= step;
+            if (e.beamerBossChargeTimer <= 0) {
+              e.beamerBossPhase = "fire";
+              e.beamerBossShotAngle = e.beamerBossAimAngle;
+              e.beamerBossShotHead = 0;
+              e.beamerBossShotTail = 0;
+              e.beamerBossShotTickTimer = 0;
+              playSoundFresh("freesound_community-beam-8-43831.mp3", (window.sentinelVolume && window.sentinelVolume.beamerShot) || 0.7);
+            }
+          } else if (e.beamerBossPhase === "fire") {
+            const shotAngle = e.beamerBossShotAngle;
+            e.beamerBossFacingAngle = shotAngle;
+            e.beamerBossShotHead += e.beamerBossShotSpeed * step;
+            e.beamerBossShotTail = Math.max(0, e.beamerBossShotHead - e.beamerBossShotSegmentLength);
+            e.beamerBossShotTickTimer -= step;
+
+            if (e.beamerBossShotTickTimer <= 0) {
+              const shotX = Math.cos(shotAngle);
+              const shotY = Math.sin(shotAngle);
+              const shotStartDistance = emitterOffset + e.beamerBossShotTail;
+              const shotEndDistance = emitterOffset + e.beamerBossShotHead;
+              const shotStartX = e.x + shotX * shotStartDistance;
+              const shotStartY = e.y + shotY * shotStartDistance;
+              const shotEndX = e.x + shotX * shotEndDistance;
+              const shotEndY = e.y + shotY * shotEndDistance;
+              if (distanceToSegment(shotStartX, shotStartY, shotEndX, shotEndY) <= player.radius + 8) {
+                damagePlayer(e.beamerBossShotDamage);
+              }
+              e.beamerBossShotTickTimer = 10;
+            }
+
+            if (e.beamerBossShotTail >= beamLength) {
+              e.beamerBossAimShotsRemaining = Math.max(0, e.beamerBossAimShotsRemaining - 1);
+              if (e.beamerBossAimShotsRemaining > 0) {
+                beginTransition("aimCharge", 24);
+              } else {
+                e.beamerBossNovaBurstsPerSequence = healthPhase;
+                e.beamerBossNovaBurstsRemaining = e.beamerBossNovaBurstsPerSequence;
+                beginTransition("novaCharge", 36);
+              }
+            }
+          } else if (e.beamerBossPhase === "novaCharge") {
+            e.beamerBossFacingAngle = angleToPlayer;
+            e.beamerBossNovaChargeTimer -= step;
+            if (e.beamerBossNovaChargeTimer <= 0) {
+              e.beamerBossPhase = "nova";
+              e.beamerBossNovaRadius = 0;
+              e.beamerBossNovaPreviousRadius = 0;
+              e.beamerBossNovaHitPlayer = false;
+            }
+          } else if (e.beamerBossPhase === "nova") {
+            const maxRadius = typeof e.beamerBossNovaMaxRadius === "number"
+              ? e.beamerBossNovaMaxRadius
+              : Math.hypot(canvas.width, canvas.height);
+            e.beamerBossNovaPreviousRadius = e.beamerBossNovaRadius;
+            e.beamerBossNovaRadius = Math.min(maxRadius, e.beamerBossNovaRadius + 8 * step);
+            const playerDistance = Math.hypot(player.x - e.x, player.y - e.y);
+            const gapCount = Math.max(1, e.beamerBossNovaGapCount || 8);
+            const sectorAngle = (Math.PI * 2) / gapCount;
+            const playerAngle = Math.atan2(player.y - e.y, player.x - e.x);
+            const normalizedAngle = ((playerAngle - e.beamerBossNovaGapOffset) % (Math.PI * 2) + (Math.PI * 2)) % (Math.PI * 2);
+            const withinSectorAngle = normalizedAngle % sectorAngle;
+            const arcLength = sectorAngle * (e.beamerBossNovaArcFraction || 0.68);
+            const gapHalfWidth = (sectorAngle - arcLength) / 2;
+            const gapCenterDistance = Math.abs(withinSectorAngle - (arcLength + gapHalfWidth));
+            const playerAngularRadius = playerDistance <= player.radius + 4
+              ? Math.PI
+              : Math.asin(Math.min(1, (player.radius + 4) / playerDistance));
+            const insideNovaArc = gapCenterDistance + playerAngularRadius >= gapHalfWidth;
+            if (
+              !e.beamerBossNovaHitPlayer &&
+              insideNovaArc &&
+              playerDistance + player.radius >= e.beamerBossNovaPreviousRadius &&
+              playerDistance - player.radius <= e.beamerBossNovaRadius
+            ) {
+              damagePlayer(e.damage * 2);
+              e.beamerBossNovaHitPlayer = true;
+            }
+            if (e.beamerBossNovaRadius >= maxRadius) {
+              e.beamerBossNovaBurstsRemaining = Math.max(0, e.beamerBossNovaBurstsRemaining - 1);
+              beginTransition(e.beamerBossNovaBurstsRemaining > 0 ? "novaCharge" : "spin", e.beamerBossNovaBurstsRemaining > 0 ? 24 : 36);
+            }
+          }
+
+          if (e.beamerBossEntering === false) {
+            e.x = Math.max(110, Math.min(canvas.width - 110, e.x));
+            e.y = Math.max(110, Math.min(canvas.height - 110, e.y));
+          }
+          continue;
+        }
+
         if (e.type === "beamer") {
           if (typeof e.beamCooldown !== "number") e.beamCooldown = 110 + Math.floor(Math.random() * 70);
           if (typeof e.beamCastTimer !== "number") e.beamCastTimer = 0;
@@ -7994,12 +8543,30 @@ const droplifelenght = 280;
         // ---- Boss music polling ----
         // True bosses are the gated bosses that define boss waves
         const BOSS_MUSIC_TYPES = ['gruntBoss', 'bruteBoss', 'slingerBoss', 'stalkerBoss'];
-        const hasBossEnemy = enemies.some(en => BOSS_MUSIC_TYPES.includes(en.type) && en.health > 0);
-        if (hasBossEnemy && !window._bossMusicallyActive) {
+        const hasBeamerBoss = enemies.some(en => en.type === 'beamerBoss' && en.health > 0);
+        const hasOtherBossEnemy = enemies.some(en => BOSS_MUSIC_TYPES.includes(en.type) && en.health > 0);
+        if (hasBeamerBoss) {
+          if (!window._beamerBossMusicActive) {
+            window._beamerBossMusicActive = true;
+            window._bossMusicallyActive = true;
+            stopGameMusic();
+            stopBossMusic();
+            playBossMusic(
+              BEAMER_BOSS_MUSIC_FILE,
+              window.sentinelVolume && window.sentinelVolume.beamerBossMusic !== undefined
+                ? window.sentinelVolume.beamerBossMusic
+                : 0.45
+            );
+          }
+        } else if (window._beamerBossMusicActive) {
+          window._beamerBossMusicActive = false;
+          window._bossMusicallyActive = false;
+          stopAllMusic();
+        } else if (hasOtherBossEnemy && !window._bossMusicallyActive) {
           window._bossMusicallyActive = true;
-          // Pause game music immediately, then start boss music
+          // Pause game music immediately, then start the standard boss music
           _silenceGameMusicForBoss(() => { playBossMusic(); });
-        } else if (!hasBossEnemy && window._bossMusicallyActive) {
+        } else if (!hasOtherBossEnemy && window._bossMusicallyActive) {
           window._bossMusicallyActive = false;
           // Fade out boss music, then resume game music
           fadeOutBossMusic(1000, () => { _restoreGameMusicFromBoss(800); });
@@ -8054,20 +8621,19 @@ const droplifelenght = 280;
             interWaveDelayTimer = 0;
             wave++;
             runWavesCleared++;
-            if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-              window._victoryTriggered = true;
-              window._victoryTime = Date.now();
-            }
+            triggerVictoryIfFinalWaveCleared();
             // Auto-unlock the next wave for future runs (for waves 1-50)
-            if (wave <= 50 && typeof unlockWave === "function") {
+            if (!window._victoryTriggered && wave <= FINAL_CAMPAIGN_WAVE && typeof unlockWave === "function") {
               unlockWave(wave);
             }
             
-            try {
-              playSound('warning.wav', window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0);
-            } catch (e) {}
-            spawnWave();
-            burstTimer = burstInterval;
+            if (!window._victoryTriggered) {
+              try {
+                playSound('warning.wav', window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0);
+              } catch (e) {}
+              spawnWave();
+              burstTimer = burstInterval;
+            }
           }
         } else {
           interWavePending = false;
@@ -8136,13 +8702,20 @@ const droplifelenght = 280;
 
       // Protocol orb glow (attackable discovery drops)
       protocolOrbs.forEach(orb => {
-        const pulse = 0.85 + Math.sin(Date.now() * 0.008) * 0.15;
+        const now = Date.now();
+        const pulse = 0.85 + Math.sin(now * 0.008) * 0.15;
+        const spawnProgress = Math.min(1, (orb.spawnAge || 0) / 0.28);
+        const spawnEase = 1 - Math.pow(1 - spawnProgress, 3);
+        const popScale = spawnProgress < 1
+          ? 0.25 + 0.75 * spawnEase + Math.sin(spawnProgress * Math.PI) * 0.12
+          : 1;
+        const popAlpha = 0.35 + 0.65 * spawnEase;
         const progress = orb.requiredFrames > 0 ? Math.min(1, orb.progressFrames / orb.requiredFrames) : 0;
-        const coreRadius = orb.radius * pulse;
-        const outerRadius = orb.radius * (1.9 + progress * 0.5);
+        const coreRadius = orb.radius * pulse * popScale;
         const _orbTier = (PROTOCOLS[orb.protocolName] && PROTOCOLS[orb.protocolName].tier) || "Standard";
         const coreColor = getProtocolRarityColor(orb.rarity, _orbTier);
         const edgeColor = getProtocolRarityEdgeColor(orb.rarity, _orbTier);
+        const outerRadius = orb.radius * (1.9 + progress * 0.5) * popScale;
 
         ctx.save();
         ctx.shadowColor = coreColor;
@@ -8154,13 +8727,23 @@ const droplifelenght = 280;
         ctx.beginPath();
         ctx.arc(orb.x, orb.y, outerRadius, 0, Math.PI * 2);
         ctx.fillStyle = grad;
+        ctx.globalAlpha = popAlpha;
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(orb.x, orb.y, coreRadius, 0, Math.PI * 2);
         ctx.fillStyle = coreColor;
-        ctx.globalAlpha = 0.75;
+        ctx.globalAlpha = 0.75 * popAlpha;
         ctx.fill();
+
+        if (spawnProgress < 1) {
+          ctx.globalAlpha = (1 - spawnProgress) * 0.7;
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = coreColor;
+          ctx.beginPath();
+          ctx.arc(orb.x, orb.y, orb.radius * (1 + spawnProgress * 1.8), 0, Math.PI * 2);
+          ctx.stroke();
+        }
 
         // Progress ring while attacking over time
         ctx.globalAlpha = 1;
@@ -8606,11 +9189,13 @@ const droplifelenght = 280;
 
       enemies.forEach(e => {
                 // Draw boss health bar above boss
-                if (e.type === "gruntBoss" || e.type === "bruteBoss" || e.type === "slingerBoss" || e.type === "stalkerBoss") {
+                if (e.type === "gruntBoss" || e.type === "bruteBoss" || e.type === "slingerBoss" || e.type === "stalkerBoss" || e.type === "beamerBoss") {
                   const barWidth = 80;
                   const barHeight = 8;
                   const barX = e.x - barWidth / 2;
-                  const barY = e.y - e.radius - 24;
+                  const barY = e.type === "beamerBoss"
+                    ? e.y - e.radius * 2.1 - 34
+                    : e.y - e.radius - 24;
                   if (typeof e.maxHealth !== "number" || e.maxHealth < e.health) {
                     e.maxHealth = Math.max(1, e.health);
                   }
@@ -8619,7 +9204,7 @@ const droplifelenght = 280;
                   ctx.globalAlpha = 0.92;
                   ctx.lineWidth = 3;
                   ctx.strokeStyle = "#222";
-                  ctx.fillStyle = e.type === "bruteBoss" ? "#ff6a00" : (e.type === "slingerBoss" ? "#ff9f1a" : "#e00000");
+                  ctx.fillStyle = e.type === "beamerBoss" ? "#27dfff" : (e.type === "bruteBoss" ? "#ff6a00" : (e.type === "slingerBoss" ? "#ff9f1a" : "#e00000"));
                   ctx.beginPath();
                   ctx.rect(barX, barY, barWidth, barHeight);
                   ctx.stroke();
@@ -8631,7 +9216,7 @@ const droplifelenght = 280;
                     ctx.fillStyle = "#fff";
                     ctx.textAlign = "center";
                     ctx.textBaseline = "bottom";
-                    ctx.fillText(e.type === "bruteBoss" ? "Brute Major" : (e.type === "slingerBoss" ? "Slinger Major" : (e.type === "stalkerBoss" ? "Stalker Major" : "Shard Major")), e.x, barY - 2);
+                    ctx.fillText(e.type === "beamerBoss" ? "Beamer Major" : (e.type === "bruteBoss" ? "Brute Major" : (e.type === "slingerBoss" ? "Slinger Major" : (e.type === "stalkerBoss" ? "Stalker Major" : "Shard Major"))), e.x, barY - 2);
                   }
                   ctx.restore();
                 }
@@ -8820,6 +9405,168 @@ const droplifelenght = 280;
             ctx.lineWidth = 2.5;
             ctx.beginPath();
             ctx.arc(0, 0, e.radius + 4, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        } else if (e.type === "beamerBoss") {
+          const phase = e.beamerBossPhase;
+          const angle = typeof e.beamerBossFacingAngle === "number" ? e.beamerBossFacingAngle : 0;
+          const beamLength = typeof e.beamerBossBeamLength === "number" ? e.beamerBossBeamLength : Math.hypot(canvas.width, canvas.height) + 120;
+          const emitterOffset = e.radius * 1.8;
+          const spinBeamReach = Math.max(emitterOffset, Math.min(beamLength, e.beamerBossSpinBeamReach || 0));
+          const novaGapCount = Math.max(1, e.beamerBossNovaGapCount || 8);
+          const novaSectorAngle = (Math.PI * 2) / novaGapCount;
+          const novaArcLength = novaSectorAngle * (e.beamerBossNovaArcFraction || 0.68);
+          const novaGapOffset = typeof e.beamerBossNovaGapOffset === "number" ? e.beamerBossNovaGapOffset : 0;
+          const drawBeam = (beamAngle, startDistance, endDistance, color, width, alpha, blur) => {
+            const beamX = Math.cos(beamAngle);
+            const beamY = Math.sin(beamAngle);
+            const startX = e.x + beamX * startDistance;
+            const startY = e.y + beamY * startDistance;
+            const endX = e.x + beamX * endDistance;
+            const endY = e.y + beamY * endDistance;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.lineCap = "round";
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = blur;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.restore();
+          };
+          const drawNovaRing = (radius, alpha, width, blur) => {
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = "#66e7ff";
+            ctx.lineWidth = width;
+            ctx.shadowColor = "#00bfff";
+            ctx.shadowBlur = blur;
+            for (let segment = 0; segment < novaGapCount; segment++) {
+              const startAngle = novaGapOffset + segment * novaSectorAngle;
+              ctx.beginPath();
+              ctx.arc(e.x, e.y, radius, startAngle, startAngle + novaArcLength);
+              ctx.stroke();
+            }
+            ctx.restore();
+          };
+          const drawSpinChargeWaves = (spinAngle, beamCount, progress, elapsed) => {
+            ctx.save();
+            ctx.shadowColor = "#00bfff";
+            ctx.shadowBlur = 12 + progress * 12;
+            ctx.strokeStyle = "#9af4ff";
+            for (let beamIndex = 0; beamIndex < beamCount; beamIndex++) {
+              const direction = spinAngle + (Math.PI * 2 * beamIndex) / beamCount;
+              const beamX = Math.cos(direction);
+              const beamY = Math.sin(direction);
+              for (let waveIndex = 0; waveIndex < 3; waveIndex++) {
+                const waveProgress = (elapsed * 0.045 + waveIndex / 3) % 1;
+                const pulseDistance = emitterOffset + 6 + waveProgress * 42;
+                const pulseRadius = 3 + Math.sin(waveProgress * Math.PI) * 5;
+                ctx.globalAlpha = (1 - waveProgress * 0.5) * (0.35 + progress * 0.45);
+                ctx.lineWidth = 1.5 + progress * 1.5;
+                ctx.beginPath();
+                ctx.arc(
+                  e.x + beamX * pulseDistance,
+                  e.y + beamY * pulseDistance,
+                  pulseRadius,
+                  0,
+                  Math.PI * 2
+                );
+                ctx.stroke();
+              }
+            }
+            ctx.restore();
+          };
+
+          if (phase === "spinCharge") {
+            const chargeDuration = e.beamerBossSpinChargeDuration || 60;
+            const progress = 1 - Math.max(0, e.beamerBossSpinChargeTimer) / chargeDuration;
+            const elapsed = chargeDuration - Math.max(0, e.beamerBossSpinChargeTimer);
+            const spinAngle = typeof e.beamerBossSpinAngle === "number" ? e.beamerBossSpinAngle : angle;
+            const beamCount = typeof e.beamerBossSpinBeamCount === "number"
+              ? e.beamerBossSpinBeamCount
+              : e.beamerBossHealthPhase === 2 ? 4 : e.beamerBossHealthPhase >= 3 ? 8 : 2;
+            drawSpinChargeWaves(spinAngle, beamCount, progress, elapsed);
+          } else if (phase === "spin") {
+            const spinAngle = typeof e.beamerBossSpinAngle === "number" ? e.beamerBossSpinAngle : angle;
+            const beamCount = typeof e.beamerBossSpinBeamCount === "number"
+              ? e.beamerBossSpinBeamCount
+              : e.beamerBossHealthPhase === 2 ? 4 : e.beamerBossHealthPhase >= 3 ? 8 : 2;
+            for (let beamIndex = 0; beamIndex < beamCount; beamIndex++) {
+              const direction = spinAngle + (Math.PI * 2 * beamIndex) / beamCount;
+              drawBeam(direction, emitterOffset, spinBeamReach, "#00bfff", 12, 0.62, 24);
+              drawBeam(direction, emitterOffset, spinBeamReach, "#d4f7ff", 3, 0.92, 8);
+            }
+            const spinDuration = 600;
+            const spinTimer = typeof e.beamerBossSpinTimer === "number" ? e.beamerBossSpinTimer : spinDuration;
+            const chargeDuration = e.beamerBossSpinChargeDuration || 60;
+            drawSpinChargeWaves(
+              spinAngle,
+              beamCount,
+              1,
+              chargeDuration + Math.max(0, spinDuration - spinTimer)
+            );
+          } else if (phase === "aimCharge") {
+            const chargeDuration = e.beamerBossChargeDuration || 90;
+            const progress = 1 - Math.max(0, e.beamerBossChargeTimer) / chargeDuration;
+            drawBeam(angle, emitterOffset, beamLength, "#ff674d", 2 + progress * 2, 0.48 + progress * 0.35, 18 + progress * 12);
+            ctx.save();
+            ctx.globalAlpha = 0.35 + progress * 0.55;
+            ctx.fillStyle = "#b9f4ff";
+            ctx.shadowColor = "#16cfff";
+            ctx.shadowBlur = 14 + progress * 30;
+            ctx.beginPath();
+            ctx.arc(hoverX, hoverY, 8 + progress * 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          } else if (phase === "fire") {
+            const shotAngle = e.beamerBossShotAngle;
+            const tailDistance = Math.min(beamLength, e.beamerBossShotTail);
+            const headDistance = Math.min(beamLength, e.beamerBossShotHead);
+            drawBeam(shotAngle, emitterOffset + tailDistance, emitterOffset + headDistance, "#00bfff", 14, 0.78, 28);
+            drawBeam(shotAngle, emitterOffset + tailDistance, emitterOffset + headDistance, "#e5fbff", 4, 1, 10);
+          } else if (phase === "novaCharge") {
+            const chargeDuration = e.beamerBossNovaChargeDuration || 150;
+            const progress = 1 - Math.max(0, e.beamerBossNovaChargeTimer) / chargeDuration;
+            const maxRadius = typeof e.beamerBossNovaMaxRadius === "number" ? e.beamerBossNovaMaxRadius : beamLength;
+            const previewRadius = Math.max(e.radius + 20, maxRadius * progress);
+            drawNovaRing(previewRadius, 0.2 + progress * 0.55, 3 + progress * 5, 12 + progress * 24);
+          } else if (phase === "nova") {
+            const maxRadius = typeof e.beamerBossNovaMaxRadius === "number" ? e.beamerBossNovaMaxRadius : beamLength;
+            const progress = maxRadius > 0 ? e.beamerBossNovaRadius / maxRadius : 1;
+            drawNovaRing(e.beamerBossNovaRadius, Math.max(0.18, 0.9 - progress * 0.68), Math.max(3, 14 - progress * 8), 24);
+          }
+
+          ctx.save();
+          ctx.translate(hoverX, hoverY);
+          ctx.rotate(angle);
+          const phaseFlash = e.beamerBossStunTimer > 0 && Math.floor(Date.now() / 90) % 2 === 0;
+          ctx.globalAlpha = phaseFlash ? 0.75 : 1;
+          if (beamerBossImg && beamerBossImg.complete && beamerBossImg.naturalWidth > 0) {
+            const drawScale = 4.2;
+            ctx.drawImage(beamerBossImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
+          } else {
+            ctx.fillStyle = "#1c7fb2";
+            ctx.shadowColor = "#00d9ff";
+            ctx.shadowBlur = 18;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#c8f7ff";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
+          if (phaseFlash) {
+            ctx.strokeStyle = "#d4f7ff";
+            ctx.lineWidth = 4;
+            ctx.shadowColor = "#00d9ff";
+            ctx.shadowBlur = 24;
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * 2.1 + 8, 0, Math.PI * 2);
             ctx.stroke();
           }
           ctx.restore();
@@ -9069,6 +9816,7 @@ const droplifelenght = 280;
       
 
       if (window._victoryTriggered && !gameOver && window._victoryTime) {
+        stopBossSounds();
         const _vsElapsed = Date.now() - window._victoryTime;
         // Pre-smoke at 2s: follows player
         if (_vsElapsed >= 2000) {
@@ -9117,6 +9865,7 @@ const droplifelenght = 280;
           window._gameOverBurstDone = false;
           window._playerUsedContinue = true;
           gameOver = true;
+          stopBossSounds();
           stopLowHealthSound();
           deactivateAttack();
           showStats = false;
@@ -9191,31 +9940,7 @@ const droplifelenght = 280;
           for (let i = particles.length - 1; i >= 0; i--) {
             if (particles[i].type === "playerSmoke") releaseParticleAt(i);
           }
-          // Core burst — fiery shards
-          for (let i = 0; i < 70; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 0.4 + Math.random() * 2.2;
-            const colors = ["#ff3c3c", "#ff8800", "#ffdd00", "#ffffff", "#ff4466"];
-            spawnParticle(px, py,
-              Math.cos(angle) * speed, Math.sin(angle) * speed,
-              90 + Math.random() * 120,
-              colors[Math.floor(Math.random() * colors.length)],
-              0.97 + Math.random() * 0.025,
-              2 + Math.random() * 6,
-              "playerDeath");
-          }
-          // Long-burning embers
-          for (let i = 0; i < 50; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 0.1 + Math.random() * 0.9;
-            spawnParticle(px, py,
-              Math.cos(angle) * speed, Math.sin(angle) * speed,
-              150 + Math.random() * 180,
-              ["#ff6600", "#ff3300", "#ffaa00", "#ff2200"][Math.floor(Math.random() * 4)],
-              0.985 + Math.random() * 0.012,
-              2 + Math.random() * 8,
-              "playerDeath");
-          }
+          spawnPlayerDeathBurst(px, py);
         }
 
         // Transition: once timer runs out, flip to final screen
@@ -9227,22 +9952,7 @@ const droplifelenght = 280;
         if (window._gameOverDeathPos && !window._gameOverOverlay) {
           const sp = window._gameOverDeathPos;
           const smokeCount = 2 + Math.floor(Math.random() * 2);
-          for (let i = 0; i < smokeCount; i++) {
-            const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2; // mostly upward
-            const speed = 0.15 + Math.random() * 0.5;
-            const offsetX = (Math.random() - 0.5) * 18;
-            const offsetY = (Math.random() - 0.5) * 18;
-            const grey = Math.floor(80 + Math.random() * 100);
-            spawnParticle(
-              sp.x + offsetX, sp.y + offsetY,
-              Math.cos(angle) * speed, Math.sin(angle) * speed,
-              60 + Math.random() * 90,
-              `rgba(${grey},${grey},${grey},0.55)`,
-              0.992 + Math.random() * 0.006,
-              6 + Math.random() * 18,
-              "playerSmoke"
-            );
-          }
+          spawnPlayerDeathSmoke(sp.x, sp.y, smokeCount);
         }
 
         // Draw explosion particles during entire game over phase
@@ -9297,10 +10007,12 @@ const droplifelenght = 280;
             if (window._editorSessionActive) {
               if (window._gameOverOverlay) { window._gameOverOverlay.remove(); window._gameOverOverlay = null; }
               gameOver = false;
+              window._bossSoundsStoppedForEndState = false;
               window._gameOverTime = undefined;
               window._playerUsedContinue = false;
               followMouse = false;
               window._bossMusicallyActive = false;
+              window._beamerBossMusicActive = false;
               stopBossMusic();
               stopLowHealthSound();
               if (typeof window.SentinelEditor !== "undefined" && window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
@@ -9327,10 +10039,12 @@ const droplifelenght = 280;
               showMenuScreen = true;
               showMenu();
               gameOver = false;
+              window._bossSoundsStoppedForEndState = false;
               window._gameOverTime = undefined;
               window._playerUsedContinue = false;
               followMouse = false;
               window._bossMusicallyActive = false;
+              window._beamerBossMusicActive = false;
               stopBossMusic();
               stopLowHealthSound();
               fadeOutGameMusic(1200, () => { playMenuMusic(); });

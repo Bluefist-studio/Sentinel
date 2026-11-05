@@ -16,7 +16,9 @@
 		gruntbossminor: "gbm",
 		gruntboss: "gb",
 		slingerboss: "sb",
-		bruteboss: "bb"
+		bruteboss: "bb",
+		stalkerBoss: "stb",
+		beamerBoss: "bmb"
 	};
 	
 	const TIMELINE_MOB_DECOMPRESS_MAP = {
@@ -30,7 +32,9 @@
 		gbm: "gruntbossminor",
 		gb: "gruntboss",
 		sb: "slingerboss",
-		bb: "bruteboss"
+		bb: "bruteboss",
+		stb: "stalkerBoss",
+		bmb: "beamerBoss"
 	};
 	
 	// Load wave overrides from localStorage
@@ -126,7 +130,9 @@
 		gruntBossMinor: "bm",
 		gruntBoss: "bo",
 		slingerBoss: "sb",
-		bruteBoss: "bb"
+		bruteBoss: "bb",
+		stalkerBoss: "stb",
+		beamerBoss: "bmb"
 	};
 
 	function hasSupportedWaveCodePrefix(raw) {
@@ -164,10 +170,14 @@
 			bosses: "bosses",
 			slingerBoss: "slingerBoss",
 			bruteBoss: "bruteBoss",
+			stalkerBoss: "stalkerBoss",
+			beamerBoss: "beamerBoss",
 			gruntbossminor: "gruntBossMinor",
 			gruntboss: "gruntBoss",
 			slingerboss: "slingerBoss",
-			bruteboss: "bruteBoss"
+			bruteboss: "bruteBoss",
+			stalkerboss: "stalkerBoss",
+			beamerboss: "beamerBoss"
 		};
 		Object.entries(intervals).forEach(([inputKey, inputValue]) => {
 			const resolvedKey = aliases[inputKey];
@@ -262,7 +272,9 @@
 						gruntBossMinor: (src.mobIntervals.gruntBossMinor || src.mobIntervals.bossMinors) ? Number(intervalUnitsToSeconds(src.mobIntervals.gruntBossMinor || src.mobIntervals.bossMinors).toFixed(3)) : undefined,
 						gruntBoss: (src.mobIntervals.gruntBoss || src.mobIntervals.bosses) ? Number(intervalUnitsToSeconds(src.mobIntervals.gruntBoss || src.mobIntervals.bosses).toFixed(3)) : undefined,
 						slingerBoss: (src.mobIntervals.slingerBoss || src.mobIntervals.slingerboss) ? Number(intervalUnitsToSeconds(src.mobIntervals.slingerBoss || src.mobIntervals.slingerboss).toFixed(3)) : undefined,
-						bruteBoss: (src.mobIntervals.bruteBoss || src.mobIntervals.bruteboss) ? Number(intervalUnitsToSeconds(src.mobIntervals.bruteBoss || src.mobIntervals.bruteboss).toFixed(3)) : undefined
+						bruteBoss: (src.mobIntervals.bruteBoss || src.mobIntervals.bruteboss) ? Number(intervalUnitsToSeconds(src.mobIntervals.bruteBoss || src.mobIntervals.bruteboss).toFixed(3)) : undefined,
+						stalkerBoss: src.mobIntervals.stalkerBoss ? Number(intervalUnitsToSeconds(src.mobIntervals.stalkerBoss).toFixed(3)) : undefined,
+						beamerBoss: src.mobIntervals.beamerBoss ? Number(intervalUnitsToSeconds(src.mobIntervals.beamerBoss).toFixed(3)) : undefined
 					}
 					: undefined
 			};
@@ -336,7 +348,9 @@
 							gruntBossMinor: (src.mobIntervalsSeconds.gruntBossMinor || src.mobIntervalsSeconds.bossMinors) ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.gruntBossMinor || src.mobIntervalsSeconds.bossMinors)) : undefined,
 							gruntBoss: (src.mobIntervalsSeconds.gruntBoss || src.mobIntervalsSeconds.bosses) ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.gruntBoss || src.mobIntervalsSeconds.bosses)) : undefined,
 							slingerBoss: src.mobIntervalsSeconds.slingerBoss ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.slingerBoss)) : undefined,
-							bruteBoss: src.mobIntervalsSeconds.bruteBoss ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bruteBoss)) : undefined
+							bruteBoss: src.mobIntervalsSeconds.bruteBoss ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.bruteBoss)) : undefined,
+							stalkerBoss: src.mobIntervalsSeconds.stalkerBoss ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.stalkerBoss)) : undefined,
+							beamerBoss: src.mobIntervalsSeconds.beamerBoss ? secondsToIntervalUnits(parseFloat(src.mobIntervalsSeconds.beamerBoss)) : undefined
 						}
 						: undefined
 				)
