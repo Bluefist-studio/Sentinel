@@ -3094,8 +3094,6 @@ window.onload = function () {
   window.player = player;
 
   const enemies = [], projectiles = [], healthDrops = [], xpDrops = [], slingerDrops = [], bruteDrops = [], protocolOrbs = [], particles = [], mines = [];
-  const protocolOrbSpawnQueue = [];
-  let protocolOrbSpawnTimer = 0;
   const enemyPool = [], projectilePool = [], particlePool = [];
 
   function clearPooledObject(obj) {
@@ -3261,6 +3259,69 @@ window.onload = function () {
     }
   }
 
+  function triggerBossPhaseEffect(enemy, phase) {
+    enemy._bossPhaseEffectStage = "smoke";
+    enemy._bossPhaseEffectTimer = 12;
+    enemy._bossPhaseEffectSmokeCount = Math.max(1, phase - 1);
+    enemy._bossPhaseEffectX = enemy.x;
+    enemy._bossPhaseEffectY = enemy.y;
+    enemy._bossPhaseStunTimer = 180;
+    playSoundFresh("sparky_laser.wav", (window.sentinelVolume && window.sentinelVolume.laser) || 0.3);
+    for (let i = 0; i < 12; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.8 + Math.random() * 2;
+      const color = ["#8deaff", "#c9f8ff", "#ffffff"][Math.floor(Math.random() * 3)];
+      spawnParticle(
+        enemy.x,
+        enemy.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        8 + Math.random() * 12,
+        color,
+        0.88,
+        1.5 + Math.random() * 2,
+        "enemyHit"
+      );
+    }
+  }
+
+  function updateBossPhaseEffect(enemy, step) {
+    if (enemy._bossPhaseEffectStage === "smoke" || enemy._bossPhaseEffectStage === "deathBurst") {
+      enemy._bossPhaseEffectTimer -= step;
+      if (enemy._bossPhaseEffectTimer <= 0) {
+        if (enemy._bossPhaseEffectStage === "smoke") {
+          spawnPlayerDeathSmoke(enemy._bossPhaseEffectX, enemy._bossPhaseEffectY, enemy._bossPhaseEffectSmokeCount);
+          enemy._bossPhaseEffectStage = "deathBurst";
+          enemy._bossPhaseEffectTimer = 10;
+        } else {
+          playSoundFresh("lumora_studios-pixel-explosion-319166.mp3", (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5);
+          spawnPlayerDeathBurst(enemy._bossPhaseEffectX, enemy._bossPhaseEffectY, "enemyHit");
+          enemy._bossPhaseEffectStage = null;
+          enemy._bossPhaseEffectTimer = 0;
+        }
+      }
+    }
+    if (enemy._bossPhaseStunTimer > 0) {
+      enemy._bossPhaseStunTimer = Math.max(0, enemy._bossPhaseStunTimer - step);
+      return enemy._bossPhaseStunTimer > 0;
+    }
+    return false;
+  }
+
+  function getSlingerBossPhase(healthRatio) {
+    if (healthRatio <= 0.2) return 4;
+    if (healthRatio <= 0.33) return 3;
+    if (healthRatio <= 0.67) return 2;
+    return 1;
+  }
+
+  function getSlingerBossAttackPattern(phase, attackIndex) {
+    if (phase === 2) return attackIndex % 2 === 0 ? "fragment" : "mine";
+    if (phase === 3) return attackIndex % 2 === 0 ? "fan" : "fragment";
+    if (phase === 4) return "radialGap";
+    return "fan";
+  }
+
   function releaseParticleAt(index) {
     const particle = removeAtSwap(particles, index);
     particlePool.push(particle);
@@ -3360,9 +3421,10 @@ window.onload = function () {
         m.x += (m.vx || 0) * delta * SPEED_MULTIPLIER;
         m.y += (m.vy || 0) * delta * SPEED_MULTIPLIER;
       }
-      // Check if player is in explosion zone
+      // Detonate on physical contact; timed mines still damage within the blast radius on expiry.
       const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
-      if (distToPlayer < 52 + player.radius) {
+      const mineContactRadius = (typeof m.radius === "number" ? m.radius : 0) + player.radius;
+      if (distToPlayer <= mineContactRadius) {
         detonateMine(m);
         mines.splice(i, 1);
         continue;
@@ -3378,7 +3440,7 @@ window.onload = function () {
     }
   }
 
-  // Draw mines with visible trigger zone
+  // Draw mines
   function drawMines() {
     for (let m of mines) {
       if (m.type === "burn") {
@@ -3416,26 +3478,6 @@ window.onload = function () {
         continue;
       }
       ctx.save();
-      // Draw trigger zone ring
-      ctx.beginPath();
-      ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255, 187, 0, 0.28)";
-      ctx.lineWidth = 3;
-      ctx.setLineDash([8, 8]);
-      // Removed shadowColor and shadowBlur for mobs
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Draw soft shadow under mine
-      ctx.save();
-      ctx.globalAlpha = 0.32;
-      ctx.shadowColor = 'rgba(0,0,0,0.6)';
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
-      ctx.beginPath();
-      ctx.ellipse(m.x, m.y + m.radius * 0.55, m.radius * 1.05, m.radius * 0.45, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
 
       // Draw mine image core (larger)
       ctx.save();
@@ -3893,8 +3935,6 @@ window.onload = function () {
       bruteDrops.length = 0;
       healthDrops.length = 0;
       protocolOrbs.length = 0;
-      protocolOrbSpawnQueue.length = 0;
-      protocolOrbSpawnTimer = 0;
     },
     applyStats,
     spawnWaveNow: (targetWave, previewOverride) => {
@@ -4068,7 +4108,7 @@ window.onload = function () {
       rarity === "Common" && tier === "Standard" ? 2.5 : 2;
     const radius = rarity === "Rare" ? 12 : 10;
     const spawnPosition = findProtocolOrbSpawnPosition(x, y, radius);
-    protocolOrbSpawnQueue.push({
+    protocolOrbs.push({
       ...spawnPosition,
       radius,
       type: "protocolOrb",
@@ -4087,7 +4127,7 @@ window.onload = function () {
     const maxY = Math.max(canvas.height - radius - 8, canvas.height / 2);
     const originX = Math.max(minX, Math.min(maxX, x));
     const originY = Math.max(minY, Math.min(maxY, y));
-    const existingOrbs = protocolOrbs.concat(protocolOrbSpawnQueue);
+    const existingOrbs = protocolOrbs;
 
     for (let ring = 0; ring <= 12; ring++) {
       const positionsInRing = ring === 0 ? 1 : ring * 12;
@@ -4828,14 +4868,6 @@ const droplifelenght = 280;
   }
 
   function updateProtocolOrbs(delta) {
-    if (protocolOrbSpawnQueue.length > 0) {
-      protocolOrbSpawnTimer = Math.max(0, protocolOrbSpawnTimer - delta);
-      if (protocolOrbSpawnTimer === 0) {
-        protocolOrbs.push(protocolOrbSpawnQueue.shift());
-        protocolOrbSpawnTimer = protocolOrbSpawnQueue.length > 0 ? 0.5 : 0;
-      }
-    }
-
     const regressRate = 0.35;
     const pickupMod = (typeof ProtocolSystem !== "undefined" && ProtocolSystem.getStatMods)
       ? (ProtocolSystem.getStatMods().Pickup || 0)
@@ -5960,8 +5992,6 @@ const droplifelenght = 280;
     slingerDrops.length = 0;
     bruteDrops.length = 0;
     protocolOrbs.length = 0;
-    protocolOrbSpawnQueue.length = 0;
-    protocolOrbSpawnTimer = 0;
     particles.length = 0;
     projectiles.length = 0;
     mines.length = 0;
@@ -6150,6 +6180,17 @@ const droplifelenght = 280;
                             const missingHealthRatio = Math.max(0, Math.min(1, 1 - (e.health / maxHealth)));
                             const phaseProgress = Math.max(0, Math.min(1, missingHealthRatio / 0.68));
                             e.bruteBossPhaseProgress = phaseProgress;
+                            const healthRatio = 1 - missingHealthRatio;
+                            const phase = healthRatio <= 0.33 ? 3 : healthRatio <= 0.67 ? 2 : 1;
+                            const previousPhase = typeof e._prevBruteBossPhase === "number"
+                              ? e._prevBruteBossPhase
+                              : phase;
+                            e._prevBruteBossPhase = phase;
+                            if (phase !== previousPhase) {
+                              triggerBossPhaseEffect(e, phase);
+                              continue;
+                            }
+                            if (e._bossPhaseStunTimer > 0) continue;
                             const volleyShots = 1 + Math.floor(phaseProgress * 4);
 
                             if (e.fireballCooldown <= 0) {
@@ -6183,6 +6224,7 @@ const droplifelenght = 280;
                 // Brute nova visual particles
                 for (let e of enemies) {
                   if (e.type === "brute" || e.type === "bruteBoss") {
+                    if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                     if (typeof e.fxCooldown !== "number") e.fxCooldown = Math.floor(Math.random() * 3);
                     if (e.fxCooldown > 0) {
                       e.fxCooldown--;
@@ -6246,6 +6288,7 @@ const droplifelenght = 280;
             // Brute nova visual and collision
             for (let e of enemies) {
               if (e.type === "brute" || e.type === "bruteBoss") {
+                if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                 // Nova animation states
                 const minRadius = typeof e.novaMinRadius === "number" ? e.novaMinRadius : (e.radius + 20); // slightly bigger than brute
                 let maxRadius = e.radius * (typeof e.novaMaxMultiplier === "number" ? e.novaMaxMultiplier : 3.2);
@@ -6317,8 +6360,15 @@ const droplifelenght = 280;
       // Dust particles disabled for performance
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
-          if (e.health <= 0) {
-            const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss", "brute", "shielder"].includes(e.type);
+        if (e.health > 0 && updateBossPhaseEffect(e, delta * SPEED_MULTIPLIER)) continue;
+            if (e.health <= 0) {
+      if (SCREEN_SHAKE_ENEMY_TYPES.has(e.type)) {
+        screenShake = Math.max(
+          screenShake,
+          SCREEN_SHAKE_BOSS_TYPES.has(e.type) ? 16 : 9
+        );
+      }
+      const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss", "brute", "shielder"].includes(e.type);
             playSoundFresh(
               isBossType ? 'lumora_studios-pixel-explosion-319166.mp3' : 'freesound_community-8-bit-explosion-95847.mp3',
               (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5
@@ -7445,28 +7495,55 @@ const droplifelenght = 280;
           e.y = Math.max(edgePaddingY, Math.min(canvas.height - edgePaddingY, e.y));
           continue;
         }
-        const isSlinger = e.type === "slinger" || e.type === "slingerBoss";
-        const isSlingerBossEntering = e.type === "slingerBoss" && e.slingerBossEntering !== false;
+        const isSlinger = e.type === "slinger";
         if (e.type === "slingerBoss") {
+          const maxHealth = Math.max(1, typeof e.maxHealth === "number" ? e.maxHealth : e.health);
+          const healthRatio = Math.max(0, Math.min(1, e.health / maxHealth));
+          const phase = getSlingerBossPhase(healthRatio);
+          const previousPhase = typeof e.slingerBossPhase === "number" ? e.slingerBossPhase : phase;
+          const step = delta * SPEED_MULTIPLIER;
+          const beginTelegraph = () => {
+            e.slingerBossStage = "telegraph";
+            e.slingerBossStageTimer = phase === 4 ? 36 : phase === 3 ? 42 : phase === 2 ? 48 : 54;
+            e.slingerBossAimAngle = Math.atan2(player.y - e.y, player.x - e.x);
+            e.slingerBossTargetX = player.x;
+            e.slingerBossTargetY = player.y;
+          };
+
+          if (phase !== previousPhase) {
+            e.slingerBossPhase = phase;
+            e.slingerBossAttackIndex = 0;
+            beginTelegraph();
+            triggerBossPhaseEffect(e, phase);
+            continue;
+          }
+          e.slingerBossPhase = phase;
+          if (typeof e.slingerBossAttackIndex !== "number") e.slingerBossAttackIndex = 0;
+          if (
+            typeof e.slingerBossStage !== "string" ||
+            typeof e.slingerBossStageTimer !== "number" ||
+            typeof e.slingerBossAimAngle !== "number" ||
+            typeof e.slingerBossTargetX !== "number" ||
+            typeof e.slingerBossTargetY !== "number"
+          ) {
+            beginTelegraph();
+          }
+
           const centerX = canvas.width * 0.5;
           const centerY = canvas.height * 0.5;
-          // Initialise orbit state on first frame
           if (typeof e._orbitAngle !== "number") {
             e._orbitAngle = Math.atan2(e.y - centerY, e.x - centerX);
           }
           if (typeof e._orbitRadius !== "number") {
             e._orbitRadius = Math.hypot(e.x - centerX, e.y - centerY);
           }
-          // Slowly advance orbit angle
-          const orbitSpeed = 0.004; // radians per SPEED_MULTIPLIER tick — slow circle
-          e._orbitAngle += orbitSpeed * delta * SPEED_MULTIPLIER;
-          // Gradually shrink the orbit radius toward the target settled radius
+          const orbitSpeed = 0.004 + (phase - 1) * 0.0006;
+          e._orbitAngle += orbitSpeed * step;
           const orbitTargetRadius = 160;
-          const spiralRate = 0.18; // px per SPEED_MULTIPLIER tick — slow spiral
+          const spiralRate = 0.18;
           if (e._orbitRadius > orbitTargetRadius) {
-            e._orbitRadius = Math.max(orbitTargetRadius, e._orbitRadius - spiralRate * delta * SPEED_MULTIPLIER);
+            e._orbitRadius = Math.max(orbitTargetRadius, e._orbitRadius - spiralRate * step);
           }
-          // Chase the orbit point smoothly
           const targetOX = centerX + Math.cos(e._orbitAngle) * e._orbitRadius;
           const targetOY = centerY + Math.sin(e._orbitAngle) * e._orbitRadius;
           const odx = targetOX - e.x;
@@ -7474,11 +7551,97 @@ const droplifelenght = 280;
           const odist = Math.hypot(odx, ody);
           const trackSpeed = e.speed * 1.4;
           if (odist > 1) {
-            e.x += (odx / odist) * Math.min(odist, trackSpeed * delta * SPEED_MULTIPLIER);
-            e.y += (ody / odist) * Math.min(odist, trackSpeed * delta * SPEED_MULTIPLIER);
+            e.x += (odx / odist) * Math.min(odist, trackSpeed * step);
+            e.y += (ody / odist) * Math.min(odist, trackSpeed * step);
           }
-          // Keep slingerBossEntering false so firing logic uses the right arm
-          e.slingerBossEntering = false;
+
+          const fireShot = (angle, speed, damage, radius, type, color) => spawnProjectile(
+            e.x,
+            e.y,
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed,
+            damage,
+            radius,
+            color,
+            type
+          );
+          const firePattern = () => {
+            const attackIndex = e.slingerBossAttackIndex;
+            const pattern = getSlingerBossAttackPattern(phase, attackIndex);
+            const aimAngle = typeof e.slingerBossAimAngle === "number" ? e.slingerBossAimAngle : 0;
+            const targetX = typeof e.slingerBossTargetX === "number" ? e.slingerBossTargetX : player.x;
+            const targetY = typeof e.slingerBossTargetY === "number" ? e.slingerBossTargetY : player.y;
+            let fired = false;
+
+            if (pattern === "fragment") {
+              const shell = fireShot(aimAngle, 1.28, e.damage + 1, 9.2, "slingerBossFragShell", "#ffd08a");
+              shell.fragTargetX = targetX;
+              shell.fragTargetY = targetY;
+              shell.fragmentCount = 8;
+              shell.fragmentDamage = Math.max(0.5, e.damage * 0.45);
+              shell.fragmentRadius = 5.2;
+              shell.lifeTimer = Math.ceil(Math.hypot(targetX - e.x, targetY - e.y) / 1.28) + 20;
+              fired = true;
+            } else if (pattern === "mine") {
+              const mineSpeed = 2.2 + Math.random();
+              mines.push({
+                x: e.x,
+                y: e.y,
+                radius: 18,
+                timer: 360,
+                color: "#ffbb00",
+                active: true,
+                contactOnly: true,
+                vx: Math.cos(aimAngle) * mineSpeed,
+                vy: Math.sin(aimAngle) * mineSpeed
+              });
+              fired = true;
+            } else if (pattern === "radialGap") {
+              const shotCount = 12;
+              for (let shotIndex = 0; shotIndex < shotCount; shotIndex++) {
+                const angle = (Math.PI * 2 * shotIndex) / shotCount;
+                const difference = Math.atan2(Math.sin(angle - aimAngle), Math.cos(angle - aimAngle));
+                if (Math.abs(difference) < 0.53) continue;
+                fireShot(angle, 1.9, e.damage, 7, "slingerBossProjectile", "#ffb347");
+              }
+              fired = true;
+            } else {
+              const shotCount = phase === 3 ? 5 : 3;
+              const spread = phase === 3 ? 0.52 : 0.36;
+              for (let shotIndex = 0; shotIndex < shotCount; shotIndex++) {
+                const offset = shotCount === 1 ? 0 : (shotIndex / (shotCount - 1) - 0.5) * spread;
+                fireShot(aimAngle + offset, phase >= 3 ? 1.8 : 1.62, e.damage, 7, "slingerBossProjectile", "#ffb347");
+              }
+              fired = true;
+            }
+
+            if (fired) {
+              playSound("laser.wav", (window.sentinelVolume && window.sentinelVolume.enemyProjectile) || 1.0);
+            }
+            e.slingerBossAttackIndex++;
+          };
+
+          if (e.slingerBossStage === "telegraph") {
+            e.slingerBossAimAngle = Math.atan2(e.slingerBossTargetY - e.y, e.slingerBossTargetX - e.x);
+            e.slingerBossStageTimer = Math.max(0, (e.slingerBossStageTimer || 0) - step);
+            if (e.slingerBossStageTimer <= 0) {
+              firePattern();
+              e.slingerBossStage = "attack";
+              e.slingerBossStageTimer = 12;
+            }
+          } else if (e.slingerBossStage === "attack") {
+            e.slingerBossStageTimer = Math.max(0, e.slingerBossStageTimer - step);
+            if (e.slingerBossStageTimer <= 0) {
+              e.slingerBossStage = "recovery";
+              e.slingerBossStageTimer = phase === 4 ? 30 : phase === 3 ? 36 : phase === 2 ? 42 : 48;
+            }
+          } else if (e.slingerBossStage === "recovery") {
+            e.slingerBossStageTimer = Math.max(0, e.slingerBossStageTimer - step);
+            if (e.slingerBossStageTimer <= 0) beginTelegraph();
+          } else {
+            beginTelegraph();
+          }
+          continue;
         }
         if (e.type === "stalkerBoss") {
           const centerX = canvas.width * 0.5;
@@ -7552,8 +7715,15 @@ const droplifelenght = 280;
               blinkCastSpeed = 22 + Math.floor(Math.random() * 10);
             }
             
-            // Store phase for reference
+            const previousPhase = typeof e._prevStalkerBossPhase === "number"
+              ? e._prevStalkerBossPhase
+              : phaseLevel;
             e.stalkerBossPhase = phaseLevel;
+            e._prevStalkerBossPhase = phaseLevel;
+            if (phaseLevel > previousPhase) {
+              triggerBossPhaseEffect(e, phaseLevel);
+              continue;
+            }
             
             // Initialize blink sequence tracking
             if (!e.blinkSequenceActive && typeof e.blinkSequenceCount === "undefined") {
@@ -7801,115 +7971,11 @@ const droplifelenght = 280;
         }
         const isTouchingPlayer = dist < (e.radius + player.radius);
         const isSlingerInRange = dist < (e.attackRange || 20) + player.radius;
-        const canAttackNow = e.type === "slingerBoss"
-          ? (e.slingerBossEntryStage !== "padding")
-          : (e.type === "gruntBoss" && e.gruntBossEntering !== false)
-            ? false
+        const canAttackNow = (e.type === "gruntBoss" && e.gruntBossEntering !== false)
+          ? false
           : (isSlinger ? isSlingerInRange : isTouchingPlayer);
         if (canAttackNow) {
-          if (isSlinger && e.type === "slingerBoss") {
-            const angleToPlayer = Math.atan2(player.y - e.y, player.x - e.x);
-            const maxHealth = Math.max(1, typeof e.maxHealth === "number" ? e.maxHealth : e.health);
-            const healthRatio = Math.max(0, Math.min(1, e.health / maxHealth));
-            let phase = 1;
-            if (healthRatio <= 0.30) phase = 3;
-            else if (healthRatio <= 0.80) phase = 2;
-            const previousPhase = typeof e._prevSlingerBossPhase === 'number' ? e._prevSlingerBossPhase : phase;
-            if (phase !== previousPhase) {
-              const burstCount = 24;
-              const burstColors = ["#ffbb00", "#fff200", "#ff4444"];
-              const burstColor = burstColors[Math.floor(Math.random() * burstColors.length)];
-              for (let bi = 0; bi < burstCount; bi++) {
-                const burstAngle = Math.random() * Math.PI * 2;
-                const burstSpeed = 2.1 + Math.random() * 1.5;
-                spawnParticle(
-                  e.x,
-                  e.y,
-                  Math.cos(burstAngle) * burstSpeed,
-                  Math.sin(burstAngle) * burstSpeed,
-                  20 + Math.floor(Math.random() * 14),
-                  burstColor,
-                  0.89 + Math.random() * 0.05,
-                  2 + Math.random() * 2.5,
-                  "enemyDeath"
-                );
-              }
-              e._phaseBurstTimer = 12;
-              e._phaseBurstColor = burstColor;
-            }
-            e.slingerBossPhase = phase;
-            e._prevSlingerBossPhase = phase;
-
-            let firedAny = false;
-            const fireShot = (shotAngle, shotSpeed, shotDamage, shotRadius, shotType, shotColor) => {
-              firedAny = true;
-              return spawnProjectile(
-                e.x,
-                e.y,
-                Math.cos(shotAngle) * shotSpeed,
-                Math.sin(shotAngle) * shotSpeed,
-                shotDamage,
-                shotRadius,
-                shotColor,
-                shotType
-              );
-            };
-
-            const cooldownStep = delta * SPEED_MULTIPLIER;
-            if (typeof e.slingerBossFragCooldown !== "number") e.slingerBossFragCooldown = 0;
-            e.slingerBossFragCooldown -= cooldownStep;
-            if (e.slingerBossFragCooldown <= 0) {
-              const shell = fireShot(angleToPlayer, 1.28, e.damage + 1, 9.2, "slingerBossFragShell", "#ffd08a");
-              shell.fragTargetX = player.x;
-              shell.fragTargetY = player.y;
-              shell.fragmentCount = 8;
-              shell.fragmentDamage = Math.max(0.5, e.damage * 0.45);
-              shell.fragmentRadius = 5.2;
-              // Give enough life to always reach the target — distance / speed + 20 tick buffer
-              shell.lifeTimer = Math.ceil(Math.hypot(player.x - e.x, player.y - e.y) / 1.28) + 20;
-              e.slingerBossFragCooldown = phase === 1 ? 160 : (phase === 2 ? 190 : 120);
-            }
-
-            if (phase === 3 && e.attackCooldown <= 0) {
-              fireShot(angleToPlayer, 1.62, e.damage, 7, "slingerBossProjectile", "#ffb347");
-              e.attackCooldown = 34;
-            }
-
-            if (phase === 2) {
-              if (typeof e.mineInterval !== 'number') e.mineInterval = 120;
-              if (typeof e.nextMineTime !== 'number') e.nextMineTime = e.mineInterval;
-
-              e.nextMineTime -= cooldownStep;
-              if (e.nextMineTime <= 0) {
-                const mineLaunchAngle = Math.random() * Math.PI * 2;
-                const mineSpeed = 2.2 + Math.random() * 1.0;
-                mines.push({
-                  x: e.x,
-                  y: e.y,
-                  radius: 18,
-                  timer: 360,
-                  color: '#ffbb00',
-                  active: true,
-                  contactOnly: true,
-                  vx: Math.cos(mineLaunchAngle) * mineSpeed,
-                  vy: Math.sin(mineLaunchAngle) * mineSpeed
-                });
-                e.nextMineTime = e.mineInterval;
-              }
-            } else {
-              if (typeof e.mineInterval !== 'number') e.mineInterval = 120;
-              e.nextMineTime = e.mineInterval;
-            }
-
-            if (phase !== 2) {
-              e.slingerBossAutoShotsLeft = 0;
-              e.slingerBossAutoShotTimer = 0;
-            }
-
-            if (firedAny) {
-              playSound('laser.wav', (window.sentinelVolume && window.sentinelVolume.enemyProjectile) || 1.0);
-            }
-          } else if (e.attackCooldown <= 0) {
+          if (e.attackCooldown <= 0) {
             if (isSlinger) {
               const angle = Math.atan2(player.y - e.y, player.x - e.x);
               const speed = 1.5;
@@ -8017,8 +8083,6 @@ const droplifelenght = 280;
               ctx.arc(e.x, e.y, e.radius + 52, 0, Math.PI * 2);
               ctx.strokeStyle = "rgba(255, 68, 68, 0.35)";
               ctx.lineWidth = 3;
-              ctx.shadowColor = "#ff4444";
-              ctx.shadowBlur = 8;
               ctx.stroke();
               ctx.restore();
 
@@ -8422,6 +8486,25 @@ const droplifelenght = 280;
   }
 
   let lastTimestamp = performance.now();
+  let screenShake = 0;
+  const SCREEN_SHAKE_ENEMY_TYPES = new Set([
+    "brute",
+    "gruntBossMinor",
+    "shielder",
+    "beamer",
+    "gruntBoss",
+    "bruteBoss",
+    "slingerBoss",
+    "stalkerBoss",
+    "beamerBoss"
+  ]);
+  const SCREEN_SHAKE_BOSS_TYPES = new Set([
+    "gruntBoss",
+    "bruteBoss",
+    "slingerBoss",
+    "stalkerBoss",
+    "beamerBoss"
+  ]);
 
   let _lastDebugLog = 0;
   function gameLoop(currentTimestamp) {
@@ -8432,6 +8515,9 @@ const droplifelenght = 280;
     // Calculate delta time in seconds
     const delta = (currentTimestamp - lastTimestamp) / 1000;
     lastTimestamp = currentTimestamp;
+    const shakeOffsetX = screenShake > 0 ? (Math.random() * 2 - 1) * screenShake : 0;
+    const shakeOffsetY = screenShake > 0 ? (Math.random() * 2 - 1) * screenShake : 0;
+    screenShake = Math.max(0, screenShake - delta * 48);
 
     // ...existing code...
         // Draw wave announcement if timer is active
@@ -8467,12 +8553,15 @@ const droplifelenght = 280;
       showStats = false;
     }
 
+    // Reset the previous frame's shake before clearing and drawing.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     // Draw background image, fallback to clear if not loaded
     if (backgroundImg.complete && backgroundImg.naturalWidth > 0) {
       ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+    ctx.translate(shakeOffsetX, shakeOffsetY);
 
     // Rebuild lights cache if canvas size changed
     if (canvas.width !== _lightCanvasCachedW || canvas.height !== _lightCanvasCachedH) {
@@ -9352,6 +9441,8 @@ const droplifelenght = 280;
           ctx.save();
           ctx.translate(hoverX, hoverY);
           if (e.type === "slingerBoss") {
+            const phaseFlash = e._bossPhaseStunTimer > 0 && Math.floor(Date.now() / 90) % 2 === 0;
+            ctx.globalAlpha = phaseFlash ? 0.6 : 1;
             ctx.drawImage(slingerBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           } else {
             ctx.drawImage(slingerImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);

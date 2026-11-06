@@ -33,9 +33,9 @@ window.SentinelWaveControl = (function () {
     grunt: { base: 5, perWave: 1 },
     kamikaze: { base: 20, perWave: 10 },
     slinger: { base: 10, perWave: 1 },
-    slingerBoss: { base: 4000, perWave: 75 },
+    slingerBoss: { base: 6000, perWave: 75 },
     brute: { base: 200, perWave: 25 },
-    bruteBoss: { base: 6000, perWave: 75 },
+    bruteBoss: { base: 8000, perWave: 75 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
     beamerBoss: { base: 250000, perWave: 100 },
@@ -171,7 +171,7 @@ window.SentinelWaveControl = (function () {
     34: "SWC3:eyJ2IjozLCJvIjp7IjM0Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1swLDJdLFswLjUsM10sWzEsMl0sWzEuNSwzXSxbMiwyXSxbMi41LDNdXSwicyI6W1s0LDFdLFs2LDFdLFs4LDFdLFsxMCwxXSxbMTIsMV0sWzE0LDFdXSwic2giOltbMi41LDJdLFs3LjUsMl0sWzEyLjUsMl0sWzUsMV0sWzEwLDFdLFsxNC41LDFdXSwic3QiOltbNSwxXSxbMTUsMV0sWzcuNSwxXSxbMi41LDFdLFsxMCwxXSxbMTIuNSwxXV19fX19fQ==",
     35: "SWC3:eyJ2IjozLCJvIjp7IjM1Ijp7InQiOnRydWUsImwiOnsiZCI6MzAsImUiOiJib3NzIiwibSI6eyJzdGIiOltbMCwxXV19fX19fQ==",
     36: "SWC3:eyJ2IjozLCJvIjp7IjM2Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJnYm0iOltbNCw0XSxbOCw0XSxbMTIsNF0sWzE2LDRdLFsyMCw0XSxbMCw0XV19fX19fQ==",
-    37: "SWC3:eyJ2IjozLCJvIjp7IjM3Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDRdLFsyLDRdLFszLDRdLFs0LDRdLFs1LDRdLFs2LDRdLFs3LDRdLFs4LDRdLFs5LDRdLFsxMCw0XSxbMTEsNF0sWzEyLDRdLFsxMyw0XSxbMTQsNF0sWzE1LDRdLFsxNiw0XSxbMTcsNF0sWzE4LDRdLFsxOSw0XSxbMjAsNF0sWzAsNF1dLCJzaCI6W1sxMCwxXV0sImdibSI6W1s0LDNdLFs4LDNdLFsxMiwzXSxbMTYsM10sWzIwLDNdLFswLDNdXX19fX19",
+    37: "SWC3:eyJ2IjozLCJvIjp7IjM3Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDFdLFsyLDFdLFszLDFdLFs0LDFdLFs1LDFdLFs2LDFdLFs3LDFdLFs4LDFdLFs5LDFdLFsxMCwxXSxbMTEsMV0sWzEyLDFdLFsxMywxXSxbMTQsMV0sWzE1LDFdLFsxNiwxXSxbMTcsMV0sWzE4LDFdLFsxOSwxXSxbMjAsMV0sWzAsNF1dLCJzaCI6W1sxMCwxXV0sImdibSI6W1s0LDNdLFs4LDNdLFsxMiwzXSxbMTYsM10sWzIwLDNdLFswLDNdXX19fX19",
     38: "SWC3:eyJ2IjozLCJvIjp7IjM4Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1syLDNdLFs0LDNdLFs2LDNdLFs4LDNdLFsxMCwzXSxbMTIsM10sWzE0LDNdLFsxNiwzXSxbMTgsM10sWzIwLDNdLFswLDNdXSwiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJnYm0iOltbNCwyXSxbOCwyXSxbMTIsMl0sWzE2LDJdLFsyMCwyXSxbMCwyXV19fX19fQ==",
     39: "SWC3:eyJ2IjozLCJvIjp7IjM5Ijp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiYiI6W1s1LDJdLFsxNCwyXSxbMiwyXSxbOCwyXSxbMTEsMl0sWzE3LDJdXSwic2giOltbNSwxXSxbMTQsMV1dLCJiZSI6W1szLDFdLFs2LjUsMV0sWzEwLjUsMV0sWzE1LDFdXSwiZ2JtIjpbWzQsMl0sWzgsMl0sWzEyLDJdLFsxNiwyXSxbMjAsMl0sWzAsMl1dfX19fX0=",
     40: "SWC3:eyJ2IjozLCJvIjp7IjQwIjp7InQiOnRydWUsImwiOnsiZCI6MjAsImUiOiJkdXJhdGlvbiIsIm0iOnsiZyI6W1sxLDFdLFsyLDFdLFszLDFdLFs0LDFdLFs1LDFdLFs2LDFdLFs3LDFdLFs4LDFdLFs5LDFdLFsxMCwxXSxbMTEsMV0sWzEyLDFdLFsxMywxXSxbMTQsMV0sWzE1LDFdLFsxNiwxXSxbMTcsMV0sWzE4LDFdLFsxOSwxXSxbMjAsMV0sWzAsMV1dLCJiIjpbWzUsMl0sWzE0LDJdLFsyLDJdLFs4LDJdLFsxMSwyXSxbMTcsMl1dLCJzaCI6W1s1LDFdLFsxNCwxXV0sImJlIjpbWzgsMl0sWzIsMV1dLCJnYm0iOltbNCwyXSxbOCwyXSxbMTIsMl0sWzE2LDJdLFsyMCwyXSxbMCwyXV19fX19fQ==",
@@ -459,19 +459,16 @@ window.SentinelWaveControl = (function () {
     // Reduced damage to make the slinger boss less punishing
     enemy.damage = 1;
     enemy.attackCooldown = 0;
-    enemy.attackRange = 5000;
     enemy.color = "#ff9f1a";
     enemy.type = "slingerBoss";
     enemy.spinAngle = Math.random() * Math.PI * 2;
     enemy.spinSpeed = (Math.random() - 0.5) * 0.02;
     enemy.sprite = slingerImg;
-    enemy.slingerBossEntering = false;
-    enemy.slingerBossEntryStage = undefined;
-    enemy.slingerBossFragCooldown = 0;
-    enemy.slingerBossEdgePaddingX = 110;
-    enemy.slingerBossEdgePaddingY = 150;
+    enemy.slingerBossPhase = 1;
+    enemy.slingerBossStage = "telegraph";
+    enemy.slingerBossStageTimer = 48;
+    enemy.slingerBossAttackIndex = 0;
     ctx.applyWaveEnemyModifiers(enemy);
-    enemy.slingerBossEntryStage = undefined;
     enemy.maxHealth = enemy.health;
   }
 
