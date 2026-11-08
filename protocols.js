@@ -364,7 +364,7 @@ const ProtocolSystem = {
     const steppedCost = baseCost * this.upgradeStepCostMultipliers[idx];
     const rounded = Math.ceil(steppedCost / 5) * 5;
 
-    return Math.max(10, rounded);
+    return Math.max(10, rounded * 10);
   },
 
   // Get next upgrade tier name for protocol, or null when maxed

@@ -70,6 +70,46 @@
       white-space: nowrap;
       pointer-events: none;
     }
+    .tut-modal-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.78);
+      z-index: 11000;
+    }
+    .tut-modal-panel {
+      width: min(520px, 94vw);
+      padding: 20px;
+      color: #c8ffff;
+      font-family: sans-serif;
+      background: rgba(0, 20, 30, 0.98);
+      border: 2px solid #00ffdd;
+      box-shadow: 0 0 28px rgba(0, 255, 221, 0.35);
+    }
+    .tut-modal-title {
+      margin: 0 0 12px;
+      color: #00ffdd;
+      font-size: 1.15rem;
+      text-align: center;
+    }
+    .tut-modal-message {
+      color: #aaf6ff;
+      font-size: 1rem;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+    .tut-modal-button {
+      display: block;
+      margin: 18px 0 0 auto;
+      padding: 0.55rem 1rem;
+      color: #00ffdd;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid #00ffdd;
+      cursor: pointer;
+    }
   `;
   document.head.appendChild(styleEl);
 
@@ -140,6 +180,53 @@
     btn.style.pointerEvents = 'none';
   }
 
+  function showTutorialModal(title, message, pauseGame = false, onClose = null, buttonLabel = 'Continue') {
+    const pauseBridge = window.SentinelEditorBridge;
+    if (pauseGame && pauseBridge) pauseBridge.setTutorialModalPause(true);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'tut-modal-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'tut-modal-title');
+
+    const panel = document.createElement('div');
+    panel.className = 'tut-modal-panel';
+    overlay.appendChild(panel);
+
+    const titleEl = document.createElement('h2');
+    titleEl.className = 'tut-modal-title';
+    titleEl.id = 'tut-modal-title';
+    titleEl.textContent = title;
+    panel.appendChild(titleEl);
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'tut-modal-message';
+    messageEl.textContent = message;
+    panel.appendChild(messageEl);
+
+    const continueBtn = document.createElement('button');
+    continueBtn.type = 'button';
+    continueBtn.className = 'tut-modal-button';
+    continueBtn.textContent = buttonLabel;
+    panel.appendChild(continueBtn);
+
+    const close = () => {
+      document.removeEventListener('keydown', onKeyDown);
+      overlay.remove();
+      if (pauseGame && pauseBridge) pauseBridge.setTutorialModalPause(false);
+      if (typeof onClose === 'function') onClose();
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') close();
+    };
+
+    continueBtn.addEventListener('click', close, { once: true });
+    document.addEventListener('keydown', onKeyDown);
+    document.body.appendChild(overlay);
+    continueBtn.focus();
+  }
+
   // ─── Stage 1 · Main Menu ───────────────────────────────────────────────────
   function applyMainMenu(overlay) {
     overlay.querySelectorAll('button').forEach((btn) => {
@@ -182,6 +269,11 @@
 
   // ─── Stage 4 · Protocol Database ──────────────────────────────────────────
   function applyProtocol(overlay) {
+    showTutorialModal(
+      'WHAT ARE PROTOCOLS?',
+      'Protocols are upgrades that change your Sentinel’s stats and playstyle. Collect protocol orbs during runs to discover more protocols. Choose 2 discovered protocols here to start each run; discoveries are saved to your Protocol Database for future runs.'
+    );
+
     // Pulse the subtitle ("Choose up to 2 discovered protocols…")
     for (const el of overlay.querySelectorAll('div')) {
       if (el.children.length === 0 &&
@@ -332,8 +424,14 @@
 
   window.addEventListener('tut:firstLevelUp', () => {
     if (stage === 'done') return;
-    // Show banner immediately on level-up
-    showBanner('Level up! Spend your Power Allocation Points using the + buttons', 'tut-levelup-banner');
+    showBanner('Level up! Release Spacebar or right mouse button to open the Stats menu', 'tut-levelup-banner');
+    showTutorialModal(
+      'LEVEL UP!',
+      'You have Power Allocation Points to spend. Click OK to open the paused Stats menu, then use the highlighted + buttons to upgrade your stats. During play, release Spacebar or the right mouse button to open this menu.',
+      true,
+      () => window.SentinelEditorBridge.openTutorialStatsMenu(),
+      'OK'
+    );
     // Wait until stat panel auto-opens (boxes populated), then install highlight
     const poll = setInterval(() => {
       if (window._statPlusButtonBoxes && window._statPlusButtonBoxes.length > 0) {
@@ -345,7 +443,7 @@
 
   // ─── Stage 6 · Gameplay – Protocol Pickup + Activation ────────────────────
   function installProtocolHighlight(pickedUpName) {
-    showBanner('New Protocol discovered! Open your stat panel and activate it', 'tut-protocol-banner');
+    showBanner('New Protocol discovered! Release Spacebar or right mouse button to open the Stats menu', 'tut-protocol-banner');
     window._tutDrawOnProtocols = function (ctx, boxes, panelX, panelY, panelW, panelH, contentY, contentH) {
       // Stop once the picked-up protocol is activated
       if (ProtocolSystem.activeProtocols && ProtocolSystem.activeProtocols.includes(pickedUpName)) {
@@ -381,6 +479,13 @@
     // Auto-scroll the protocol list to bring that card into view
     if (pickedName) window._tutScrollToProtocol = pickedName;
     installProtocolHighlight(pickedName);
+    showTutorialModal(
+      'PROTOCOLS DURING A RUN',
+      'Your 2 starter protocols begin active. You can have up to 6 protocols active at once. Click OK to open the paused Stats menu, then click the highlighted protocol in the Active Protocols list to activate it. During play, release Spacebar or the right mouse button to open this menu.\n\nRun discoveries are added to your permanent Protocol Database for future runs. Protocol orbs award Bytes based on their rarity; your run’s Bytes are added to your saved balance when the run ends. The first protocol orb you collect that is not already active each run also grants a +350 Bytes bonus. Byte amounts are displayed using binary units (1 KB = 1,024 B).',
+      true,
+      () => window.SentinelEditorBridge.openTutorialStatsMenu(),
+      'OK'
+    );
   });
 
   window.addEventListener('tut:firstProtocolActivated', () => {
@@ -409,6 +514,10 @@
 
   // ─── Stage 8 · Protocol Database upgrade ──────────────────────────────────
   function applyStep8(overlay) {
+    showTutorialModal(
+      'UPGRADE YOUR PROTOCOLS',
+      'Spend collected Bytes to upgrade discovered protocols and improve their effects. You can downgrade an upgraded protocol; this refunds the full Bytes cost of its most recent upgrade, so you can change your mind without losing Bytes.'
+    );
     showBanner('Click an Upgrade button on a discovered protocol to permanently improve it!', 'tut-upgrade-banner');
     window._tutSubtitleForce = true; // keep subtitle visible during step 8
     // Style the subtitle for high visibility

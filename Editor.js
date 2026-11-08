@@ -1709,4 +1709,5 @@
 		activateWaveCode,
 		getCurrentOverrides: () => cloneOverrides(waveEditorOverrides)
 	};
+	window.openWaveEditor = showWaveEditor;
 })();

@@ -12,8 +12,6 @@ body {
 }
 canvas {
   display: block;
-  margin: 40px auto;
+  margin: 0;
   background: #222;
-  border-radius: 12px;
-  box-shadow: 0 0 24px #000;
 }

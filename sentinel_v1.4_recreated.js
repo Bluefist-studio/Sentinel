@@ -588,7 +588,33 @@ window.onload = function () {
   let showLoadingScreen = true;
   let showMenuScreen = false;
   const titleImg = new window.Image();
-  titleImg.src = "titlescreen.png";
+  titleImg.src = "slide4.png";
+  const MENU_FADE_DURATION = 220;
+  const SENTINEL_TITLE_STYLE = "position:absolute;top:clamp(36px,7vh,72px);left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:clamp(42px,7vw,88px);font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
+  const SELECTION_TITLE_STYLE = "position:absolute;top:clamp(36px,7vh,72px);left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:clamp(30px,5vw,64px);font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
+
+  function fadeMenuElementsIn(elements) {
+    elements.forEach((element) => {
+      element.style.pointerEvents = "";
+      element.dataset.fadingOut = "false";
+    });
+    requestAnimationFrame(() => {
+      elements.forEach((element) => {
+        element.style.opacity = "1";
+      });
+    });
+  }
+
+  function fadeMenuElementsOut(elements, onComplete) {
+    if (elements.some((element) => element.dataset.fadingOut === "true")) return;
+    elements.forEach((element) => {
+      element.dataset.fadingOut = "true";
+      element.style.pointerEvents = "none";
+      element.style.opacity = "0";
+    });
+    window.setTimeout(onComplete, MENU_FADE_DURATION);
+  }
+
   // Create loading overlay elements
   const loadingOverlay = document.createElement("div");
   loadingOverlay.id = "loadingOverlay";
@@ -605,14 +631,14 @@ window.onload = function () {
   loadingOverlay.style.zIndex = 1000;
   // Loading background image
   const loadingBg = document.createElement("img");
-  loadingBg.src = "titlescreen.png";
+  loadingBg.src = "slide4.png";
   loadingBg.style.position = "absolute";
   loadingBg.style.left = "50%";
   loadingBg.style.top = "50%";
   loadingBg.style.transform = "translate(-50%, -50%)";
   loadingBg.style.width = "100vw";
   loadingBg.style.height = "100vh";
-  loadingBg.style.objectFit = "contain";
+  loadingBg.style.objectFit = "cover";
 
   // Gradient overlay for bottom fade effect
   const loadingGradient = document.createElement("div");
@@ -627,6 +653,10 @@ window.onload = function () {
   loadingOverlay.appendChild(loadingGradient);
   loadingBg.style.zIndex = 0;
   loadingOverlay.appendChild(loadingBg);
+  const loadingTitle = document.createElement("h1");
+  loadingTitle.textContent = "SENTINEL";
+  loadingTitle.style.cssText = SENTINEL_TITLE_STYLE;
+  loadingOverlay.appendChild(loadingTitle);
   // Continue button (bottom, subtle)
   const continueBtn = document.createElement("div");
   continueBtn.textContent = "Click to continue";
@@ -640,20 +670,346 @@ window.onload = function () {
   continueBtn.style.color = "#fff";
   continueBtn.style.borderRadius = "8px";
   continueBtn.style.opacity = "0.7";
+  continueBtn.style.transition = `opacity ${MENU_FADE_DURATION}ms ease`;
   continueBtn.style.zIndex = 2;
   continueBtn.style.pointerEvents = "none";
   loadingOverlay.appendChild(continueBtn);
   document.body.appendChild(loadingOverlay);
   // Continue on any click
   loadingOverlay.addEventListener("click", function() {
-    loadingOverlay.style.display = "none";
-    showLoadingScreen = false;
-    showMenuScreen = true;
-    playMenuMusic();
-    showMenu();
+    loadingOverlay.style.pointerEvents = "none";
+    fadeMenuElementsOut([continueBtn], () => {
+      loadingOverlay.remove();
+      showLoadingScreen = false;
+      showMenuScreen = true;
+      playMenuMusic();
+      showMenu();
+    });
   });
+  const introCinematicSlides = [
+    {
+      image: "slide1.png",
+      text: "Beneath the surface, behind reinforced steel and concrete, a new era of combat is being forged.",
+      duration: 5500
+    },
+    {
+      image: "slide2.png",
+      text: "The Combat Systems Division has authorized a new generation of autonomous combat machines. Their purpose: adapt, endure, and dominate.",
+      duration: 6500
+    },
+    {
+      image: "slide3.png",
+      text: "Prototype against prototype. Every machine has weaknesses. Every encounter produces data. Only the strongest configurations survive.",
+      duration: 6500
+    },
+    {
+      image: "slide4.png",
+      text: "Introducing SENTINEL. An experimental combat platform designed to evolve through modular combat protocols. Its limits remain unknown.",
+      duration: 6500
+    }
+  ];
+
+  function showIntroCinematic(onComplete) {
+    let currentSlide = 0;
+    let currentText = "";
+    let timerId;
+    let transitionId;
+    let typewriterId;
+    let progressFrameId;
+    let finished = false;
+    let writingComplete = false;
+    let gameRevealActive = false;
+    let gameStartedBehindOverlay = false;
+
+    const overlay = document.createElement("div");
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-label", "Sentinel opening cinematic");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2000;overflow:hidden;background:#02070b;color:#e8fbff;font-family:Arial,sans-serif;";
+    const cinematicFont = "'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace";
+
+    const image = document.createElement("img");
+    image.alt = "";
+    image.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 650ms ease;";
+    overlay.appendChild(image);
+
+    const shade = document.createElement("div");
+    shade.style.cssText = "position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,7,12,.28),rgba(0,7,12,.08) 35%,rgba(0,7,12,.88));";
+    overlay.appendChild(shade);
+
+    const header = document.createElement("div");
+    header.style.cssText = `position:absolute;top:clamp(20px,5vh,48px);left:clamp(24px,6vw,88px);right:clamp(24px,6vw,88px);display:flex;justify-content:space-between;align-items:center;gap:16px;color:#8cecff;font-family:${cinematicFont};font-size:clamp(11px,1.3vw,15px);font-weight:bold;letter-spacing:.16em;text-shadow:0 0 8px rgba(0,191,255,.7);`;
+    header.style.transition = "opacity 450ms ease";
+    const designation = document.createElement("span");
+    designation.textContent = "SENTINEL // CLASSIFIED ARCHIVE";
+    const slideNumber = document.createElement("span");
+    header.append(designation, slideNumber);
+    overlay.appendChild(header);
+
+    const caption = document.createElement("div");
+    caption.style.cssText = "position:absolute;left:clamp(28px,5vw,72px);bottom:clamp(100px,14vh,130px);width:min(40vw,600px);text-shadow:0 2px 14px rgba(0,0,0,.95);";
+    const consoleCursorStyle = document.createElement("style");
+    consoleCursorStyle.textContent = "@keyframes sentinelCinematicCursor{50%{opacity:0}}#sentinelCinematicText::after{content:'_';color:#73ffc0;animation:sentinelCinematicCursor .8s steps(1) infinite;}";
+    document.head.appendChild(consoleCursorStyle);
+    const eyebrow = document.createElement("div");
+    eyebrow.textContent = "COMBAT SYSTEMS DIVISION";
+    eyebrow.style.cssText = `margin-bottom:clamp(10px,2vh,18px);color:#72e8ef;font-family:${cinematicFont};font-size:clamp(11px,1.2vw,14px);font-weight:bold;letter-spacing:.14em;text-shadow:0 0 7px rgba(66,231,255,.45);`;
+    const text = document.createElement("div");
+    text.id = "sentinelCinematicText";
+    text.setAttribute("aria-live", "polite");
+    text.style.cssText = `color:#d2f7f0;font-family:${cinematicFont};font-size:clamp(16px,1.65vw,23px);font-weight:500;line-height:1.55;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,235,220,.3);white-space:pre-wrap;`;
+    caption.append(eyebrow, text);
+    overlay.appendChild(caption);
+
+    const footer = document.createElement("div");
+    footer.style.cssText = "position:absolute;left:clamp(24px,6vw,88px);right:clamp(24px,6vw,88px);bottom:clamp(20px,5vh,48px);display:flex;align-items:center;gap:18px;";
+    footer.style.transition = "opacity 450ms ease";
+    const progressTrack = document.createElement("div");
+    progressTrack.style.cssText = "height:2px;flex:1;background:rgba(180,230,245,.35);";
+    const progress = document.createElement("div");
+    progress.style.cssText = "height:100%;width:0;background:#39eaff;box-shadow:0 0 12px #00cfff;";
+    progressTrack.appendChild(progress);
+
+    const skipButton = document.createElement("button");
+    skipButton.type = "button";
+    skipButton.setAttribute("aria-label", "Hold to skip to the launch sequence");
+    skipButton.style.cssText = `position:relative;overflow:hidden;padding:12px 12px 14px;border:1px solid rgba(140,236,255,.38);background:rgba(0,14,22,.55);color:rgba(230,248,255,.86);font-family:${cinematicFont};font-size:12px;font-weight:bold;letter-spacing:.1em;cursor:pointer;`;
+    const skipLabel = document.createElement("span");
+    skipLabel.textContent = "Hold to skip";
+    const skipHoldProgress = document.createElement("span");
+    skipHoldProgress.style.cssText = "position:absolute;left:0;bottom:0;width:0;height:2px;background:#39eaff;box-shadow:0 0 10px #00cfff;pointer-events:none;";
+    skipButton.append(skipLabel, skipHoldProgress);
+    footer.append(progressTrack, skipButton);
+    overlay.appendChild(footer);
+
+    let skipHoldTimer;
+    let skipHoldActive = false;
+    let skipHoldSource = null;
+    const SKIP_HOLD_DURATION = 900;
+
+    const clearTimers = () => {
+      clearTimeout(timerId);
+      clearTimeout(transitionId);
+      clearTimeout(skipHoldTimer);
+      clearInterval(typewriterId);
+      cancelAnimationFrame(progressFrameId);
+      skipHoldTimer = null;
+      skipHoldActive = false;
+      skipHoldSource = null;
+    };
+
+    const cancelSkipHold = (source) => {
+      if (!skipHoldActive || skipHoldSource !== source) return;
+      clearTimeout(skipHoldTimer);
+      skipHoldTimer = null;
+      skipHoldActive = false;
+      skipHoldSource = null;
+      skipHoldProgress.style.transition = "none";
+      skipHoldProgress.style.width = "0";
+    };
+
+    const startSkipHold = (source, event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (finished || gameRevealActive || skipHoldActive) return;
+
+      skipHoldActive = true;
+      skipHoldSource = source;
+      skipHoldProgress.style.transition = "none";
+      skipHoldProgress.style.width = "0";
+      skipButton.offsetWidth;
+      skipHoldProgress.style.transition = `width ${SKIP_HOLD_DURATION}ms linear`;
+      skipHoldProgress.style.width = "100%";
+
+      if (source === "pointer" && skipButton.setPointerCapture) {
+        skipButton.setPointerCapture(event.pointerId);
+      }
+
+      skipHoldTimer = setTimeout(() => {
+        skipHoldTimer = null;
+        skipHoldActive = false;
+        skipHoldSource = null;
+        beginGameReveal();
+      }, SKIP_HOLD_DURATION);
+    };
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimers();
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keyup", handleKeyUp);
+      overlay.removeEventListener("click", handleAdvanceInteraction);
+      consoleCursorStyle.remove();
+      overlay.style.transition = "opacity 350ms ease";
+      overlay.style.opacity = "0";
+      setTimeout(() => {
+        overlay.remove();
+        if (!gameStartedBehindOverlay) onComplete();
+      }, 350);
+    };
+
+    const endGameReveal = () => {
+      if (finished) return;
+      finished = true;
+      clearTimers();
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keyup", handleKeyUp);
+      overlay.removeEventListener("click", handleAdvanceInteraction);
+      consoleCursorStyle.remove();
+      overlay.style.transition = "opacity 450ms ease";
+      overlay.style.opacity = "0";
+      setTimeout(() => overlay.remove(), 450);
+    };
+
+    const completeWriting = () => {
+      if (writingComplete) return;
+      clearInterval(typewriterId);
+      text.textContent = `> ${currentText}`;
+      writingComplete = true;
+      if (gameRevealActive) timerId = setTimeout(endGameReveal, 1200);
+    };
+
+    const beginGameReveal = () => {
+      if (gameRevealActive || finished) return;
+      gameRevealActive = true;
+      gameStartedBehindOverlay = true;
+      clearTimers();
+      onComplete();
+
+      overlay.style.background = "transparent";
+      image.style.opacity = "0";
+      shade.style.transition = "opacity 900ms ease";
+      shade.style.opacity = "0";
+      header.style.opacity = "0";
+      footer.style.opacity = "0";
+      footer.style.pointerEvents = "none";
+      eyebrow.textContent = "COMBAT SYSTEMS DIVISION";
+      const trialLabel = String(completedTrialRuns + 1).padStart(2, "0");
+      slideNumber.textContent = `TRIAL ${trialLabel}`;
+      currentText = `Evaluation sequence authorized.\nCombat systems online.\nTrial ${trialLabel} commencing.`;
+      writingComplete = false;
+      text.textContent = "> ";
+
+      let typedCharacters = 0;
+      typewriterId = setInterval(() => {
+        typedCharacters += 1;
+        text.textContent = `> ${currentText.slice(0, typedCharacters)}`;
+        if (typedCharacters >= currentText.length) {
+          clearInterval(typewriterId);
+          writingComplete = true;
+          timerId = setTimeout(endGameReveal, 1200);
+        }
+      }, 24);
+    };
+
+    const renderSlide = () => {
+      const slide = introCinematicSlides[currentSlide];
+      const slideIndex = currentSlide;
+      clearInterval(typewriterId);
+      currentText = slide.text;
+      writingComplete = false;
+      image.style.opacity = "0";
+      const revealImage = () => {
+        if (!finished && currentSlide === slideIndex) image.style.opacity = ".78";
+      };
+      image.onload = revealImage;
+      image.src = slide.image;
+      if (image.complete && image.naturalWidth > 0) {
+        requestAnimationFrame(revealImage);
+      }
+
+      text.textContent = "";
+      slideNumber.textContent = `TRANSMISSION ${String(currentSlide + 1).padStart(2, "0")} / ${String(introCinematicSlides.length).padStart(2, "0")}`;
+      const slideStart = (currentSlide / introCinematicSlides.length) * 100;
+      const slideEnd = ((currentSlide + 1) / introCinematicSlides.length) * 100;
+      progress.style.transition = "none";
+      progress.style.width = `${slideStart}%`;
+      progressTrack.offsetWidth;
+      cancelAnimationFrame(progressFrameId);
+      progressFrameId = requestAnimationFrame(() => {
+        progress.style.transition = `width ${slide.duration}ms linear`;
+        progress.style.width = `${slideEnd}%`;
+      });
+
+      let typedCharacters = 0;
+      const typingInterval = Math.min(42, Math.max(12, (slide.duration * 0.45) / slide.text.length));
+      text.textContent = "> ";
+      typewriterId = setInterval(() => {
+        typedCharacters += 1;
+        text.textContent = `> ${slide.text.slice(0, typedCharacters)}`;
+        if (typedCharacters >= slide.text.length) {
+          clearInterval(typewriterId);
+          writingComplete = true;
+        }
+      }, typingInterval);
+
+      timerId = setTimeout(advance, slide.duration);
+    };
+
+    const advance = () => {
+      clearTimeout(timerId);
+      clearInterval(typewriterId);
+      if (currentSlide === introCinematicSlides.length - 1) {
+        beginGameReveal();
+        return;
+      }
+      image.style.opacity = "0";
+      transitionId = setTimeout(() => {
+        currentSlide += 1;
+        renderSlide();
+      }, 350);
+    };
+
+    function handleAdvanceInteraction() {
+      if (finished) return;
+      if (!writingComplete) {
+        completeWriting();
+      } else if (gameRevealActive) {
+        endGameReveal();
+      } else {
+        advance();
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (gameRevealActive) endGameReveal();
+        else finish();
+      } else if (event.target === skipButton && (event.key === "Enter" || event.key === " ")) {
+        startSkipHold("keyboard", event);
+      } else if (event.key === "Enter" || event.key === " " || event.key === "ArrowRight") {
+        event.preventDefault();
+        handleAdvanceInteraction();
+      }
+    }
+
+    function handleKeyUp(event) {
+      if (event.key === "Enter" || event.key === " ") cancelSkipHold("keyboard");
+    }
+
+    skipButton.addEventListener("pointerdown", event => startSkipHold("pointer", event));
+    skipButton.addEventListener("pointerup", () => cancelSkipHold("pointer"));
+    skipButton.addEventListener("pointercancel", () => cancelSkipHold("pointer"));
+    skipButton.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    overlay.addEventListener("click", handleAdvanceInteraction);
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keyup", handleKeyUp);
+    document.body.appendChild(overlay);
+    renderSlide();
+    skipButton.focus();
+  }
+
   // Menu screen
   function startGame(difficulty, startStatPoints, startHealth) {
+    fadeOutMenuMusic();
+    showIntroCinematic(() => beginGame(difficulty, startStatPoints, startHealth));
+  }
+
+  function beginGame(difficulty, startStatPoints, startHealth) {
     window._editorSessionActive = false;
     window.sentinelDifficulty = difficulty;
     // Reset tutorial in-game hooks so they re-fire on each new run
@@ -663,14 +1019,13 @@ window.onload = function () {
     window._tutFirstProtActivatedFired = false;
     window._newlyPickedProtocols = new Set();
     window._seenProtocols = new Set();
+    runDeathCounted = false;
     const isRestrictedDifficulty = difficulty === "Hardcore";
     if (!isRestrictedDifficulty) {
       ProtocolSystem.setStarters(window._pendingStarterProtocols || []);
     }
     showMenuScreen = false;
-    fadeOutMenuMusic();
     window._bossMusicallyActive = false;
-    window._beamerBossMusicActive = false;
     stopBossMusic();
     stopLowHealthSound();
     playGameMusic();
@@ -749,6 +1104,13 @@ window.onload = function () {
     }
     return "#c8c8c8";
   }
+  function getProtocolRarityName(rarity, tier) {
+    const rarityNames = {
+      Common: { Lower: "Lesser", Standard: "Common", Higher: "Uncommon" },
+      Rare: { Lower: "Rare", Standard: "Epic", Higher: "Legendary" }
+    };
+    return rarityNames[rarity]?.[tier] || `${rarity} ${tier}`;
+  }
   function getProtocolRarityEdgeColor(rarity, tier) {
     if (rarity === "Common") {
       if (tier === "Lower")    return "#666666";
@@ -773,32 +1135,48 @@ window.onload = function () {
     starterOverlay.style.top = 0;
     starterOverlay.style.width = "100vw";
     starterOverlay.style.height = "100vh";
-    starterOverlay.style.background = "rgba(0,0,0,0.95)";
+    starterOverlay.style.background = "#000";
     starterOverlay.style.display = "flex";
     starterOverlay.style.flexDirection = "column";
     starterOverlay.style.justifyContent = "center";
     starterOverlay.style.alignItems = "center";
     starterOverlay.style.zIndex = 1002;
 
+    const protocolBg = document.createElement("img");
+    protocolBg.src = "slide2.png";
+    protocolBg.alt = "";
+    protocolBg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;";
+    starterOverlay.appendChild(protocolBg);
+
+    const protocolShade = document.createElement("div");
+    protocolShade.style.cssText = "position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.58),rgba(0,0,0,.78));z-index:1;pointer-events:none;";
+    starterOverlay.appendChild(protocolShade);
+
     const panel = document.createElement("div");
     panel.style.width = "min(1100px, 95vw)";
     panel.style.maxWidth = "1100px";
-    panel.style.maxHeight = "85vh";
-    panel.style.background = "rgba(0, 20, 30, 0.98)";
+    panel.style.maxHeight = "none";
+    panel.style.background = "rgba(0, 20, 30, 0.9)";
     panel.style.border = "2px solid #00ffdd";
     panel.style.borderRadius = "10px";
     panel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+    panel.style.position = "absolute";
+    panel.style.top = "clamp(100px, 14vh, 150px)";
+    panel.style.bottom = "24px";
+    panel.style.left = "50%";
+    panel.style.transform = "translateX(-50%)";
+    panel.style.boxSizing = "border-box";
+    panel.style.zIndex = 2;
     panel.style.display = "flex";
     panel.style.flexDirection = "column";
     panel.style.padding = "20px";
     starterOverlay.appendChild(panel);
 
     const title = document.createElement("h2");
-    title.textContent = "PROTOCOLS DATABASE";
-    title.style.color = "#00ffdd";
-    title.style.margin = "0 0 8px 0";
-    title.style.textAlign = "center";
-    panel.appendChild(title);
+    title.textContent = source === "mainMenu" ? "PROTOCOLS DATABASE" : "SELECT YOUR STARTER PROTOCOLS";
+    title.style.cssText = SELECTION_TITLE_STYLE;
+    title.style.fontSize = "clamp(24px, 4vw, 56px)";
+    starterOverlay.appendChild(title);
 
     const subtitle = document.createElement("div");
     subtitle.textContent = "Choose up to 2 discovered protocols to start your run with.";
@@ -817,7 +1195,7 @@ window.onload = function () {
     bytesDisplay.style.fontSize = "1rem";
     bytesDisplay.style.fontWeight = "bold";
     const playerBytes = totalCollectedBytes || 0;
-    bytesDisplay.textContent = `Bytes: ${playerBytes}`;
+    bytesDisplay.textContent = `Bytes: ${formatByteAmount(playerBytes)}`;
     panel.appendChild(bytesDisplay);
 
     const selectionCount = document.createElement("div");
@@ -837,6 +1215,7 @@ window.onload = function () {
     const content = document.createElement("div");
     content.style.flex = "1";
     content.style.minWidth = "0";
+    content.style.minHeight = "0";
     content.style.overflowY = "auto";
     content.style.border = "1px solid rgba(0,255,221,0.25)";
     content.style.borderRadius = "8px";
@@ -1144,13 +1523,13 @@ window.onload = function () {
             .join(", ");
 
           card.innerHTML = `<div style="font-weight:bold; margin-bottom:8px; color:${getProtocolRarityColor(proto.rarity, proto.tier)}; font-size:1rem;">${protocolName}</div>
-                            <div style="color:${getProtocolRarityColor(proto.rarity, proto.tier)}; font-size:0.85rem; margin-bottom:8px;">${proto.rarity} ${proto.tier}</div>
+                            <div style="color:${getProtocolRarityColor(proto.rarity, proto.tier)}; font-size:0.85rem; margin-bottom:8px;">${getProtocolRarityName(proto.rarity, proto.tier)}</div>
                             <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:8px;">${proto.intent || "Unknown"}</div>
                             <div style="color:#00ff88; font-size:0.8rem; margin-bottom:8px; line-height:1; min-height:2.1em; overflow:hidden;" data-mods>${mods || "No mods"}</div>
                             <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:0px;" data-tier-info>${upgradeTier} (${currentTierIndex + 1}/${totalTierCount})</div>
                             <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px; margin-bottom:0px;">
-                              <button class="upgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; background:rgba(0,0,0,0.4); color:${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; font-size:0.78rem; cursor:${nextUpgradeCost === null ? "default" : "pointer"}; opacity:${nextUpgradeCost === null ? "0.65" : "1"};">Upgrade (${nextUpgradeCost === null ? "MAX" : `-${nextUpgradeCost}B`})</button>
-                              <button class="downgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${currentTierIndex > 0 ? "#ff6666" : "#550000"}; background:rgba(0,0,0,0.4); color:${currentTierIndex > 0 ? "#ff6666" : "#555"}; font-size:0.78rem; cursor:${currentTierIndex > 0 ? "pointer" : "default"}; opacity:${currentTierIndex > 0 ? "1" : "0.65"};">Downgrade${currentTierIndex > 0 && downgradeRefund ? ` (+${downgradeRefund}B)` : ""}</button>
+                              <button class="upgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; background:rgba(0,0,0,0.4); color:${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; font-size:0.78rem; cursor:${nextUpgradeCost === null ? "default" : "pointer"}; opacity:${nextUpgradeCost === null ? "0.65" : "1"};">Upgrade (${nextUpgradeCost === null ? "MAX" : `-${formatByteAmount(nextUpgradeCost)}`})</button>
+                              <button class="downgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${currentTierIndex > 0 ? "#ff6666" : "#550000"}; background:rgba(0,0,0,0.4); color:${currentTierIndex > 0 ? "#ff6666" : "#555"}; font-size:0.78rem; cursor:${currentTierIndex > 0 ? "pointer" : "default"}; opacity:${currentTierIndex > 0 ? "1" : "0.65"};">Downgrade${currentTierIndex > 0 && downgradeRefund ? ` (+${formatByteAmount(downgradeRefund)})` : ""}</button>
                             </div>`;
 
           // Add button event listeners after setting innerHTML
@@ -1160,24 +1539,34 @@ window.onload = function () {
           if (upgradeBtn) {
             upgradeBtn.addEventListener("click", (e) => {
               e.stopPropagation();
-              if (nextUpgradeCost === null) return;
-              if (totalCollectedBytes < nextUpgradeCost) {
+              const currentUpgradeCost = ProtocolSystem.getNextUpgradeCost(protocolName);
+              if (currentUpgradeCost === null) return;
+              if (totalCollectedBytes < currentUpgradeCost) {
                 showUpgradeInfoModal(
                   "INSUFFICIENT BYTES",
-                  `Not enough Bytes. You need ${nextUpgradeCost}, you have ${totalCollectedBytes}.`
+                  `Not enough Bytes. You need ${formatByteAmount(currentUpgradeCost)}, you have ${formatByteAmount(totalCollectedBytes)}.`
                 );
                 return;
               }
               const nextTierName = ProtocolSystem.getNextUpgradeTierName(protocolName);
               showUpgradeConfirmModal(
-                `Upgrade ${protocolName} to ${nextTierName} for ${nextUpgradeCost} Bytes?`,
+                `Upgrade ${protocolName} to ${nextTierName} for ${formatByteAmount(currentUpgradeCost)}?`,
                 () => {
                   const result = ProtocolSystem.upgradeProtocol(protocolName, totalCollectedBytes);
+                  if (!result.success) {
+                    if (result.reason === "insufficient") {
+                      showUpgradeInfoModal(
+                        "INSUFFICIENT BYTES",
+                        `Not enough Bytes. You need ${formatByteAmount(result.cost)}, you have ${formatByteAmount(totalCollectedBytes)}.`
+                      );
+                    }
+                    return;
+                  }
                   if (result.success) {
                     totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
                     saveCollectedBytes();
                     window.dispatchEvent(new CustomEvent('tut:protocolUpgraded'));
-                    bytesDisplay.textContent = `Bytes: ${totalCollectedBytes}`;
+                    bytesDisplay.textContent = `Bytes: ${formatByteAmount(totalCollectedBytes)}`;
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
                     const totalTierCount = ProtocolSystem.upgradeTiers.length;
@@ -1191,7 +1580,7 @@ window.onload = function () {
                     card.querySelector('[data-mods]').textContent = newModsText || "No mods";
                     const upgradeBtnEl = card.querySelector('.upgrade-btn');
                     if (upgradeBtnEl) {
-                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${newNextUpgradeCost}B)`;
+                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${formatByteAmount(newNextUpgradeCost)})`;
                       upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#005500' : '#00ffdd';
                       upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#005500' : '#00ffdd'}`;
                       upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
@@ -1211,7 +1600,7 @@ window.onload = function () {
                       : null;
                     const downgradeBtnEl = card.querySelector('.downgrade-btn');
                     if (downgradeBtnEl) {
-                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && newDowngradeRefund ? ` (+${newDowngradeRefund}B)` : ''}`;
+                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && newDowngradeRefund ? ` (+${formatByteAmount(newDowngradeRefund)})` : ''}`;
                       downgradeBtnEl.style.color = newTierIndex > 0 ? '#ff6666' : '#555';
                       downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? '#ff6666' : '#550000'}`;
                       downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
@@ -1250,13 +1639,13 @@ window.onload = function () {
               e.stopPropagation();
               if (currentTierIndex <= 0) return;
               showUpgradeConfirmModal(
-                `Downgrade ${protocolName} to ${ProtocolSystem.upgradeTiers[currentTierIndex - 1]} and refund ${downgradeRefund ? downgradeRefund + " Bytes" : "last upgrade cost"}?`,
+                `Downgrade ${protocolName} to ${ProtocolSystem.upgradeTiers[currentTierIndex - 1]} and refund ${downgradeRefund ? formatByteAmount(downgradeRefund) : "last upgrade cost"}?`,
                 () => {
                   const result = ProtocolSystem.downgradeProtocol(protocolName);
                   if (result.success) {
                     totalCollectedBytes += result.refund || 0;
                     saveCollectedBytes();
-                    bytesDisplay.textContent = `Bytes: ${totalCollectedBytes}`;
+                    bytesDisplay.textContent = `Bytes: ${formatByteAmount(totalCollectedBytes)}`;
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
                     const totalTierCount = ProtocolSystem.upgradeTiers.length;
@@ -1281,7 +1670,7 @@ window.onload = function () {
                     // Update downgrade button display
                     const downgradeBtnEl = card.querySelector('.downgrade-btn');
                     if (downgradeBtnEl) {
-                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && downgradeRefundNew ? ` (+${downgradeRefundNew}B)` : ''}`;
+                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && downgradeRefundNew ? ` (+${formatByteAmount(downgradeRefundNew)})` : ''}`;
                       downgradeBtnEl.style.color = newTierIndex > 0 ? '#ff6666' : '#555';
                       downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? '#ff6666' : '#550000'}`;
                       downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
@@ -1290,7 +1679,7 @@ window.onload = function () {
                     }
                     const upgradeBtnEl = card.querySelector('.upgrade-btn');
                     if (upgradeBtnEl) {
-                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${newNextUpgradeCost}B)`;
+                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${formatByteAmount(newNextUpgradeCost)})`;
                       upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#005500' : '#00ffdd';
                       upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#005500' : '#00ffdd'}`;
                       upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
@@ -1730,7 +2119,6 @@ window.onload = function () {
         { name: "Slinger", role: "Ranged Harasser", image: "slinger.png", description: "Maintains distance and fires projectile shots at medium-to-long range." },
         { name: "Shielder", role: "Support", image: "shielder.png", description: "Defensive support unit that protects nearby enemies with shielding links." },
         { name: "Beamer", role: "Artillery", image: "beamer.png", description: "Charges and fires sweeping beam attacks while holding preferred spacing." },
-        { name: "Beamer Major", role: "Boss", image: "Beamer boss .png", description: "Slowly orbits while sweeping twin beams, then locks on and charges a traveling beam shot." },
         { name: "Stalker", role: "Skirmisher", image: "stalker.png", description: "Disruptive mobile attacker that repositions aggressively around the player." },
         { name: "Brute", role: "Heavy", image: "brute.png", description: "Durable close-range unit with high pressure in short-to-mid range fights." },
         { name: "Shard Heavy", role: "Mini-Boss", image: "grunt heavy.png", description: "Minor boss variant with elevated durability and elite pressure patterns." },
@@ -1757,14 +2145,14 @@ window.onload = function () {
       glossaryOverlay.style.zIndex = 1001;
 
       const glossaryBg = document.createElement("img");
-      glossaryBg.src = "titlescreen.png";
+      glossaryBg.src = "slide3.png";
       glossaryBg.style.position = "absolute";
       glossaryBg.style.left = "50%";
       glossaryBg.style.top = "50%";
       glossaryBg.style.transform = "translate(-50%, -50%)";
       glossaryBg.style.width = "100vw";
       glossaryBg.style.height = "100vh";
-      glossaryBg.style.objectFit = "contain";
+      glossaryBg.style.objectFit = "cover";
       glossaryBg.style.zIndex = 0;
       glossaryOverlay.appendChild(glossaryBg);
 
@@ -1926,8 +2314,8 @@ window.onload = function () {
       lbOverlay.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1001;font-family:sans-serif;";
 
       const lbBg = document.createElement("img");
-      lbBg.src = "titlescreen.png";
-      lbBg.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100vw;height:100vh;object-fit:contain;z-index:0;";
+      lbBg.src = "slide4.png";
+      lbBg.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100vw;height:100vh;object-fit:cover;z-index:0;";
       lbOverlay.appendChild(lbBg);
 
       const panel = document.createElement("div");
@@ -2056,14 +2444,14 @@ window.onload = function () {
     menuOverlay.style.zIndex = 1000;
     // Menu background image
     const menuBg = document.createElement("img");
-    menuBg.src = "titlescreen.png";
+    menuBg.src = "slide4.png";
     menuBg.style.position = "absolute";
     menuBg.style.left = "50%";
     menuBg.style.top = "50%";
     menuBg.style.transform = "translate(-50%, -50%)";
     menuBg.style.width = "100vw";
     menuBg.style.height = "100vh";
-    menuBg.style.objectFit = "contain";
+    menuBg.style.objectFit = "cover";
 
     // Gradient overlay for bottom fade effect
     const menuGradient = document.createElement("div");
@@ -2080,21 +2468,19 @@ window.onload = function () {
     menuOverlay.appendChild(menuBg);
     // Game title
     const title = document.createElement("h1");
-    title.textContent = "";
-    title.style.color = "#fff";
-    title.style.fontSize = "4rem";
-    title.style.textShadow = "0 0 24px #00ffdd, 0 0 8px #000";
-    title.style.position = "relative";
-    title.style.zIndex = 1;
+    title.textContent = "SENTINEL";
+    title.style.cssText = SENTINEL_TITLE_STYLE;
     menuOverlay.appendChild(title);
     // Main menu buttons
     const buttonContainer = document.createElement("div");
     buttonContainer.style.display = "flex";
     buttonContainer.style.flexDirection = "column";
     buttonContainer.style.gap = "1.2rem";
-    buttonContainer.style.marginTop = "2.5rem";
+    buttonContainer.style.marginTop = "1.5rem";
     buttonContainer.style.position = "relative";
     buttonContainer.style.zIndex = 1;
+    buttonContainer.style.opacity = "0";
+    buttonContainer.style.transition = `opacity ${MENU_FADE_DURATION}ms ease`;
 
     function makeMenuButton(label, color) {
       const btn = document.createElement("button");
@@ -2116,7 +2502,6 @@ window.onload = function () {
     // Add main menu buttons (Play and Protocols)
     const playBtn = makeMenuButton("Play", "#fff");
     const protocolBtn = makeMenuButton("Protocols", "#39ff8a");
-    const waveEditorBtn = makeMenuButton("Wave Editor", "#6cf0ff");
     const enemyGlossaryBtn = makeMenuButton("Enemy Glossary", "#ff4444");
     const leaderboardBtn = makeMenuButton("Leaderboards", "#ffdd00");
     const exitBtn = makeMenuButton("Exit", "#ff5555");
@@ -2124,37 +2509,30 @@ window.onload = function () {
     buttonContainer.appendChild(protocolBtn);
     buttonContainer.appendChild(leaderboardBtn);
     buttonContainer.appendChild(enemyGlossaryBtn);
-    buttonContainer.appendChild(waveEditorBtn);
     buttonContainer.appendChild(exitBtn);
     menuOverlay.appendChild(buttonContainer);
     document.body.appendChild(menuOverlay);
+    fadeMenuElementsIn([buttonContainer]);
     playMenuMusic();
 
     // Store reference to main menu for back button
     window._showMainMenu = () => {
       menuOverlay.style.display = "block";
+      fadeMenuElementsIn([buttonContainer]);
     };
 
     // Play button: show difficulty selection
     playBtn.addEventListener("click", function() {
-      menuOverlay.style.display = "none";
-      showDifficultyMenu();
+      fadeMenuElementsOut([buttonContainer], () => {
+        menuOverlay.style.display = "none";
+        showDifficultyMenu();
+      });
     });
 
     // Protocols button: show starter protocol modal (new database)
     protocolBtn.addEventListener("click", function() {
       menuOverlay.remove();
       showStarterProtocolModal(null, null, null, "mainMenu");
-      window._showMainMenu = () => {
-        showMenu();
-      };
-    });
-
-    waveEditorBtn.addEventListener("click", function() {
-      menuOverlay.remove();
-      if (window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
-        window.SentinelEditor.showWaveEditor();
-      }
       window._showMainMenu = () => {
         showMenu();
       };
@@ -2283,14 +2661,14 @@ window.onload = function () {
     diffOverlay.style.zIndex = 1000;
     // Background image
     const diffBg = document.createElement("img");
-    diffBg.src = "titlescreen.png";
+    diffBg.src = "slide1.png";
     diffBg.style.position = "absolute";
     diffBg.style.left = "50%";
     diffBg.style.top = "50%";
     diffBg.style.transform = "translate(-50%, -50%)";
     diffBg.style.width = "100vw";
     diffBg.style.height = "100vh";
-    diffBg.style.objectFit = "contain";
+    diffBg.style.objectFit = "cover";
 
     // Gradient overlay
     const diffGradient = document.createElement("div");
@@ -2310,8 +2688,9 @@ window.onload = function () {
     const backBtn = document.createElement("button");
     backBtn.textContent = "← Back";
     backBtn.style.position = "absolute";
-    backBtn.style.top = "120px";
-    backBtn.style.left = "calc(50% - 512px + 16px)";
+    backBtn.style.top = "auto";
+    backBtn.style.bottom = "clamp(24px, 5vh, 48px)";
+    backBtn.style.left = "clamp(24px, 6vw, 88px)";
     backBtn.style.transform = "none";
     backBtn.style.fontSize = "1.2rem";
     backBtn.style.padding = "0.5rem 1.5rem";
@@ -2329,12 +2708,9 @@ window.onload = function () {
     // Title
     const title = document.createElement("h2");
     title.textContent = "SELECT DIFFICULTY";
-    title.style.color = "#fff";
-    title.style.fontSize = "3rem";
-    title.style.textShadow = "0 0 24px #00ffdd, 0 0 8px #000";
-    title.style.position = "relative";
-    title.style.zIndex = 1;
-    title.style.marginBottom = "2rem";
+    title.style.cssText = SELECTION_TITLE_STYLE;
+    title.style.opacity = "0";
+    title.style.transition = `opacity ${MENU_FADE_DURATION}ms ease`;
     diffOverlay.appendChild(title);
 
     // Difficulty buttons
@@ -2344,6 +2720,9 @@ window.onload = function () {
     buttonContainer.style.gap = "1.2rem";
     buttonContainer.style.position = "relative";
     buttonContainer.style.zIndex = 1;
+    buttonContainer.style.opacity = "0";
+    buttonContainer.style.transition = `opacity ${MENU_FADE_DURATION}ms ease`;
+    backBtn.style.transition = "background 0.2s";
 
     function makeButton(label, color) {
       const btn = document.createElement("button");
@@ -2370,6 +2749,10 @@ window.onload = function () {
     buttonContainer.appendChild(apocalypseBtn);
     diffOverlay.appendChild(buttonContainer);
     document.body.appendChild(diffOverlay);
+    fadeMenuElementsIn([title, buttonContainer]);
+
+    const difficultyTitle = title;
+    const difficultyButtons = buttonContainer;
 
     function showWaveSelectionMenu(difficulty, startStatPoints, startHealth) {
       const waveOverlay = document.createElement("div");
@@ -2379,44 +2762,22 @@ window.onload = function () {
       waveOverlay.style.top = 0;
       waveOverlay.style.width = "100vw";
       waveOverlay.style.height = "100vh";
-      waveOverlay.style.background = "#000";
+      waveOverlay.style.background = "transparent";
       waveOverlay.style.display = "flex";
       waveOverlay.style.flexDirection = "column";
       waveOverlay.style.justifyContent = "center";
       waveOverlay.style.alignItems = "center";
       waveOverlay.style.zIndex = 1000;
-
-      // Background image
-      const waveBg = document.createElement("img");
-      waveBg.src = "titlescreen.png";
-      waveBg.style.position = "absolute";
-      waveBg.style.left = "50%";
-      waveBg.style.top = "50%";
-      waveBg.style.transform = "translate(-50%, -50%)";
-      waveBg.style.width = "100vw";
-      waveBg.style.height = "100vh";
-      waveBg.style.objectFit = "contain";
-
-      // Gradient overlay
-      const waveGradient = document.createElement("div");
-      waveGradient.style.position = "absolute";
-      waveGradient.style.left = "0";
-      waveGradient.style.bottom = "0";
-      waveGradient.style.width = "100vw";
-      waveGradient.style.height = "180px";
-      waveGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
-      waveGradient.style.pointerEvents = "none";
-      waveGradient.style.zIndex = 1;
-      waveOverlay.appendChild(waveGradient);
-      waveBg.style.zIndex = 0;
-      waveOverlay.appendChild(waveBg);
+      waveOverlay.appendChild(diffGradient);
+      waveOverlay.appendChild(diffBg);
 
       // Back button
       const backBtn = document.createElement("button");
       backBtn.textContent = "← Back";
       backBtn.style.position = "absolute";
-      backBtn.style.top = "120px";
-      backBtn.style.left = "calc(50% - 512px + 16px)";
+      backBtn.style.top = "auto";
+      backBtn.style.bottom = "clamp(24px, 5vh, 48px)";
+      backBtn.style.left = "clamp(24px, 6vw, 88px)";
       backBtn.style.fontSize = "1.2rem";
       backBtn.style.padding = "0.5rem 1.5rem";
       backBtn.style.background = "rgba(0,0,0,0.7)";
@@ -2433,12 +2794,9 @@ window.onload = function () {
       // Title
       const title = document.createElement("h2");
       title.textContent = "SELECT START WAVE";
-      title.style.color = "#fff";
-      title.style.fontSize = "3rem";
-      title.style.textShadow = "0 0 24px #00ffdd, 0 0 8px #000";
-      title.style.position = "relative";
-      title.style.zIndex = 1;
-      title.style.marginBottom = "2rem";
+      title.style.cssText = SELECTION_TITLE_STYLE;
+      title.style.opacity = "0";
+      title.style.transition = `opacity ${MENU_FADE_DURATION}ms ease`;
       waveOverlay.appendChild(title);
 
       // Wave buttons container
@@ -2448,6 +2806,8 @@ window.onload = function () {
       buttonContainer.style.gap = "1.2rem";
       buttonContainer.style.position = "relative";
       buttonContainer.style.zIndex = 1;
+      buttonContainer.style.opacity = "0";
+      buttonContainer.style.transition = `opacity ${MENU_FADE_DURATION}ms ease`;
 
       function makeWaveButton(waveNum, playerLevel, isUnlocked) {
         const btn = document.createElement("button");
@@ -2468,14 +2828,17 @@ window.onload = function () {
           btn.addEventListener("mouseover", () => btn.style.background = "rgba(0,0,0,0.9)");
           btn.addEventListener("mouseout", () => btn.style.background = "rgba(0,0,0,0.7)");
           btn.addEventListener("click", () => {
-            waveOverlay.remove();
-            window._selectedStartWave = waveNum;
-            window._selectedStartLevel = playerLevel;
-            if (difficulty === "Hardcore" || difficulty === "Apocalypse") {
-              startGame(difficulty, startStatPoints, startHealth);
-            } else {
-              showStarterProtocolModal(difficulty, startStatPoints, startHealth);
-            }
+            fadeMenuElementsOut([title, buttonContainer], () => {
+              waveOverlay.remove();
+              diffOverlay.remove();
+              window._selectedStartWave = waveNum;
+              window._selectedStartLevel = playerLevel;
+              if (difficulty === "Hardcore" || difficulty === "Apocalypse") {
+                startGame(difficulty, startStatPoints, startHealth);
+              } else {
+                showStarterProtocolModal(difficulty, startStatPoints, startHealth);
+              }
+            });
           });
         }
         return btn;
@@ -2492,10 +2855,15 @@ window.onload = function () {
 
       waveOverlay.appendChild(buttonContainer);
       document.body.appendChild(waveOverlay);
+      fadeMenuElementsIn([title, buttonContainer]);
 
       backBtn.addEventListener("click", () => {
-        waveOverlay.remove();
-        showDifficultyMenu();
+        fadeMenuElementsOut([title, buttonContainer], () => {
+          waveOverlay.remove();
+          diffOverlay.insertBefore(diffGradient, diffOverlay.firstChild);
+          diffOverlay.insertBefore(diffBg, diffGradient.nextSibling);
+          fadeMenuElementsIn([difficultyTitle, difficultyButtons]);
+        });
       });
     }
 
@@ -2579,8 +2947,9 @@ window.onload = function () {
     }
 
     normalBtn.addEventListener("click", () => {
-      diffOverlay.remove();
-      showWaveSelectionMenu("Normal", 0, 15);
+      fadeMenuElementsOut([title, buttonContainer], () => {
+        showWaveSelectionMenu("Normal", 0, 15);
+      });
     });
     hardcoreBtn.addEventListener("click", () => {
       showDifficultyConfirmModal("Hardcore", () => {
@@ -2602,8 +2971,10 @@ window.onload = function () {
 
       // Back button
       backBtn.addEventListener("click", () => {
-      diffOverlay.remove();
-      showMenu();
+        fadeMenuElementsOut([title, buttonContainer], () => {
+          diffOverlay.remove();
+          showMenu();
+        });
     });
   }
 
@@ -2735,7 +3106,7 @@ window.onload = function () {
     };
   }
 
-  let keys = {}, paused = false, gameOver = false;
+  let keys = {}, paused = false, gameOver = false, tutorialModalPause = false;
   // Player sprite
   const playerImg = new window.Image();
   playerImg.src = "player_drone.png";
@@ -2770,6 +3141,10 @@ window.onload = function () {
   let wave = 1, xp = 0, xpToLevel = 10, level = 1, statPoints = 5; // Start at wave 1
   const COLLECTED_BYTES_STORAGE_KEY = "sentinel.collectedBytes.v1";
   const UNLOCKED_WAVES_STORAGE_KEY = "sentinel.unlockedWaves.v1";
+  const COMPLETED_TRIAL_RUNS_STORAGE_KEY = "sentinel.completedTrialRuns.v1";
+  const BYTE_REWARD_MULTIPLIER = 10;
+  let completedTrialRuns = 0;
+  let runDeathCounted = false;
   let runCollectedBytes = 0;
   let totalCollectedBytes = 0;
   let runBytesFinalized = false;
@@ -2777,6 +3152,45 @@ window.onload = function () {
   let runWavesCleared = 0;
   let runStartWaves = 0;
   const bytePickupNotifications = [];
+
+  try {
+    const storedTrialRuns = localStorage.getItem(COMPLETED_TRIAL_RUNS_STORAGE_KEY);
+    if (storedTrialRuns !== null) {
+      const parsedTrialRuns = Number(storedTrialRuns);
+      if (Number.isSafeInteger(parsedTrialRuns) && parsedTrialRuns >= 0) {
+        completedTrialRuns = parsedTrialRuns;
+      } else {
+        console.warn("Ignoring invalid saved trial run count.");
+      }
+    }
+  } catch (error) {
+    console.error("Unable to load saved trial run count.", error);
+  }
+
+  function recordCompletedTrialRun() {
+    completedTrialRuns += 1;
+    try {
+      localStorage.setItem(COMPLETED_TRIAL_RUNS_STORAGE_KEY, String(completedTrialRuns));
+    } catch (error) {
+      console.error("Unable to save trial run count.", error);
+    }
+  }
+
+  function formatByteAmount(amount) {
+    const units = ["Bytes", "KB", "MB", "GB", "TB", "PB"];
+    let value = Math.max(0, Number(amount) || 0);
+    let unitIndex = 0;
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex++;
+    }
+
+    const formattedValue = unitIndex === 0
+      ? Math.floor(value).toLocaleString()
+      : value.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    return `${formattedValue} ${units[unitIndex]}`;
+  }
 
   // Milestone waves available across all difficulties: 1, 5, 15, 25, 35, 45
   const MILESTONE_WAVES = [
@@ -2886,7 +3300,6 @@ window.onload = function () {
     showMenuScreen = true;
     showMenu();
     window._bossMusicallyActive = false;
-    window._beamerBossMusicActive = false;
     stopBossMusic();
     stopLowHealthSound();
     fadeOutGameMusic(1200, () => {
@@ -3040,16 +3453,9 @@ window.onload = function () {
   // Burst interval in frames (higher = longer pause between bursts)
   let burstInterval = 120; // Increased for bigger cooldown
   const INTER_WAVE_DELAY_SECONDS = 8;
-  const FINAL_CAMPAIGN_WAVE = 45;
+  const VICTORY_WAVE = 40; // Set to desired victory wave (change for final version)
   let interWaveDelayTimer = 0;
   let interWavePending = false;
-  function triggerVictoryIfFinalWaveCleared() {
-    if (!window._victoryTriggered && !gameOver && wave > FINAL_CAMPAIGN_WAVE) {
-      window._victoryTriggered = true;
-      window._victoryTime = Date.now();
-    }
-    return !!window._victoryTriggered;
-  }
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
@@ -3204,6 +3610,11 @@ window.onload = function () {
     return particle;
   }
 
+  function releaseParticleAt(index) {
+    const particle = removeAtSwap(particles, index);
+    particlePool.push(particle);
+  }
+
   function spawnPlayerDeathSmoke(x, y, count) {
     for (let i = 0; i < count; i++) {
       const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
@@ -3322,11 +3733,6 @@ window.onload = function () {
     return "fan";
   }
 
-  function releaseParticleAt(index) {
-    const particle = removeAtSwap(particles, index);
-    particlePool.push(particle);
-  }
-
   function detonateMine(m, playSound = true) {
     if (!m) return;
     if (playSound) {
@@ -3421,10 +3827,9 @@ window.onload = function () {
         m.x += (m.vx || 0) * delta * SPEED_MULTIPLIER;
         m.y += (m.vy || 0) * delta * SPEED_MULTIPLIER;
       }
-      // Detonate on physical contact; timed mines still damage within the blast radius on expiry.
+      // Check if player is in explosion zone
       const distToPlayer = Math.hypot(player.x - m.x, player.y - m.y);
-      const mineContactRadius = (typeof m.radius === "number" ? m.radius : 0) + player.radius;
-      if (distToPlayer <= mineContactRadius) {
+      if (distToPlayer < 52 + player.radius) {
         detonateMine(m);
         mines.splice(i, 1);
         continue;
@@ -3440,7 +3845,7 @@ window.onload = function () {
     }
   }
 
-  // Draw mines
+  // Draw mines with visible trigger zone
   function drawMines() {
     for (let m of mines) {
       if (m.type === "burn") {
@@ -3478,6 +3883,26 @@ window.onload = function () {
         continue;
       }
       ctx.save();
+      // Draw trigger zone ring
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 52, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 187, 0, 0.28)";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 8]);
+      // Removed shadowColor and shadowBlur for mobs
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw soft shadow under mine
+      ctx.save();
+      ctx.globalAlpha = 0.32;
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = 'rgba(30, 30, 30, 0.85)';
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y + m.radius * 0.55, m.radius * 1.05, m.radius * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
       // Draw mine image core (larger)
       ctx.save();
@@ -3690,7 +4115,6 @@ window.onload = function () {
         window._playerUsedContinue = false;
         followMouse = false;
         window._bossMusicallyActive = false;
-        window._beamerBossMusicActive = false;
         stopBossMusic();
         stopLowHealthSound();
         fadeOutGameMusic(1200, () => { playMenuMusic(); });
@@ -3791,6 +4215,18 @@ window.onload = function () {
     getPaused: () => paused,
     setPaused: (value) => {
       paused = !!value;
+    },
+    setTutorialModalPause: (value) => {
+      tutorialModalPause = !!value;
+      if (tutorialModalPause) paused = true;
+    },
+    openTutorialStatsMenu: () => {
+      rightMouseHeld = false;
+      spaceHeld = false;
+      attackHeld = false;
+      deactivateAttack();
+      showStats = true;
+      paused = true;
     },
     getEditorSessionActive: () => !!window._editorSessionActive,
     setEditorSessionActive: (value) => {
@@ -3990,14 +4426,6 @@ window.onload = function () {
   function tryDiscoverProtocolFromEnemy(enemyType, x, y, options = {}) {
     const forceDrop = !!(options && options.forceDrop);
     const forcedRarity = options && typeof options.rarity === "string" ? options.rarity : null;
-    const waveProgress = Number.isFinite(wave) ? Math.max(0, wave - 1) : 0;
-    const waveDropBonus = Math.min(0.15, waveProgress * 0.003);
-    const specialPoolBaseChance = Math.min(0.2, 0.05 + waveProgress * 0.0025);
-    const specialPoolEnemyMultipliers = {
-      stalker: 1.5,
-      shielder: 1.5,
-      beamer: 2
-    };
     const dropRules = {
       grunt: { chance: 0.08 },
       kamikaze: { chance: 0.1 },
@@ -4012,8 +4440,7 @@ window.onload = function () {
     };
 
     const rule = dropRules[enemyType] || { chance: 0.1 };
-    const dropChance = Math.min(1, rule.chance + waveDropBonus);
-    if (!forceDrop && Math.random() > dropChance) return;
+    if (!forceDrop && Math.random() > rule.chance) return;
 
     // Allow duplicates: protocols can drop even if another orb of the same protocol is already on-screen.
     const droppableProtocols = Object.keys(PROTOCOLS);
@@ -4030,21 +4457,9 @@ window.onload = function () {
 
     const chooseRandom = (pool) => pool[Math.floor(Math.random() * pool.length)];
 
-    const targetedPools = [
-      getPool("Common", ["Higher"]),
-      getPool("Rare", ["Lower"]),
-      getPool("Rare", ["Standard"])
-    ].filter(pool => pool.length > 0);
-    const specialPoolChance = Math.min(
-      0.3,
-      specialPoolBaseChance * (specialPoolEnemyMultipliers[enemyType] || 1)
-    );
-
     let pool = [];
     if (forcedRarity === "Rare" || forcedRarity === "Common") {
       pool = getPool(forcedRarity);
-    } else if (targetedPools.length > 0 && Math.random() < specialPoolChance) {
-      pool = chooseRandom(targetedPools);
     } else if (enemyType === "grunt") {
       // Common lower only
       pool = getPool("Common", ["Lower"]);
@@ -4089,11 +4504,7 @@ window.onload = function () {
       pool = getPool("Rare");
     }
 
-    if (pool.length === 0) {
-      if (forcedRarity) return;
-      pool = getPool("Common");
-    }
-    if (pool.length === 0) return;
+    if (pool.length === 0) pool = droppableProtocols;
 
     const droppedProtocol = chooseRandom(pool);
     if (!droppedProtocol) return;
@@ -4106,44 +4517,16 @@ window.onload = function () {
       rarity === "Rare"   && tier === "Lower"    ? 3.5 :
       rarity === "Common" && tier === "Higher"   ? 3 :
       rarity === "Common" && tier === "Standard" ? 2.5 : 2;
-    const radius = rarity === "Rare" ? 12 : 10;
-    const spawnPosition = findProtocolOrbSpawnPosition(x, y, radius);
     protocolOrbs.push({
-      ...spawnPosition,
-      radius,
+      x,
+      y,
+      radius: rarity === "Rare" ? 12 : 10,
       type: "protocolOrb",
       protocolName: droppedProtocol,
       rarity,
       requiredFrames: requiredSeconds * 60,
-      progressFrames: 0,
-      spawnAge: 0
+      progressFrames: 0
     });
-  }
-
-  function findProtocolOrbSpawnPosition(x, y, radius) {
-    const minX = Math.min(radius + 8, canvas.width / 2);
-    const maxX = Math.max(canvas.width - radius - 8, canvas.width / 2);
-    const minY = Math.min(radius + 8, canvas.height / 2);
-    const maxY = Math.max(canvas.height - radius - 8, canvas.height / 2);
-    const originX = Math.max(minX, Math.min(maxX, x));
-    const originY = Math.max(minY, Math.min(maxY, y));
-    const existingOrbs = protocolOrbs;
-
-    for (let ring = 0; ring <= 12; ring++) {
-      const positionsInRing = ring === 0 ? 1 : ring * 12;
-      const distance = ring * (radius * 2 + 20);
-      for (let i = 0; i < positionsInRing; i++) {
-        const angle = (Math.PI * 2 * i) / positionsInRing;
-        const candidateX = Math.max(minX, Math.min(maxX, originX + Math.cos(angle) * distance));
-        const candidateY = Math.max(minY, Math.min(maxY, originY + Math.sin(angle) * distance));
-        const hasSpace = existingOrbs.every(orb =>
-          Math.hypot(candidateX - orb.x, candidateY - orb.y) >= radius + orb.radius + 20
-        );
-        if (hasSpace) return { x: candidateX, y: candidateY };
-      }
-    }
-
-    return { x: originX, y: originY };
   }
 
   function completeProtocolOrb(orb) {
@@ -4159,7 +4542,7 @@ window.onload = function () {
     const favoriteWarningColor = "#ffd84d";
     const protocolInfluence = Math.max(1, Math.floor((PROTOCOLS[orb.protocolName]?.influence) || 0));
     if (!useRunOnlyDiscovery) {
-      collectRunBytes(protocolInfluence);
+      collectRunBytes(protocolInfluence * BYTE_REWARD_MULTIPLIER);
     }
     const discovered = useRunOnlyDiscovery && typeof ProtocolSystem.discoverRunOnly === "function"
       ? ProtocolSystem.discoverRunOnly(orb.protocolName)
@@ -4178,8 +4561,9 @@ window.onload = function () {
         window._tutLastPickedProtocol = orb.protocolName;
         window.dispatchEvent(new CustomEvent('tut:firstProtocolPickup'));
         // Tutorial bonus: reward the player for picking up their first protocol
-        runCollectedBytes += 35;
-        protocolWarnings.push({ text: '+35 BYTES — FIRST PROTOCOL BONUS', color: '#00ffaa', timer: 240 });
+        const firstProtocolBonus = 35 * BYTE_REWARD_MULTIPLIER;
+        runCollectedBytes += firstProtocolBonus;
+        protocolWarnings.push({ text: `+${formatByteAmount(firstProtocolBonus).toUpperCase()} — FIRST PROTOCOL BONUS`, color: '#00ffaa', timer: 240 });
         while (protocolWarnings.length > 4) protocolWarnings.shift();
       }
     }
@@ -4620,12 +5004,7 @@ window.onload = function () {
 
     let isAttackFrame = nearest && minDist < player.range + nearest.radius && player.attackCooldown <= 0 && followMouse;
     if (isAttackFrame) {
-      const attackDx = nearest.x - player.x;
-      const attackDy = nearest.y - player.y;
-      const attackDist = Math.hypot(attackDx, attackDy) || 1;
-      const impactX = nearest.x - (attackDx / attackDist) * nearest.radius;
-      const impactY = nearest.y - (attackDy / attackDist) * nearest.radius;
-      drawLine(player.x, player.y, impactX, impactY, "LightBlue");
+      drawLine(player.x, player.y, nearest.x, nearest.y, "LightBlue");
       const shieldReduction = Math.max(0, Math.min(0.8, Number(nearest.shieldReduction) || 0));
       nearest.health -= player.damage * (1 - shieldReduction);
 
@@ -4639,8 +5018,8 @@ window.onload = function () {
           "rgb(248, 144, 144)"
         ][Math.floor(Math.random() * 4)];
         spawnParticle(
-          impactX,
-          impactY,
+          nearest.x,
+          nearest.y,
           Math.cos(angle) * speed,
           Math.sin(angle) * speed,
           18 + Math.floor(Math.random() * 32),
@@ -4676,7 +5055,9 @@ window.onload = function () {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
         if (!noLootDrop && nearest.type === "beamer") {
-          slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
+          for (let i = 0; i < 2; i++) {
+            slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
+          }
         }
         if (!noLootDrop && nearest.type === "shielder") {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
@@ -4877,7 +5258,6 @@ const droplifelenght = 280;
 
     for (let i = protocolOrbs.length - 1; i >= 0; i--) {
       const orb = protocolOrbs[i];
-      orb.spawnAge = Math.min(0.28, (orb.spawnAge || 0) + delta);
       const distToPlayer = Math.hypot(player.x - orb.x, player.y - orb.y);
       if (distToPlayer <= player.pickupRadius) {
         orb.progressFrames = Math.min(orb.requiredFrames, orb.progressFrames + (delta * SPEED_MULTIPLIER * pickupCaptureRate));
@@ -5446,7 +5826,7 @@ const droplifelenght = 280;
           };
 
           const titleLines = wrapText(hoveredBox.name, contentWidth, "900 14px sans-serif");
-          const familyLine = proto.family + " • " + proto.rarity + " • " + proto.tier;
+          const familyLine = proto.family + " • " + getProtocolRarityName(proto.rarity, proto.tier);
           const orderedStats = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
           const statShort = {
             Range: "Rng:",
@@ -5655,7 +6035,7 @@ const droplifelenght = 280;
       const candTokens = orderedStats.map(s => ({ text: `${statShort[s]}${fmtS(candMods[s] || 0)}`, color: tkCol(candMods[s] || 0) }));
 
       const titleLines = candProto ? _wrap(candName, contentW, "900 14px sans-serif") : [candName];
-      const familyLine = candProto ? (candProto.family + " • " + candProto.rarity + " • " + candProto.tier) : "";
+      const familyLine = candProto ? (candProto.family + " • " + getProtocolRarityName(candProto.rarity, candProto.tier)) : "";
       const candTokLines = _estTok(candTokens, contentW, "11px sans-serif");
 
       const hov = window._protocolReplaceHovered;
@@ -5938,7 +6318,7 @@ const droplifelenght = 280;
   
 
   function restartGame() {
-    window._bossSoundsStoppedForEndState = false;
+      window._bossSoundsStoppedForEndState = false;
       waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
     Object.assign(player, {
       x: 500, y: 430, health: 10, attackCooldown: 0,
@@ -6180,17 +6560,6 @@ const droplifelenght = 280;
                             const missingHealthRatio = Math.max(0, Math.min(1, 1 - (e.health / maxHealth)));
                             const phaseProgress = Math.max(0, Math.min(1, missingHealthRatio / 0.68));
                             e.bruteBossPhaseProgress = phaseProgress;
-                            const healthRatio = 1 - missingHealthRatio;
-                            const phase = healthRatio <= 0.33 ? 3 : healthRatio <= 0.67 ? 2 : 1;
-                            const previousPhase = typeof e._prevBruteBossPhase === "number"
-                              ? e._prevBruteBossPhase
-                              : phase;
-                            e._prevBruteBossPhase = phase;
-                            if (phase !== previousPhase) {
-                              triggerBossPhaseEffect(e, phase);
-                              continue;
-                            }
-                            if (e._bossPhaseStunTimer > 0) continue;
                             const volleyShots = 1 + Math.floor(phaseProgress * 4);
 
                             if (e.fireballCooldown <= 0) {
@@ -6224,7 +6593,6 @@ const droplifelenght = 280;
                 // Brute nova visual particles
                 for (let e of enemies) {
                   if (e.type === "brute" || e.type === "bruteBoss") {
-                    if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                     if (typeof e.fxCooldown !== "number") e.fxCooldown = Math.floor(Math.random() * 3);
                     if (e.fxCooldown > 0) {
                       e.fxCooldown--;
@@ -6288,7 +6656,6 @@ const droplifelenght = 280;
             // Brute nova visual and collision
             for (let e of enemies) {
               if (e.type === "brute" || e.type === "bruteBoss") {
-                if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                 // Nova animation states
                 const minRadius = typeof e.novaMinRadius === "number" ? e.novaMinRadius : (e.radius + 20); // slightly bigger than brute
                 let maxRadius = e.radius * (typeof e.novaMaxMultiplier === "number" ? e.novaMaxMultiplier : 3.2);
@@ -6362,13 +6729,13 @@ const droplifelenght = 280;
       const e = enemies[i];
         if (e.health > 0 && updateBossPhaseEffect(e, delta * SPEED_MULTIPLIER)) continue;
             if (e.health <= 0) {
-      if (SCREEN_SHAKE_ENEMY_TYPES.has(e.type)) {
-        screenShake = Math.max(
-          screenShake,
-          SCREEN_SHAKE_BOSS_TYPES.has(e.type) ? 16 : 9
-        );
-      }
-      const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss", "brute", "shielder"].includes(e.type);
+            if (SCREEN_SHAKE_ENEMY_TYPES.has(e.type)) {
+              screenShake = Math.max(
+                screenShake,
+                SCREEN_SHAKE_BOSS_TYPES.has(e.type) ? 16 : 9
+              );
+            }
+            const isBossType = ["gruntBoss", "gruntBossMinor", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss", "brute", "shielder"].includes(e.type);
             playSoundFresh(
               isBossType ? 'lumora_studios-pixel-explosion-319166.mp3' : 'freesound_community-8-bit-explosion-95847.mp3',
               (window.sentinelVolume && window.sentinelVolume.enemyDeath) || 0.5
@@ -6397,20 +6764,43 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
+              // Don't drop XP if wave end condition is "boss"
+              const isBossWaveEndCondition1 = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+              // Drop the same rewards for all boss types (rare + 2 common protocols, plus 25 XP drops)
+              if (!(e.noLoot || e.noXP) && !isBossWaveEndCondition1) {
+                tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
+                for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
+                  const spread = 16;
+                  tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
+                    forceDrop: true,
+                    rarity: "Common"
+                  });
+                }
+                for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                  const xpAngle = Math.random() * Math.PI * 2;
+                  const xpDist = 14 + Math.random() * 34;
+                  xpDrops.push({
+                    x: e.x + Math.cos(xpAngle) * xpDist,
+                    y: e.y + Math.sin(xpAngle) * xpDist
+                  });
+                }
+              }
               // Boss-gated waves use direct completion; other waves use standard burst progression
               if (wave === 5) {
                 unlockWave(5);
                 wave++;
                 runWavesCleared++;
-                if (!triggerVictoryIfFinalWaveCleared()) {
-                  try {
-                    let warnAudio = new Audio('warning.wav');
-                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                    warnAudio.playbackRate = 0.7;
-                    warnAudio.play();
-                  } catch (e) {}
-                  spawnWave();
+                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
+                  window._victoryTriggered = true;
+                  window._victoryTime = Date.now();
                 }
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
               }
             } else if (e.type === "gruntBossMinor") {
               // Grunt boss minor is not a true boss; keep its special death visuals + small XP payout
@@ -6483,15 +6873,17 @@ const droplifelenght = 280;
                 unlockWave(25);
                 wave++;
                 runWavesCleared++;
-                if (!triggerVictoryIfFinalWaveCleared()) {
-                  try {
-                    let warnAudio = new Audio('warning.wav');
-                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                    warnAudio.playbackRate = 0.7;
-                    warnAudio.play();
-                  } catch (e) {}
-                  spawnWave();
+                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
+                  window._victoryTriggered = true;
+                  window._victoryTime = Date.now();
                 }
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
               }
             } else if (e.type === "stalker") {
               const stalkerPalette = ["#57e7ff", "#7fdfff", "#a7f3ff", "#3ec6ff"];
@@ -6535,20 +6927,43 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
+              if (!(e.noLoot || e.noXP)) {
+                const isBossWaveEndConditionStalker = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
+                if (!isBossWaveEndConditionStalker) {
+                  tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
+                  for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
+                    const spread = 16;
+                    tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
+                      forceDrop: true,
+                      rarity: "Common"
+                    });
+                  }
+                  for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                    const xpAngle = Math.random() * Math.PI * 2;
+                    const xpDist = 14 + Math.random() * 34;
+                    xpDrops.push({
+                      x: e.x + Math.cos(xpAngle) * xpDist,
+                      y: e.y + Math.sin(xpAngle) * xpDist
+                    });
+                  }
+                }
+              }
               // Wave 35 boss gate
               if (wave === 35) {
                 unlockWave(35);
                 wave++;
                 runWavesCleared++;
-                if (!triggerVictoryIfFinalWaveCleared()) {
-                  try {
-                    let warnAudio = new Audio('warning.wav');
-                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                    warnAudio.playbackRate = 0.7;
-                    warnAudio.play();
-                  } catch (e) {}
-                  spawnWave();
+                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
+                  window._victoryTriggered = true;
+                  window._victoryTime = Date.now();
                 }
+                try {
+                  let warnAudio = new Audio('warning.wav');
+                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                  warnAudio.playbackRate = 0.7;
+                  warnAudio.play();
+                } catch (e) {}
+                spawnWave();
               }
             } else if (e.type === "beamerBoss") {
               const deathPalette = ["#00bfff", "#69eaff", "#d4f7ff", "#ffffff"];
@@ -6650,31 +7065,22 @@ const droplifelenght = 280;
             if (!(e.noLoot || e.noXP)) {
               const isBoss = ["gruntBoss", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss"].includes(e.type);
               if (isBoss) {
-                // Bosses always drop 2 rare + 3 common protocols.
+                // Bosses always drop 1 rare + 2 common protocols, plus 25 XP drops.
+                tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
                 for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
-                  const spread = 16;
-                  tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
-                    forceDrop: true,
-                    rarity: "Rare"
-                  });
-                }
-                for (let dropIndex = 0; dropIndex < 3; dropIndex++) {
                   const spread = 16;
                   tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
                     forceDrop: true,
                     rarity: "Common"
                   });
                 }
-                const isBossWaveEndCondition = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
-                if (!isBossWaveEndCondition) {
-                  for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
-                    const xpAngle = Math.random() * Math.PI * 2;
-                    const xpDist = 14 + Math.random() * 34;
-                    xpDrops.push({
-                      x: e.x + Math.cos(xpAngle) * xpDist,
-                      y: e.y + Math.sin(xpAngle) * xpDist
-                    });
-                  }
+                for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                  const xpAngle = Math.random() * Math.PI * 2;
+                  const xpDist = 14 + Math.random() * 34;
+                  xpDrops.push({
+                    x: e.x + Math.cos(xpAngle) * xpDist,
+                    y: e.y + Math.sin(xpAngle) * xpDist
+                  });
                 }
               } else {
                 tryDiscoverProtocolFromEnemy(e.type, e.x, e.y);
@@ -7528,6 +7934,7 @@ const droplifelenght = 280;
           ) {
             beginTelegraph();
           }
+          if (e._bossPhaseStunTimer > 0) continue;
 
           const centerX = canvas.width * 0.5;
           const centerY = canvas.height * 0.5;
@@ -7715,15 +8122,8 @@ const droplifelenght = 280;
               blinkCastSpeed = 22 + Math.floor(Math.random() * 10);
             }
             
-            const previousPhase = typeof e._prevStalkerBossPhase === "number"
-              ? e._prevStalkerBossPhase
-              : phaseLevel;
+            // Store phase for reference
             e.stalkerBossPhase = phaseLevel;
-            e._prevStalkerBossPhase = phaseLevel;
-            if (phaseLevel > previousPhase) {
-              triggerBossPhaseEffect(e, phaseLevel);
-              continue;
-            }
             
             // Initialize blink sequence tracking
             if (!e.blinkSequenceActive && typeof e.blinkSequenceCount === "undefined") {
@@ -7971,9 +8371,11 @@ const droplifelenght = 280;
         }
         const isTouchingPlayer = dist < (e.radius + player.radius);
         const isSlingerInRange = dist < (e.attackRange || 20) + player.radius;
-        const canAttackNow = (e.type === "gruntBoss" && e.gruntBossEntering !== false)
+        const canAttackNow = e.type === "slingerBoss"
           ? false
-          : (isSlinger ? isSlingerInRange : isTouchingPlayer);
+          : (e.type === "gruntBoss" && e.gruntBossEntering !== false)
+            ? false
+            : (isSlinger ? isSlingerInRange : isTouchingPlayer);
         if (canAttackNow) {
           if (e.attackCooldown <= 0) {
             if (isSlinger) {
@@ -8083,6 +8485,8 @@ const droplifelenght = 280;
               ctx.arc(e.x, e.y, e.radius + 52, 0, Math.PI * 2);
               ctx.strokeStyle = "rgba(255, 68, 68, 0.35)";
               ctx.lineWidth = 3;
+              ctx.shadowColor = "#ff4444";
+              ctx.shadowBlur = 8;
               ctx.stroke();
               ctx.restore();
 
@@ -8515,9 +8919,6 @@ const droplifelenght = 280;
     // Calculate delta time in seconds
     const delta = (currentTimestamp - lastTimestamp) / 1000;
     lastTimestamp = currentTimestamp;
-    const shakeOffsetX = screenShake > 0 ? (Math.random() * 2 - 1) * screenShake : 0;
-    const shakeOffsetY = screenShake > 0 ? (Math.random() * 2 - 1) * screenShake : 0;
-    screenShake = Math.max(0, screenShake - delta * 48);
 
     // ...existing code...
         // Draw wave announcement if timer is active
@@ -8535,7 +8936,9 @@ const droplifelenght = 280;
           ctx.restore();
           waveAnnouncementTimer -= delta * 60; // 60 = original FPS
         }
-    if (window._introPhase) {
+    if (tutorialModalPause) {
+      paused = true;
+    } else if (window._introPhase) {
       paused = true;
       showStats = false;
     } else if (window._secondDeathPending) {
@@ -8553,7 +8956,16 @@ const droplifelenght = 280;
       showStats = false;
     }
 
-    // Reset the previous frame's shake before clearing and drawing.
+    let shakeOffsetX = 0;
+    let shakeOffsetY = 0;
+    if (paused) {
+      screenShake = 0;
+    } else if (screenShake > 0) {
+      shakeOffsetX = (Math.random() * 2 - 1) * screenShake;
+      shakeOffsetY = (Math.random() * 2 - 1) * screenShake;
+      screenShake = Math.max(0, screenShake - delta * 48);
+    }
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -8710,19 +9122,20 @@ const droplifelenght = 280;
             interWaveDelayTimer = 0;
             wave++;
             runWavesCleared++;
-            triggerVictoryIfFinalWaveCleared();
+            if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
+              window._victoryTriggered = true;
+              window._victoryTime = Date.now();
+            }
             // Auto-unlock the next wave for future runs (for waves 1-50)
-            if (!window._victoryTriggered && wave <= FINAL_CAMPAIGN_WAVE && typeof unlockWave === "function") {
+            if (wave <= 50 && typeof unlockWave === "function") {
               unlockWave(wave);
             }
             
-            if (!window._victoryTriggered) {
-              try {
-                playSound('warning.wav', window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0);
-              } catch (e) {}
-              spawnWave();
-              burstTimer = burstInterval;
-            }
+            try {
+              playSound('warning.wav', window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0);
+            } catch (e) {}
+            spawnWave();
+            burstTimer = burstInterval;
           }
         } else {
           interWavePending = false;
@@ -8791,20 +9204,13 @@ const droplifelenght = 280;
 
       // Protocol orb glow (attackable discovery drops)
       protocolOrbs.forEach(orb => {
-        const now = Date.now();
-        const pulse = 0.85 + Math.sin(now * 0.008) * 0.15;
-        const spawnProgress = Math.min(1, (orb.spawnAge || 0) / 0.28);
-        const spawnEase = 1 - Math.pow(1 - spawnProgress, 3);
-        const popScale = spawnProgress < 1
-          ? 0.25 + 0.75 * spawnEase + Math.sin(spawnProgress * Math.PI) * 0.12
-          : 1;
-        const popAlpha = 0.35 + 0.65 * spawnEase;
+        const pulse = 0.85 + Math.sin(Date.now() * 0.008) * 0.15;
         const progress = orb.requiredFrames > 0 ? Math.min(1, orb.progressFrames / orb.requiredFrames) : 0;
-        const coreRadius = orb.radius * pulse * popScale;
+        const coreRadius = orb.radius * pulse;
+        const outerRadius = orb.radius * (1.9 + progress * 0.5);
         const _orbTier = (PROTOCOLS[orb.protocolName] && PROTOCOLS[orb.protocolName].tier) || "Standard";
         const coreColor = getProtocolRarityColor(orb.rarity, _orbTier);
         const edgeColor = getProtocolRarityEdgeColor(orb.rarity, _orbTier);
-        const outerRadius = orb.radius * (1.9 + progress * 0.5) * popScale;
 
         ctx.save();
         ctx.shadowColor = coreColor;
@@ -8816,23 +9222,13 @@ const droplifelenght = 280;
         ctx.beginPath();
         ctx.arc(orb.x, orb.y, outerRadius, 0, Math.PI * 2);
         ctx.fillStyle = grad;
-        ctx.globalAlpha = popAlpha;
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(orb.x, orb.y, coreRadius, 0, Math.PI * 2);
         ctx.fillStyle = coreColor;
-        ctx.globalAlpha = 0.75 * popAlpha;
+        ctx.globalAlpha = 0.75;
         ctx.fill();
-
-        if (spawnProgress < 1) {
-          ctx.globalAlpha = (1 - spawnProgress) * 0.7;
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = coreColor;
-          ctx.beginPath();
-          ctx.arc(orb.x, orb.y, orb.radius * (1 + spawnProgress * 1.8), 0, Math.PI * 2);
-          ctx.stroke();
-        }
 
         // Progress ring while attacking over time
         ctx.globalAlpha = 1;
@@ -8963,7 +9359,7 @@ const droplifelenght = 280;
             ctx.fillStyle = "#ffd84d";
             ctx.shadowColor = "#ffd84d";
             ctx.shadowBlur = 10;
-            ctx.fillText(`+${notification.amount} Bytes`, textX, textY);
+            ctx.fillText(`+${formatByteAmount(notification.amount)}`, textX, textY);
             ctx.restore();
           }
         }
@@ -10031,7 +10427,31 @@ const droplifelenght = 280;
           for (let i = particles.length - 1; i >= 0; i--) {
             if (particles[i].type === "playerSmoke") releaseParticleAt(i);
           }
-          spawnPlayerDeathBurst(px, py);
+          // Core burst — fiery shards
+          for (let i = 0; i < 70; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.4 + Math.random() * 2.2;
+            const colors = ["#ff3c3c", "#ff8800", "#ffdd00", "#ffffff", "#ff4466"];
+            spawnParticle(px, py,
+              Math.cos(angle) * speed, Math.sin(angle) * speed,
+              90 + Math.random() * 120,
+              colors[Math.floor(Math.random() * colors.length)],
+              0.97 + Math.random() * 0.025,
+              2 + Math.random() * 6,
+              "playerDeath");
+          }
+          // Long-burning embers
+          for (let i = 0; i < 50; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.1 + Math.random() * 0.9;
+            spawnParticle(px, py,
+              Math.cos(angle) * speed, Math.sin(angle) * speed,
+              150 + Math.random() * 180,
+              ["#ff6600", "#ff3300", "#ffaa00", "#ff2200"][Math.floor(Math.random() * 4)],
+              0.985 + Math.random() * 0.012,
+              2 + Math.random() * 8,
+              "playerDeath");
+          }
         }
 
         // Transition: once timer runs out, flip to final screen
@@ -10043,7 +10463,22 @@ const droplifelenght = 280;
         if (window._gameOverDeathPos && !window._gameOverOverlay) {
           const sp = window._gameOverDeathPos;
           const smokeCount = 2 + Math.floor(Math.random() * 2);
-          spawnPlayerDeathSmoke(sp.x, sp.y, smokeCount);
+          for (let i = 0; i < smokeCount; i++) {
+            const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2; // mostly upward
+            const speed = 0.15 + Math.random() * 0.5;
+            const offsetX = (Math.random() - 0.5) * 18;
+            const offsetY = (Math.random() - 0.5) * 18;
+            const grey = Math.floor(80 + Math.random() * 100);
+            spawnParticle(
+              sp.x + offsetX, sp.y + offsetY,
+              Math.cos(angle) * speed, Math.sin(angle) * speed,
+              60 + Math.random() * 90,
+              `rgba(${grey},${grey},${grey},0.55)`,
+              0.992 + Math.random() * 0.006,
+              6 + Math.random() * 18,
+              "playerSmoke"
+            );
+          }
         }
 
         // Draw explosion particles during entire game over phase
@@ -10103,7 +10538,6 @@ const droplifelenght = 280;
               window._playerUsedContinue = false;
               followMouse = false;
               window._bossMusicallyActive = false;
-              window._beamerBossMusicActive = false;
               stopBossMusic();
               stopLowHealthSound();
               if (typeof window.SentinelEditor !== "undefined" && window.SentinelEditor && typeof window.SentinelEditor.showWaveEditor === "function") {
@@ -10111,6 +10545,12 @@ const droplifelenght = 280;
               }
               requestAnimationFrame(gameLoop);
               return;
+            }
+
+            const isVictory = !!window._victoryTriggered;
+            if (!isVictory && !runDeathCounted) {
+              runDeathCounted = true;
+              recordCompletedTrialRun();
             }
 
             const runScore = Math.max(0, ((runWavesCleared - runStartWaves) * 100) - (Math.floor(runHealthLost) * 2));
@@ -10135,7 +10575,6 @@ const droplifelenght = 280;
               window._playerUsedContinue = false;
               followMouse = false;
               window._bossMusicallyActive = false;
-              window._beamerBossMusicActive = false;
               stopBossMusic();
               stopLowHealthSound();
               fadeOutGameMusic(1200, () => { playMenuMusic(); });
@@ -10146,7 +10585,6 @@ const droplifelenght = 280;
             overlay.id = "gameOverOverlay";
             overlay.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:800;font-family:sans-serif;";
 
-            const isVictory = !!window._victoryTriggered;
             const resultColor = isVictory ? "#ffd700" : "#ff3c3c";
             const panel = document.createElement("div");
             panel.style.cssText = `width:min(600px,92vw);max-height:92vh;overflow-y:auto;background:rgba(0,10,15,0.97);border:2px solid ${resultColor};border-radius:12px;box-shadow:0 0 32px ${resultColor}55;padding:28px 24px 22px;display:flex;flex-direction:column;align-items:center;gap:10px;`;
@@ -10169,7 +10607,7 @@ const droplifelenght = 280;
             // Stats row
             const statsRow = document.createElement("div");
             statsRow.style.cssText = "display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin:6px 0;";
-            [[`${runCollectedBytes}`, "Bytes", "#00ffdd"], [`${runWavesCleared}`, "Waves", "#aaf6ff"], [`${Math.floor(runHealthLost)}`, "HP Lost", "#ff8888"]].forEach(([val, label, color]) => {
+            [[formatByteAmount(runCollectedBytes), "Earned", "#00ffdd"], [`${runWavesCleared}`, "Waves", "#aaf6ff"], [`${Math.floor(runHealthLost)}`, "HP Lost", "#ff8888"]].forEach(([val, label, color]) => {
               const box = document.createElement("div");
               box.style.cssText = "display:flex;flex-direction:column;align-items:center;";
               const v = document.createElement("div");
