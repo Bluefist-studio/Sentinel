@@ -481,7 +481,7 @@
     installProtocolHighlight(pickedName);
     showTutorialModal(
       'PROTOCOLS DURING A RUN',
-      'Your 2 starter protocols begin active. You can have up to 6 protocols active at once. Click OK to open the paused Stats menu, then click the highlighted protocol in the Active Protocols list to activate it. During play, release Spacebar or the right mouse button to open this menu.\n\nRun discoveries are added to your permanent Protocol Database for future runs. Protocol orbs award Bytes based on their rarity; your run’s Bytes are added to your saved balance when the run ends. The first protocol orb you collect that is not already active each run also grants a +350 Bytes bonus. Byte amounts are displayed using binary units (1 KB = 1,024 B).',
+      'Your 2 starter protocols begin active. You can have up to 6 protocols active at once. Click OK to open the paused Stats menu, then click the highlighted protocol in the Active Protocols list to activate it. During play, release Spacebar or the right mouse button to open this menu.\n\nRun discoveries are added to your permanent Protocol Database for future runs. Protocol orbs award data based on their rarity; your run’s data is added to your saved balance when the run ends. The first protocol orb you collect that is not already active each run also grants a +350 KB bonus. Data is displayed in KB (1 MB = 1,024 KB).',
       true,
       () => window.SentinelEditorBridge.openTutorialStatsMenu(),
       'OK'
@@ -516,7 +516,7 @@
   function applyStep8(overlay) {
     showTutorialModal(
       'UPGRADE YOUR PROTOCOLS',
-      'Spend collected Bytes to upgrade discovered protocols and improve their effects. You can downgrade an upgraded protocol; this refunds the full Bytes cost of its most recent upgrade, so you can change your mind without losing Bytes.'
+      'Spend collected data to upgrade discovered protocols and improve their effects. You can downgrade an upgraded protocol; this refunds the full KB cost of its most recent upgrade, so you can change your mind without losing data.'
     );
     showBanner('Click an Upgrade button on a discovered protocol to permanently improve it!', 'tut-upgrade-banner');
     window._tutSubtitleForce = true; // keep subtitle visible during step 8

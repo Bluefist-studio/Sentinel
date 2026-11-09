@@ -875,6 +875,19 @@ window.onload = function () {
       gameStartedBehindOverlay = true;
       clearTimers();
       onComplete();
+      const playArea = canvas.getBoundingClientRect();
+      caption.style.left = `${playArea.left + playArea.width * 0.1}px`;
+      caption.style.top = `${playArea.top + playArea.height * 0.34}px`;
+      caption.style.bottom = "auto";
+      caption.style.width = `${playArea.width * 0.8}px`;
+      caption.style.padding = "18px 22px";
+      caption.style.boxSizing = "border-box";
+      caption.style.background = "rgba(0,12,22,.82)";
+      caption.style.border = "1px solid rgba(0,217,255,.72)";
+      caption.style.boxShadow = "0 0 24px rgba(0,217,255,.24), inset 0 0 18px rgba(0,100,150,.16)";
+      caption.style.backdropFilter = "blur(3px)";
+      eyebrow.style.color = "#00d9ff";
+      text.style.color = "#eaffff";
 
       overlay.style.background = "transparent";
       image.style.opacity = "0";
@@ -1073,6 +1086,8 @@ window.onload = function () {
     
     spawnWave();
     gameStarted = true;
+    hudFrameOverlay.style.display = "block";
+    hudWaveDisplay.style.display = "block";
     // Intro animation phase
     window._introPhase = "animating";
     window._introStartTime = performance.now();
@@ -1195,7 +1210,7 @@ window.onload = function () {
     bytesDisplay.style.fontSize = "1rem";
     bytesDisplay.style.fontWeight = "bold";
     const playerBytes = totalCollectedBytes || 0;
-    bytesDisplay.textContent = `Bytes: ${formatByteAmount(playerBytes)}`;
+    bytesDisplay.textContent = `Data: ${formatByteAmount(playerBytes)}`;
     panel.appendChild(bytesDisplay);
 
     const selectionCount = document.createElement("div");
@@ -1543,8 +1558,8 @@ window.onload = function () {
               if (currentUpgradeCost === null) return;
               if (totalCollectedBytes < currentUpgradeCost) {
                 showUpgradeInfoModal(
-                  "INSUFFICIENT BYTES",
-                  `Not enough Bytes. You need ${formatByteAmount(currentUpgradeCost)}, you have ${formatByteAmount(totalCollectedBytes)}.`
+                  "INSUFFICIENT DATA",
+                  `Not enough data. You need ${formatByteAmount(currentUpgradeCost)}, you have ${formatByteAmount(totalCollectedBytes)}.`
                 );
                 return;
               }
@@ -1556,8 +1571,8 @@ window.onload = function () {
                   if (!result.success) {
                     if (result.reason === "insufficient") {
                       showUpgradeInfoModal(
-                        "INSUFFICIENT BYTES",
-                        `Not enough Bytes. You need ${formatByteAmount(result.cost)}, you have ${formatByteAmount(totalCollectedBytes)}.`
+                        "INSUFFICIENT DATA",
+                        `Not enough data. You need ${formatByteAmount(result.cost)}, you have ${formatByteAmount(totalCollectedBytes)}.`
                       );
                     }
                     return;
@@ -1566,7 +1581,7 @@ window.onload = function () {
                     totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
                     saveCollectedBytes();
                     window.dispatchEvent(new CustomEvent('tut:protocolUpgraded'));
-                    bytesDisplay.textContent = `Bytes: ${formatByteAmount(totalCollectedBytes)}`;
+                    bytesDisplay.textContent = `Data: ${formatByteAmount(totalCollectedBytes)}`;
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
                     const totalTierCount = ProtocolSystem.upgradeTiers.length;
@@ -1645,7 +1660,7 @@ window.onload = function () {
                   if (result.success) {
                     totalCollectedBytes += result.refund || 0;
                     saveCollectedBytes();
-                    bytesDisplay.textContent = `Bytes: ${formatByteAmount(totalCollectedBytes)}`;
+                    bytesDisplay.textContent = `Data: ${formatByteAmount(totalCollectedBytes)}`;
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
                     const totalTierCount = ProtocolSystem.upgradeTiers.length;
@@ -2110,6 +2125,8 @@ window.onload = function () {
     document.body.appendChild(starterOverlay);
   }
   function showMenu() {
+    hudFrameOverlay.style.display = "none";
+    hudWaveDisplay.style.display = "none";
     const ENEMY_GLOSSARY = {
       factionName: "UNCLASSIFIED HOSTILES",
       factionDescription: "Faction designation pending. This index summarizes observed hostile combat roles and behavior patterns.",
@@ -3084,9 +3101,6 @@ window.onload = function () {
             }
           let waveAnnouncementTimer = 60; // Show announcement at game start
           const WAVE_ANNOUNCE_DURATION = 660; // Duration for wave announcement
-        // HUD overlay image
-        const hudImg = new window.Image();
-        hudImg.src = "liphud_slim_dark.png";
       // Game background image
       const backgroundImg = new window.Image();
       backgroundImg.src = "background4.png";
@@ -3094,6 +3108,32 @@ window.onload = function () {
     let playerVisualAngle = Math.PI / 2; // Start facing down
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
+  const gameStage = document.getElementById("gameStage");
+  const GAME_STAGE_WIDTH = 1365;
+  const GAME_STAGE_HEIGHT = 768;
+
+  function updateGameStageScale() {
+    const viewportScaleX = window.innerWidth / GAME_STAGE_WIDTH;
+    const viewportScaleY = window.innerHeight / GAME_STAGE_HEIGHT;
+    const viewportAspect = window.innerWidth / window.innerHeight;
+    const stageAspect = GAME_STAGE_WIDTH / GAME_STAGE_HEIGHT;
+    const scale = viewportAspect < 4 / 3 || viewportAspect > stageAspect
+      ? Math.min(viewportScaleX, viewportScaleY)
+      : Math.max(viewportScaleX, viewportScaleY);
+    gameStage.style.setProperty("--game-stage-scale", String(scale));
+  }
+
+  updateGameStageScale();
+  window.addEventListener("resize", updateGameStageScale);
+
+  const hudFrameOverlay = document.createElement("img");
+  hudFrameOverlay.src = "lidhud2_16x9.png";
+  hudFrameOverlay.alt = "";
+  hudFrameOverlay.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:20;display:none;pointer-events:none;user-select:none;";
+  gameStage.appendChild(hudFrameOverlay);
+  const hudWaveDisplay = document.createElement("div");
+  hudWaveDisplay.style.cssText = "position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:21;display:none;color:#00d9ff;font:bold 32px sans-serif;text-align:center;white-space:nowrap;text-shadow:0 0 18px #00d9ff,0 0 4px #000;pointer-events:none;user-select:none;";
+  gameStage.appendChild(hudWaveDisplay);
 
   function getCanvasMousePos(e) {
     const rect = canvas.getBoundingClientRect();
@@ -3177,7 +3217,7 @@ window.onload = function () {
   }
 
   function formatByteAmount(amount) {
-    const units = ["Bytes", "KB", "MB", "GB", "TB", "PB"];
+    const units = ["KB", "MB", "GB", "TB", "PB"];
     let value = Math.max(0, Number(amount) || 0);
     let unitIndex = 0;
 
@@ -3310,6 +3350,7 @@ window.onload = function () {
   totalCollectedBytes = loadCollectedBytes();
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
+  let statsMenuAnimationProgress = 0;
   let returnToMenuModalOpen = false;
   window._editorSessionActive = false;
   const protocolWarnings = [];
@@ -3453,9 +3494,70 @@ window.onload = function () {
   // Burst interval in frames (higher = longer pause between bursts)
   let burstInterval = 120; // Increased for bigger cooldown
   const INTER_WAVE_DELAY_SECONDS = 8;
-  const VICTORY_WAVE = 40; // Set to desired victory wave (change for final version)
+  const FINAL_CAMPAIGN_WAVE = 45;
   let interWaveDelayTimer = 0;
   let interWavePending = false;
+
+  function clearVictoryConsole() {
+    clearInterval(window._victoryConsoleTypewriter);
+    clearTimeout(window._victoryConsoleHoldTimer);
+    clearTimeout(window._victoryConsoleFadeTimer);
+    window._victoryConsoleOverlay?.remove();
+    window._victoryConsoleOverlay = null;
+    window._victoryConsoleTypewriter = null;
+    window._victoryConsoleHoldTimer = null;
+    window._victoryConsoleFadeTimer = null;
+  }
+
+  function showVictoryConsole(onComplete) {
+    clearVictoryConsole();
+    const panel = document.createElement("div");
+    panel.style.cssText = `position:absolute;left:${(GAME_STAGE_WIDTH - canvas.width) / 2 + canvas.width * 0.1}px;top:${canvas.height * 0.34}px;width:${canvas.width * 0.8}px;box-sizing:border-box;padding:18px 22px;background:rgba(0,12,22,.86);border:1px solid rgba(0,217,255,.72);box-shadow:0 0 24px rgba(0,217,255,.24),inset 0 0 18px rgba(0,100,150,.16);color:#eaffff;z-index:22;pointer-events:none;`;
+    const heading = document.createElement("div");
+    heading.textContent = "COMBAT SYSTEMS DIVISION // VICTORY PROTOCOL";
+    heading.style.cssText = "margin-bottom:12px;color:#00d9ff;font:700 13px 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.1em;text-shadow:0 0 7px rgba(0,217,255,.6);";
+    const message = document.createElement("div");
+    message.style.cssText = "color:#eaffff;font:500 21px/1.55 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,200,255,.3);white-space:pre-wrap;";
+    panel.append(heading, message);
+    gameStage.appendChild(panel);
+    window._victoryConsoleOverlay = panel;
+
+    const fullMessage = "Trial completed.\nAuto-destruction sequence activated.";
+    let typedCharacters = 0;
+    window._victoryConsoleTypewriter = setInterval(() => {
+      typedCharacters = Math.min(typedCharacters + 1, fullMessage.length);
+      message.textContent = fullMessage.slice(0, typedCharacters) + (typedCharacters < fullMessage.length ? "_" : "");
+      if (typedCharacters >= fullMessage.length) {
+        clearInterval(window._victoryConsoleTypewriter);
+        window._victoryConsoleTypewriter = null;
+        window._victoryConsoleHoldTimer = setTimeout(() => {
+          panel.style.transition = "opacity 450ms ease";
+          panel.style.opacity = "0";
+          window._victoryConsoleFadeTimer = setTimeout(() => {
+            panel.remove();
+            if (window._victoryConsoleOverlay === panel) {
+              window._victoryConsoleOverlay = null;
+            }
+            window._victoryConsoleFadeTimer = null;
+            onComplete();
+          }, 450);
+        }, 900);
+      }
+    }, 30);
+  }
+
+  function triggerVictoryIfFinalWaveCleared() {
+    if (!window._victoryTriggered && !gameOver && wave > FINAL_CAMPAIGN_WAVE) {
+      window._victoryTriggered = true;
+      window._victoryTime = undefined;
+      showVictoryConsole(() => {
+        if (window._victoryTriggered && !gameOver) {
+          window._victoryTime = Date.now();
+        }
+      });
+    }
+    return !!window._victoryTriggered;
+  }
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
@@ -4426,6 +4528,14 @@ window.onload = function () {
   function tryDiscoverProtocolFromEnemy(enemyType, x, y, options = {}) {
     const forceDrop = !!(options && options.forceDrop);
     const forcedRarity = options && typeof options.rarity === "string" ? options.rarity : null;
+    const waveProgress = Number.isFinite(wave) ? Math.max(0, wave - 1) : 0;
+    const waveDropBonus = Math.min(0.15, waveProgress * 0.003);
+    const specialPoolBaseChance = Math.min(0.2, 0.05 + waveProgress * 0.0025);
+    const specialPoolEnemyMultipliers = {
+      stalker: 1.5,
+      shielder: 1.5,
+      beamer: 2
+    };
     const dropRules = {
       grunt: { chance: 0.08 },
       kamikaze: { chance: 0.1 },
@@ -4440,7 +4550,8 @@ window.onload = function () {
     };
 
     const rule = dropRules[enemyType] || { chance: 0.1 };
-    if (!forceDrop && Math.random() > rule.chance) return;
+    const dropChance = Math.min(1, rule.chance + waveDropBonus);
+    if (!forceDrop && Math.random() > dropChance) return;
 
     // Allow duplicates: protocols can drop even if another orb of the same protocol is already on-screen.
     const droppableProtocols = Object.keys(PROTOCOLS);
@@ -4457,9 +4568,21 @@ window.onload = function () {
 
     const chooseRandom = (pool) => pool[Math.floor(Math.random() * pool.length)];
 
+    const targetedPools = [
+      getPool("Common", ["Higher"]),
+      getPool("Rare", ["Lower"]),
+      getPool("Rare", ["Standard"])
+    ].filter(pool => pool.length > 0);
+    const specialPoolChance = Math.min(
+      0.3,
+      specialPoolBaseChance * (specialPoolEnemyMultipliers[enemyType] || 1)
+    );
+
     let pool = [];
     if (forcedRarity === "Rare" || forcedRarity === "Common") {
       pool = getPool(forcedRarity);
+    } else if (targetedPools.length > 0 && Math.random() < specialPoolChance) {
+      pool = chooseRandom(targetedPools);
     } else if (enemyType === "grunt") {
       // Common lower only
       pool = getPool("Common", ["Lower"]);
@@ -4517,16 +4640,42 @@ window.onload = function () {
       rarity === "Rare"   && tier === "Lower"    ? 3.5 :
       rarity === "Common" && tier === "Higher"   ? 3 :
       rarity === "Common" && tier === "Standard" ? 2.5 : 2;
+    const radius = rarity === "Rare" ? 12 : 10;
+    const spawnPosition = findProtocolOrbSpawnPosition(x, y, radius);
     protocolOrbs.push({
-      x,
-      y,
-      radius: rarity === "Rare" ? 12 : 10,
+      ...spawnPosition,
+      radius,
       type: "protocolOrb",
       protocolName: droppedProtocol,
       rarity,
       requiredFrames: requiredSeconds * 60,
       progressFrames: 0
     });
+  }
+
+  function findProtocolOrbSpawnPosition(x, y, radius) {
+    const minX = Math.min(radius + 8, canvas.width / 2);
+    const maxX = Math.max(canvas.width - radius - 8, canvas.width / 2);
+    const minY = Math.min(radius + 8, canvas.height / 2);
+    const maxY = Math.max(canvas.height - radius - 8, canvas.height / 2);
+    const originX = Math.max(minX, Math.min(maxX, x));
+    const originY = Math.max(minY, Math.min(maxY, y));
+
+    for (let ring = 0; ring <= 12; ring++) {
+      const positionsInRing = ring === 0 ? 1 : ring * 12;
+      const distance = ring * (radius * 2 + 20);
+      for (let i = 0; i < positionsInRing; i++) {
+        const angle = (Math.PI * 2 * i) / positionsInRing;
+        const candidateX = Math.max(minX, Math.min(maxX, originX + Math.cos(angle) * distance));
+        const candidateY = Math.max(minY, Math.min(maxY, originY + Math.sin(angle) * distance));
+        const hasSpace = protocolOrbs.every(orb =>
+          Math.hypot(candidateX - orb.x, candidateY - orb.y) >= radius + orb.radius + 20
+        );
+        if (hasSpace) return { x: candidateX, y: candidateY };
+      }
+    }
+
+    return { x: originX, y: originY };
   }
 
   function completeProtocolOrb(orb) {
@@ -5363,7 +5512,13 @@ const droplifelenght = 280;
   }
 
   function drawHUD() {
+    hudWaveDisplay.textContent = "Wave " + wave;
     // ...existing code...
+    const menuSlideProgress = 1 - Math.pow(1 - statsMenuAnimationProgress, 3);
+    const statsSlideX = -330 * (1 - menuSlideProgress);
+    const protocolsSlideX = 330 * (1 - menuSlideProgress);
+    const hotkeySlideY = 110 * (1 - menuSlideProgress);
+    const isStatsMenuVisible = showStats || statsMenuAnimationProgress > 0;
     if (window._editorSessionActive && gameStarted && !gameOver) {
       ctx.save();
       ctx.font = "bold 16px sans-serif";
@@ -5375,7 +5530,7 @@ const droplifelenght = 280;
       ctx.fillText("Press O to open editor", canvas.width / 2, 65);
       ctx.restore();
     }
-    if (showStats) {
+    if (isStatsMenuVisible) {
       // ...existing code for stats panel...
       const statsPanelWidth = 320;
       const statsPanelHeight = 370;
@@ -5384,20 +5539,22 @@ const droplifelenght = 280;
       const statsPanelCenterX = statsPanelX + statsPanelWidth / 2;
 
       ctx.save();
+      ctx.translate(statsSlideX, 0);
+      ctx.save();
       ctx.globalAlpha = 0.75;
-      ctx.fillStyle = '#152c16';
+      ctx.fillStyle = '#0b1b2b';
       ctx.fillRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
-      // Green glowing border
+      // Blue glowing border
       ctx.globalAlpha = 1.0;
-      ctx.shadowColor = '#00ffdd';
+      ctx.shadowColor = '#00d9ff';
       ctx.shadowBlur = 18;
-      ctx.strokeStyle = '#00ffdd';
+      ctx.strokeStyle = '#00d9ff';
       ctx.lineWidth = 3;
       ctx.strokeRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
       ctx.restore();
-      ctx.fillStyle = "#00ffdd";
+      ctx.fillStyle = "#00d9ff";
       ctx.textAlign = "left";
       ctx.font = "bold 16px sans-serif";
       ctx.textAlign = "center";
@@ -5442,7 +5599,7 @@ const droplifelenght = 280;
         // Stat name centered
         ctx.font = "bold 14px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillStyle = "#00ffdd";
+        ctx.fillStyle = "#00d9ff";
         ctx.fillText(stat.label, panelCenter, y);
         // Base / Protocol line
         ctx.font = "11px sans-serif";
@@ -5450,9 +5607,9 @@ const droplifelenght = 280;
         ctx.fillText(bpValue, panelCenter, y + 12);
         // - button
         const minusX = panelCenter - (groupWidth / 2);
-        ctx.fillStyle = stat.base > 0 ? "#00ffdd" : "#555";
+        ctx.fillStyle = stat.base > 0 ? "#00d9ff" : "#555";
         ctx.fillRect(minusX, y + 18, 18, 16);
-        ctx.fillStyle = "#152c16";
+        ctx.fillStyle = "#061525";
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("-", minusX + 9, y + 31);
@@ -5465,7 +5622,7 @@ const droplifelenght = 280;
         });
         // Total value centered between buttons
         ctx.font = "16px sans-serif";
-        ctx.fillStyle = "#00ffdd";
+        ctx.fillStyle = "#00d9ff";
         ctx.textAlign = "center";
         const valueX = panelCenter;
         ctx.fillText(totalText, valueX, y + 31);
@@ -5478,9 +5635,9 @@ const droplifelenght = 280;
         });
         // + button
         const plusX = panelCenter + (groupWidth / 2) - 18;
-        ctx.fillStyle = statPoints > 0 && stat.base < (level + 1) ? "#00ffdd" : "#555";
+        ctx.fillStyle = statPoints > 0 && stat.base < (level + 1) ? "#00d9ff" : "#555";
         ctx.fillRect(plusX, y + 18, 18, 16);
-        ctx.fillStyle = "#152c16";
+        ctx.fillStyle = "#061525";
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("+", plusX + 9, y + 31);
@@ -5502,9 +5659,9 @@ const droplifelenght = 280;
         const pulse = 0.35 + 0.55 * Math.abs(Math.sin(Date.now() / 400));
         ctx.save();
         ctx.globalAlpha = pulse;
-        ctx.shadowColor = '#00ffdd';
+        ctx.shadowColor = '#00d9ff';
         ctx.shadowBlur = 14;
-        ctx.strokeStyle = '#00ffdd';
+        ctx.strokeStyle = '#00d9ff';
         ctx.lineWidth = 2;
         for (const box of window._statPlusButtonBoxes) {
           ctx.strokeRect(box.x - 4, box.y - 4, box.w + 8, box.h + 8);
@@ -5515,24 +5672,31 @@ const droplifelenght = 280;
       ctx.fillStyle = "#aaf6ff";
       ctx.textAlign = "center";
       ctx.fillText("B: Base   P: Protocol   T: Total", statsPanelCenterX, statsPanelY + statsPanelHeight - 10);
+      for (const boxes of [window._statButtonBoxes, window._statMinusButtonBoxes, window._statPlusButtonBoxes]) {
+        for (const box of boxes) box.x += statsSlideX;
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(0, hotkeySlideY);
         ctx.globalAlpha = 0.75;
-        ctx.fillStyle = '#152c16';
+        ctx.fillStyle = '#0b1b2b';
         ctx.fillRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
         ctx.globalAlpha = 1.0;
-        ctx.shadowColor = '#00ffdd';
+        ctx.shadowColor = '#00d9ff';
         ctx.shadowBlur = 18;
-        ctx.strokeStyle = '#00ffdd';
+        ctx.strokeStyle = '#00d9ff';
         ctx.lineWidth = 3;
         ctx.strokeRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
         ctx.shadowBlur = 0;
-        ctx.fillStyle = "#00ffdd";
+        ctx.fillStyle = "#00d9ff";
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("[1]-> Range  [2]-> Power  [3]-> Atk Speed  [4]-> Movement  [5]-> Vitality  [6]-> Pickup", canvas.width / 2, canvas.height - 85);
         ctx.restore();
 
     // Protocol Selection Panel (right side, wider with scrolling, organized by families)
-    if (showStats) {
+    if (isStatsMenuVisible) {
       const panelWidth = 320;
       const panelHeight = 370;
       const panelX = canvas.width - panelWidth - 10;
@@ -5541,21 +5705,23 @@ const droplifelenght = 280;
       const contentHeight = panelHeight - 55;
       
       ctx.save();
+      ctx.translate(protocolsSlideX, 0);
+      ctx.save();
       ctx.globalAlpha = 0.75;
-      ctx.fillStyle = '#152c16';
+      ctx.fillStyle = '#0b1b2b';
       ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-      // Green glowing border
+      // Blue glowing border
       ctx.globalAlpha = 1.0;
-      ctx.shadowColor = '#00ffdd';
+      ctx.shadowColor = '#00d9ff';
       ctx.shadowBlur = 18;
-      ctx.strokeStyle = '#00ffdd';
+      ctx.strokeStyle = '#00d9ff';
       ctx.lineWidth = 3;
       ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
       ctx.restore();
       
-      ctx.fillStyle = "#00ffdd";
+      ctx.fillStyle = "#00d9ff";
       ctx.textAlign = "center";
       ctx.font = "bold 14px sans-serif";
       ctx.fillText("Active Protocols", panelX + panelWidth / 2, panelY + 20);
@@ -5599,7 +5765,7 @@ const droplifelenght = 280;
         
         // Family header
         ctx.save();
-        ctx.fillStyle = "#00ffdd";
+        ctx.fillStyle = "#00d9ff";
         ctx.font = "bold 12px sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(family, panelX + panelWidth / 2, y + 15);
@@ -5640,7 +5806,7 @@ const droplifelenght = 280;
           ctx.strokeRect(cardX, y, cardWidth, 26);
           
           ctx.font = "bold 12px sans-serif";
-          ctx.fillStyle = isActive ? "#152c16" : (isDiscovered ? _prc : "#7f8f8b");
+          ctx.fillStyle = isActive ? "#061525" : (isDiscovered ? _prc : "#7f8f8b");
           ctx.textAlign = "center";
           ctx.fillText(protocolName.substr(0, 28), cardX + cardWidth / 2, y + 16);
 
@@ -5684,9 +5850,9 @@ const droplifelenght = 280;
           if (window._newlyPickedProtocols.has(box.name)) {
             const np = 0.4 + 0.5 * Math.abs(Math.sin(Date.now() / 450));
             ctx.globalAlpha = np;
-            ctx.shadowColor = '#00ffdd';
+            ctx.shadowColor = '#00d9ff';
             ctx.shadowBlur = 18;
-            ctx.strokeStyle = '#00ffdd';
+            ctx.strokeStyle = '#00d9ff';
             ctx.lineWidth = 2.5;
             ctx.strokeRect(box.x - 4, box.y - 4, box.w + 8, box.h + 8);
           }
@@ -5703,7 +5869,7 @@ const droplifelenght = 280;
         const scrollbarHeight = Math.max(20, contentHeight * scrollRatio);
         const scrollbarY = contentY + (window._protocolScrollOffset / totalContentHeight) * contentHeight;
         
-        ctx.fillStyle = "rgba(0, 255, 221, 0.5)";
+        ctx.fillStyle = "rgba(0, 217, 255, 0.5)";
         ctx.fillRect(panelX + 2, scrollbarY, 6, scrollbarHeight);
       }
 
@@ -5716,9 +5882,9 @@ const droplifelenght = 280;
         const pulse = 0.35 + 0.55 * Math.abs(Math.sin(Date.now() / 500));
         ctx.save();
         ctx.globalAlpha = pulse;
-        ctx.shadowColor = '#00ffdd';
+        ctx.shadowColor = '#00d9ff';
         ctx.shadowBlur = 20;
-        ctx.strokeStyle = '#00ffdd';
+        ctx.strokeStyle = '#00d9ff';
         ctx.lineWidth = 3;
         ctx.strokeRect(panelX + 2, panelY + 2, panelWidth - 4, panelHeight - 4);
         ctx.restore();
@@ -5744,6 +5910,13 @@ const droplifelenght = 280;
           }
         }
       }
+
+      window._protocolPanelX = panelX + protocolsSlideX;
+      for (const box of window._protocolSelectorBoxes) {
+        box.x += protocolsSlideX;
+        box.favoriteX += protocolsSlideX;
+      }
+      ctx.restore();
       
       // Display hovered protocol details following mouse cursor
       if (!window._protocolReplaceMode && hoveredProtocol >= 0) {
@@ -5911,7 +6084,7 @@ const droplifelenght = 280;
           ctx.save();
           ctx.save();
           ctx.globalAlpha = 0.93;
-          ctx.fillStyle = '#152c16';
+          ctx.fillStyle = '#0b1b2b';
           ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
           ctx.strokeStyle = hoveredBox.discovered ? getProtocolRarityColor(proto.rarity, proto.tier) : "#7f8f8b";
           ctx.lineWidth = 2.5;
@@ -6062,18 +6235,18 @@ const droplifelenght = 280;
 
       // Panel bg + border
       ctx.globalAlpha = 0.96;
-      ctx.fillStyle = "#0a1a18";
+      ctx.fillStyle = "#081a2b";
       ctx.fillRect(panelX, panelY, panelW, panelH);
       ctx.globalAlpha = 1;
-      ctx.shadowColor = "#00ffdd"; ctx.shadowBlur = 18;
-      ctx.strokeStyle = "#00ffdd"; ctx.lineWidth = 2;
+      ctx.shadowColor = "#00d9ff"; ctx.shadowBlur = 18;
+      ctx.strokeStyle = "#00d9ff"; ctx.lineWidth = 2;
       ctx.strokeRect(panelX, panelY, panelW, panelH);
       ctx.shadowBlur = 0;
 
       let ty = panelY + pad + titleLineHeight;
 
       // Candidate name & family
-      ctx.font = "900 14px sans-serif"; ctx.fillStyle = "#00ff88"; ctx.textAlign = "center";
+      ctx.font = "900 14px sans-serif"; ctx.fillStyle = "#00d9ff"; ctx.textAlign = "center";
       titleLines.forEach(line => { ctx.fillText(line, centerX, ty); ty += titleLineHeight; });
       ctx.font = "bold 11px sans-serif"; ctx.fillStyle = candProto ? getProtocolRarityColor(candProto.rarity, candProto.tier) : "#aaf6ff";
       ctx.fillText(familyLine, centerX, ty); ty += bodyLineHeight;
@@ -6091,12 +6264,12 @@ const droplifelenght = 280;
         const name = activeList[i];
         const isHov = name === hov;
         ctx.globalAlpha = 0.9;
-        ctx.fillStyle = isHov ? "#1a4a3a" : "#1a2e2a";
+        ctx.fillStyle = isHov ? "#123a56" : "#0d263b";
         ctx.fillRect(panelX + pad, ty, contentW, cardH);
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = isHov ? "#00ff88" : "#00ffdd"; ctx.lineWidth = 1.5;
+        ctx.strokeStyle = isHov ? "#00d9ff" : "#287ca3"; ctx.lineWidth = 1.5;
         ctx.strokeRect(panelX + pad, ty, contentW, cardH);
-        ctx.fillStyle = isHov ? "#00ff88" : "#c8ffff";
+        ctx.fillStyle = isHov ? "#00d9ff" : "#c8ffff";
         ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
         ctx.fillText(name, centerX, ty + 17);
         window._protocolReplacePanelBoxes.push({ x: panelX + pad, y: ty, w: contentW, h: cardH, name, cancel: false });
@@ -6123,10 +6296,10 @@ const droplifelenght = 280;
       const cancelW = 110;
       const cancelX = centerX - cancelW / 2;
       ctx.globalAlpha = 0.85;
-      ctx.fillStyle = "#0a1e1a";
+      ctx.fillStyle = "#0b2033";
       ctx.fillRect(cancelX, cancelY, cancelW, cardH);
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = "#2f9cad"; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#287ca3"; ctx.lineWidth = 1.5;
       ctx.strokeRect(cancelX, cancelY, cancelW, cardH);
       ctx.fillStyle = "#c8ffff"; ctx.font = "13px sans-serif"; ctx.textAlign = "center";
       ctx.fillText("Cancel", centerX, cancelY + 17);
@@ -6266,7 +6439,10 @@ const droplifelenght = 280;
         if (!showStats) return;
         const { x: mx, y: my } = getCanvasMousePos(e);
         // Check if mouse is over protocol panel (right side)
-        if (mx > canvas.width - 340 && my > 190 && my < 560) {
+        const protocolPanelX = typeof window._protocolPanelX === "number"
+          ? window._protocolPanelX
+          : canvas.width - 330;
+        if (mx >= protocolPanelX && mx <= protocolPanelX + 320 && my > 190 && my < 560) {
           e.preventDefault();
           const protocolCountsByFamily = { "Targeting": 0, "Overdrive": 0, "Utility": 0 };
           Object.keys(PROTOCOLS).forEach(protocolName => {
@@ -6288,36 +6464,12 @@ const droplifelenght = 280;
       window._statButtonListenersAdded = true;
     }
     }
-    // Draw HUD overlay image
-    if (hudImg.complete && hudImg.naturalWidth > 0) {
-      ctx.drawImage(hudImg, 0, 0, canvas.width, canvas.height);
-    }
-    // Draw wave and stat point H122030UD above HUD overlay
-    ctx.save();
-    ctx.shadowColor = "#000";
-    ctx.shadowBlur = 4;
-    const q1 = canvas.width * 0.125;
-    const q2 = canvas.width * 0.375;
-    const q3 = canvas.width * 0.625;
-    const q4 = canvas.width * 0.875;
-    ctx.textAlign = "center";
-
-
-    // Prominent Wave label
-    ctx.font = "bold 32px sans-serif";
-    ctx.fillStyle = "#00ffdd";
-    ctx.shadowColor = '#00ffdd';
-    ctx.shadowBlur = 18;
-    const wavetext = "Wave " + wave;
-    const wavetextWidth = ctx.measureText(wavetext).wi3dth;
-    ctx.fillText(wavetext, canvas.width / 2, 45);
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
   }
 
   
 
   function restartGame() {
+      clearVictoryConsole();
       window._bossSoundsStoppedForEndState = false;
       waveAnnouncementTimer = WAVE_ANNOUNCE_DURATION;
     Object.assign(player, {
@@ -6406,20 +6558,24 @@ const droplifelenght = 280;
   function updateEnemies(delta) {
                         for (let e of enemies) {
                           if (typeof e.shieldPersistTimer !== "number") e.shieldPersistTimer = 0;
+                          if (e.shieldedBy && e.shieldedBy.type === "shielder" && e.shieldedBy.health <= 0) {
+                            e.shieldPersistTimer = 0;
+                          }
                           if (e.shieldPersistTimer > 0) {
                             e.shieldPersistTimer -= delta * SPEED_MULTIPLIER;
                             if (e.shieldPersistTimer <= 0) {
                               e.shieldPersistTimer = 0;
                               e.shielded = false;
                               e.shieldReduction = 0;
+                              e.shieldedBy = null;
                             } else {
                               e.shielded = true;
                             }
                           } else {
                             e.shielded = false;
                             e.shieldReduction = 0;
+                            e.shieldedBy = null;
                           }
-                          e.shieldedBy = null;
                           if (Array.isArray(e.activeShieldTargets)) e.activeShieldTargets.length = 0;
                         }
                         // Decrease noBossCollision timer for grunts
@@ -6560,6 +6716,17 @@ const droplifelenght = 280;
                             const missingHealthRatio = Math.max(0, Math.min(1, 1 - (e.health / maxHealth)));
                             const phaseProgress = Math.max(0, Math.min(1, missingHealthRatio / 0.68));
                             e.bruteBossPhaseProgress = phaseProgress;
+                            const healthRatio = 1 - missingHealthRatio;
+                            const phase = healthRatio <= 0.33 ? 3 : healthRatio <= 0.67 ? 2 : 1;
+                            const previousPhase = typeof e._prevBruteBossPhase === "number"
+                              ? e._prevBruteBossPhase
+                              : phase;
+                            e._prevBruteBossPhase = phase;
+                            if (phase !== previousPhase) {
+                              triggerBossPhaseEffect(e, phase);
+                              continue;
+                            }
+                            if (e._bossPhaseStunTimer > 0) continue;
                             const volleyShots = 1 + Math.floor(phaseProgress * 4);
 
                             if (e.fireballCooldown <= 0) {
@@ -6593,6 +6760,7 @@ const droplifelenght = 280;
                 // Brute nova visual particles
                 for (let e of enemies) {
                   if (e.type === "brute" || e.type === "bruteBoss") {
+                    if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                     if (typeof e.fxCooldown !== "number") e.fxCooldown = Math.floor(Math.random() * 3);
                     if (e.fxCooldown > 0) {
                       e.fxCooldown--;
@@ -6656,6 +6824,7 @@ const droplifelenght = 280;
             // Brute nova visual and collision
             for (let e of enemies) {
               if (e.type === "brute" || e.type === "bruteBoss") {
+                if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                 // Nova animation states
                 const minRadius = typeof e.novaMinRadius === "number" ? e.novaMinRadius : (e.radius + 20); // slightly bigger than brute
                 let maxRadius = e.radius * (typeof e.novaMaxMultiplier === "number" ? e.novaMaxMultiplier : 3.2);
@@ -6790,17 +6959,15 @@ const droplifelenght = 280;
                 unlockWave(5);
                 wave++;
                 runWavesCleared++;
-                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-                  window._victoryTriggered = true;
-                  window._victoryTime = Date.now();
+                if (!triggerVictoryIfFinalWaveCleared()) {
+                  try {
+                    let warnAudio = new Audio('warning.wav');
+                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                    warnAudio.playbackRate = 0.7;
+                    warnAudio.play();
+                  } catch (e) {}
+                  spawnWave();
                 }
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
               }
             } else if (e.type === "gruntBossMinor") {
               // Grunt boss minor is not a true boss; keep its special death visuals + small XP payout
@@ -6873,17 +7040,15 @@ const droplifelenght = 280;
                 unlockWave(25);
                 wave++;
                 runWavesCleared++;
-                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-                  window._victoryTriggered = true;
-                  window._victoryTime = Date.now();
+                if (!triggerVictoryIfFinalWaveCleared()) {
+                  try {
+                    let warnAudio = new Audio('warning.wav');
+                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                    warnAudio.playbackRate = 0.7;
+                    warnAudio.play();
+                  } catch (e) {}
+                  spawnWave();
                 }
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
               }
             } else if (e.type === "stalker") {
               const stalkerPalette = ["#57e7ff", "#7fdfff", "#a7f3ff", "#3ec6ff"];
@@ -6953,17 +7118,15 @@ const droplifelenght = 280;
                 unlockWave(35);
                 wave++;
                 runWavesCleared++;
-                if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-                  window._victoryTriggered = true;
-                  window._victoryTime = Date.now();
+                if (!triggerVictoryIfFinalWaveCleared()) {
+                  try {
+                    let warnAudio = new Audio('warning.wav');
+                    warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
+                    warnAudio.playbackRate = 0.7;
+                    warnAudio.play();
+                  } catch (e) {}
+                  spawnWave();
                 }
-                try {
-                  let warnAudio = new Audio('warning.wav');
-                  warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
-                  warnAudio.playbackRate = 0.7;
-                  warnAudio.play();
-                } catch (e) {}
-                spawnWave();
               }
             } else if (e.type === "beamerBoss") {
               const deathPalette = ["#00bfff", "#69eaff", "#d4f7ff", "#ffffff"];
@@ -8122,8 +8285,15 @@ const droplifelenght = 280;
               blinkCastSpeed = 22 + Math.floor(Math.random() * 10);
             }
             
-            // Store phase for reference
+            const previousPhase = typeof e._prevStalkerBossPhase === "number"
+              ? e._prevStalkerBossPhase
+              : phaseLevel;
             e.stalkerBossPhase = phaseLevel;
+            e._prevStalkerBossPhase = phaseLevel;
+            if (phaseLevel > previousPhase) {
+              triggerBossPhaseEffect(e, phaseLevel);
+              continue;
+            }
             
             // Initialize blink sequence tracking
             if (!e.blinkSequenceActive && typeof e.blinkSequenceCount === "undefined") {
@@ -8916,6 +9086,7 @@ const droplifelenght = 280;
       requestAnimationFrame(gameLoop);
       return;
     }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     // Calculate delta time in seconds
     const delta = (currentTimestamp - lastTimestamp) / 1000;
     lastTimestamp = currentTimestamp;
@@ -8955,6 +9126,9 @@ const droplifelenght = 280;
       paused = false;
       showStats = false;
     }
+    statsMenuAnimationProgress = Math.max(0, Math.min(1,
+      statsMenuAnimationProgress + (showStats ? delta : -delta) / 0.35
+    ));
 
     let shakeOffsetX = 0;
     let shakeOffsetY = 0;
@@ -8966,7 +9140,6 @@ const droplifelenght = 280;
       screenShake = Math.max(0, screenShake - delta * 48);
     }
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw background image, fallback to clear if not loaded
@@ -9122,20 +9295,19 @@ const droplifelenght = 280;
             interWaveDelayTimer = 0;
             wave++;
             runWavesCleared++;
-            if (!window._victoryTriggered && !gameOver && runWavesCleared >= VICTORY_WAVE) {
-              window._victoryTriggered = true;
-              window._victoryTime = Date.now();
-            }
+            triggerVictoryIfFinalWaveCleared();
             // Auto-unlock the next wave for future runs (for waves 1-50)
-            if (wave <= 50 && typeof unlockWave === "function") {
+            if (!window._victoryTriggered && wave <= FINAL_CAMPAIGN_WAVE && typeof unlockWave === "function") {
               unlockWave(wave);
             }
             
-            try {
-              playSound('warning.wav', window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0);
-            } catch (e) {}
-            spawnWave();
-            burstTimer = burstInterval;
+            if (!window._victoryTriggered) {
+              try {
+                playSound('warning.wav', window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 1.0);
+              } catch (e) {}
+              spawnWave();
+              burstTimer = burstInterval;
+            }
           }
         } else {
           interWavePending = false;
@@ -10201,14 +10373,6 @@ const droplifelenght = 280;
 
 
       //-======================HUD AND STAT ALLOCATION======================-
-      // Draw HUD overlay image after stat allocation boxes
-      if (hudImg.complete && hudImg.naturalWidth > 0) {
-        ctx.save();
-        ctx.globalAlpha = 1;
-        ctx.drawImage(hudImg, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
-        ctx.globalAlpha = 1;
-      }
       drawProtocolWarnings();
       if (gameStarted && !gameOver && !followMouse && !window._protocolReplaceMode && window._introPhase !== "animating") {
         ctx.save();
