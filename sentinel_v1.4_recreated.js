@@ -3131,6 +3131,12 @@ window.onload = function () {
   hudFrameOverlay.alt = "";
   hudFrameOverlay.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:20;display:none;pointer-events:none;user-select:none;";
   gameStage.appendChild(hudFrameOverlay);
+  const hudXrayCanvas = document.createElement("canvas");
+  hudXrayCanvas.width = canvas.width;
+  hudXrayCanvas.height = canvas.height;
+  hudXrayCanvas.style.cssText = "position:absolute;left:50%;top:0;width:1024px;height:768px;transform:translateX(-50%);z-index:21;pointer-events:none;user-select:none;background:transparent;";
+  gameStage.appendChild(hudXrayCanvas);
+  const hudXrayCtx = hudXrayCanvas.getContext("2d");
   const hudWaveDisplay = document.createElement("div");
   hudWaveDisplay.style.cssText = "position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:21;display:none;color:#00d9ff;font:bold 32px sans-serif;text-align:center;white-space:nowrap;text-shadow:0 0 18px #00d9ff,0 0 4px #000;pointer-events:none;user-select:none;";
   gameStage.appendChild(hudWaveDisplay);
@@ -5023,7 +5029,7 @@ window.onload = function () {
   function autoAttack() {
     let nearest = null, minDist = Infinity;
     for (let e of enemies) {
-      if (e.health <= 0) continue;
+      if (e.health <= 0 || !isEnemyInPlayArea(e)) continue;
       const d = Math.hypot(e.x - player.x, e.y - player.y);
       if (d < minDist) {
         minDist = d;
@@ -5420,11 +5426,161 @@ const droplifelenght = 280;
     }
   }
 
+  const LOOT_XRAY_SIDE_DISTANCE = 35;
+  const LOOT_XRAY_TOP_DISTANCE = 80;
+  const LOOT_XRAY_BOTTOM_DISTANCE = 58;
+  const LOOT_XRAY_CORNER_SIDE_DISTANCE = 110;
+  const LOOT_XRAY_CORNER_TOP_DISTANCE = 150;
+  const LOOT_XRAY_CORNER_BOTTOM_DISTANCE = 120;
+  function isEnemyInPlayArea(enemy) {
+    return enemy.x >= 0 &&
+      enemy.x <= canvas.width &&
+      enemy.y >= 0 &&
+      enemy.y <= canvas.height;
+  }
 
+  function isInLootXrayCorner(x, y, isRight, isBottom) {
+    const xFromSide = isRight ? canvas.width - x : x;
+    const yFromEdge = isBottom ? canvas.height - y : y;
+    const verticalEdgeDistance = isBottom
+      ? LOOT_XRAY_BOTTOM_DISTANCE
+      : LOOT_XRAY_TOP_DISTANCE;
+    const cornerVerticalDistance = isBottom
+      ? LOOT_XRAY_CORNER_BOTTOM_DISTANCE
+      : LOOT_XRAY_CORNER_TOP_DISTANCE;
+    if (
+      xFromSide < LOOT_XRAY_SIDE_DISTANCE ||
+      xFromSide > LOOT_XRAY_CORNER_SIDE_DISTANCE ||
+      yFromEdge < verticalEdgeDistance ||
+      yFromEdge > cornerVerticalDistance
+    ) {
+      return false;
+    }
 
+    const diagonalProgress = (yFromEdge - verticalEdgeDistance) /
+      (cornerVerticalDistance - verticalEdgeDistance);
+    const diagonalBoundaryX = LOOT_XRAY_CORNER_SIDE_DISTANCE +
+      (LOOT_XRAY_SIDE_DISTANCE - LOOT_XRAY_CORNER_SIDE_DISTANCE) * diagonalProgress;
+    return xFromSide <= diagonalBoundaryX;
+  }
 
+  function isInLootXrayArea(x, y) {
+    return x <= LOOT_XRAY_SIDE_DISTANCE ||
+      x >= canvas.width - LOOT_XRAY_SIDE_DISTANCE ||
+      y <= LOOT_XRAY_TOP_DISTANCE ||
+      y >= canvas.height - LOOT_XRAY_BOTTOM_DISTANCE ||
+      isInLootXrayCorner(x, y, false, false) ||
+      isInLootXrayCorner(x, y, true, false) ||
+      isInLootXrayCorner(x, y, false, true) ||
+      isInLootXrayCorner(x, y, true, true);
+  }
 
+  function drawLootXray(shakeOffsetX, shakeOffsetY) {
+    hudXrayCtx.clearRect(0, 0, hudXrayCanvas.width, hudXrayCanvas.height);
+    if (
+      !gameStarted ||
+      gameOver ||
+      showMenuScreen ||
+      showLoadingScreen ||
+      showStats ||
+      window._protocolReplaceMode ||
+      window._introPhase === "animating" ||
+      hudFrameOverlay.style.display !== "block"
+    ) {
+      return;
+    }
 
+    if (window.debugFramerateEnabled) {
+      hudXrayCtx.save();
+      hudXrayCtx.strokeStyle = "rgba(255,235,90,0.95)";
+      hudXrayCtx.lineWidth = 2;
+      hudXrayCtx.setLineDash([8, 6]);
+      hudXrayCtx.beginPath();
+      hudXrayCtx.moveTo(LOOT_XRAY_CORNER_SIDE_DISTANCE, LOOT_XRAY_TOP_DISTANCE);
+      hudXrayCtx.lineTo(canvas.width - LOOT_XRAY_CORNER_SIDE_DISTANCE, LOOT_XRAY_TOP_DISTANCE);
+      hudXrayCtx.lineTo(canvas.width - LOOT_XRAY_SIDE_DISTANCE, LOOT_XRAY_CORNER_TOP_DISTANCE);
+      hudXrayCtx.lineTo(canvas.width - LOOT_XRAY_SIDE_DISTANCE, canvas.height - LOOT_XRAY_CORNER_BOTTOM_DISTANCE);
+      hudXrayCtx.lineTo(canvas.width - LOOT_XRAY_CORNER_SIDE_DISTANCE, canvas.height - LOOT_XRAY_BOTTOM_DISTANCE);
+      hudXrayCtx.lineTo(LOOT_XRAY_CORNER_SIDE_DISTANCE, canvas.height - LOOT_XRAY_BOTTOM_DISTANCE);
+      hudXrayCtx.lineTo(LOOT_XRAY_SIDE_DISTANCE, canvas.height - LOOT_XRAY_CORNER_BOTTOM_DISTANCE);
+      hudXrayCtx.lineTo(LOOT_XRAY_SIDE_DISTANCE, LOOT_XRAY_CORNER_TOP_DISTANCE);
+      hudXrayCtx.closePath();
+      hudXrayCtx.stroke();
+
+      hudXrayCtx.setLineDash([]);
+      hudXrayCtx.strokeStyle = "rgba(90,235,255,0.9)";
+      hudXrayCtx.fillStyle = "rgba(180,250,255,0.95)";
+      hudXrayCtx.lineWidth = 1;
+      hudXrayCtx.font = "10px monospace";
+      for (let px = 0; px <= 200; px += 10) {
+        const isMajorTick = px % 50 === 0;
+        const tickLength = isMajorTick ? 8 : 4;
+
+        hudXrayCtx.beginPath();
+        hudXrayCtx.moveTo(px, 0);
+        hudXrayCtx.lineTo(px, tickLength);
+        hudXrayCtx.stroke();
+        hudXrayCtx.beginPath();
+        hudXrayCtx.moveTo(0, px);
+        hudXrayCtx.lineTo(tickLength, px);
+        hudXrayCtx.stroke();
+
+        if (isMajorTick) {
+          hudXrayCtx.fillText(String(px), px + 2, 20);
+          hudXrayCtx.fillText(String(px), 12, Math.max(10, px - 2));
+        }
+      }
+      hudXrayCtx.fillText("px", 226, 20);
+      hudXrayCtx.restore();
+    }
+
+    const drawMarker = (x, y, color, radius) => {
+      if (!isInLootXrayArea(x, y)) return;
+      hudXrayCtx.save();
+      hudXrayCtx.globalAlpha = 0.82;
+      hudXrayCtx.shadowColor = color;
+      hudXrayCtx.shadowBlur = 12;
+      hudXrayCtx.fillStyle = color;
+      hudXrayCtx.strokeStyle = "rgba(230,255,255,0.95)";
+      hudXrayCtx.lineWidth = 1.5;
+      hudXrayCtx.beginPath();
+      hudXrayCtx.arc(x, y, radius, 0, Math.PI * 2);
+      hudXrayCtx.fill();
+      hudXrayCtx.stroke();
+      hudXrayCtx.restore();
+    };
+
+    hudXrayCtx.save();
+    hudXrayCtx.translate(shakeOffsetX, shakeOffsetY);
+    xpDrops.forEach(drop => drawMarker(drop.x, drop.y, "#ff31ff", 5));
+    slingerDrops.forEach(drop => drawMarker(drop.x, drop.y, "#ffd700", 5));
+    bruteDrops.forEach(drop => drawMarker(drop.x, drop.y, "#ff1717", 9));
+    healthDrops.forEach(drop => drawMarker(drop.x, drop.y, "#ff1717", 9));
+    protocolOrbs.forEach(orb => {
+      if (!isInLootXrayArea(orb.x, orb.y)) return;
+      const tier = (PROTOCOLS[orb.protocolName] && PROTOCOLS[orb.protocolName].tier) || "Standard";
+      drawMarker(orb.x, orb.y, getProtocolRarityColor(orb.rarity, tier), orb.radius);
+      const progress = orb.requiredFrames > 0
+        ? Math.min(1, orb.progressFrames / orb.requiredFrames)
+        : 0;
+      if (progress > 0) {
+        hudXrayCtx.save();
+        hudXrayCtx.lineWidth = 2;
+        hudXrayCtx.strokeStyle = "#e8ffff";
+        hudXrayCtx.beginPath();
+        hudXrayCtx.arc(
+          orb.x,
+          orb.y,
+          orb.radius + 4,
+          -Math.PI / 2,
+          -Math.PI / 2 + (Math.PI * 2 * progress)
+        );
+        hudXrayCtx.stroke();
+        hudXrayCtx.restore();
+      }
+    });
+    hudXrayCtx.restore();
+  }
 
 
 
@@ -8541,11 +8697,12 @@ const droplifelenght = 280;
         }
         const isTouchingPlayer = dist < (e.radius + player.radius);
         const isSlingerInRange = dist < (e.attackRange || 20) + player.radius;
+        const isSlingerInXrayArea = isSlinger && isInLootXrayArea(e.x, e.y);
         const canAttackNow = e.type === "slingerBoss"
           ? false
           : (e.type === "gruntBoss" && e.gruntBossEntering !== false)
             ? false
-            : (isSlinger ? isSlingerInRange : isTouchingPlayer);
+            : (isSlinger ? (isSlingerInRange && !isSlingerInXrayArea) : isTouchingPlayer);
         if (canAttackNow) {
           if (e.attackCooldown <= 0) {
             if (isSlinger) {
@@ -10383,6 +10540,7 @@ const droplifelenght = 280;
         ctx.restore();
       }
       drawHUD();
+      drawLootXray(shakeOffsetX, shakeOffsetY);
       // Draw debug text on top of HUD and overlays
       if (window.debugFramerateEnabled) {
         if (typeof particles !== 'undefined' && typeof mines !== 'undefined' && typeof enemies !== 'undefined') {
