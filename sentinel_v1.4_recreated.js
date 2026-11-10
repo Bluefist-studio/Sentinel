@@ -587,11 +587,36 @@ window.onload = function () {
   // Loading/Menu screen state
   let showLoadingScreen = true;
   let showMenuScreen = false;
-  const titleImg = new window.Image();
-  titleImg.src = "slide4.png";
   const MENU_FADE_DURATION = 220;
-  const SENTINEL_TITLE_STYLE = "position:absolute;top:clamp(36px,7vh,72px);left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:clamp(42px,7vw,88px);font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
-  const SELECTION_TITLE_STYLE = "position:absolute;top:clamp(36px,7vh,72px);left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:clamp(30px,5vw,64px);font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
+  const LOOT_XRAY_SIDE_DISTANCE = 35;
+  const LOOT_XRAY_TOP_DISTANCE = 80;
+  const LOOT_XRAY_BOTTOM_DISTANCE = 58;
+  const LOOT_XRAY_CORNER_SIDE_DISTANCE = 110;
+  const LOOT_XRAY_CORNER_TOP_DISTANCE = 150;
+  const LOOT_XRAY_CORNER_BOTTOM_DISTANCE = 120;
+  const GAME_CANVAS_WIDTH = 1024;
+  const GAME_CANVAS_HEIGHT = 768;
+  const GAME_DISPLAY_WIDTH = GAME_CANVAS_WIDTH - LOOT_XRAY_CORNER_SIDE_DISTANCE * 2;
+  const GAME_DISPLAY_HEIGHT = GAME_CANVAS_HEIGHT - LOOT_XRAY_CORNER_TOP_DISTANCE - LOOT_XRAY_CORNER_BOTTOM_DISTANCE;
+  const GAME_DISPLAY_OFFSET_Y = LOOT_XRAY_CORNER_TOP_DISTANCE + GAME_DISPLAY_HEIGHT / 2 - GAME_CANVAS_HEIGHT / 2;
+  const GAME_STAGE_WIDTH = 1365;
+  const GAME_STAGE_HEIGHT = 768;
+  const TOOLTIP_HOVER_DELAY_MS = 2000;
+  const SENTINEL_TITLE_STYLE = "position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:48px;font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
+  const SELECTION_TITLE_STYLE = "position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:30px;font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
+
+  function configureDisplayOverlay(element, zIndex = 10) {
+    element.style.position = "fixed";
+    element.style.left = "50%";
+    element.style.top = "calc(50% + var(--game-display-offset-y, 0px))";
+    element.style.width = `${GAME_DISPLAY_WIDTH}px`;
+    element.style.height = `${GAME_DISPLAY_HEIGHT}px`;
+    element.style.transform = "translate(-50%, -50%) scale(var(--game-stage-scale, 1))";
+    element.style.transformOrigin = "center";
+    element.style.boxSizing = "border-box";
+    element.style.overflow = "hidden";
+    element.style.zIndex = String(zIndex);
+  }
 
   function fadeMenuElementsIn(elements) {
     elements.forEach((element) => {
@@ -618,41 +643,12 @@ window.onload = function () {
   // Create loading overlay elements
   const loadingOverlay = document.createElement("div");
   loadingOverlay.id = "loadingOverlay";
-  loadingOverlay.style.position = "fixed";
-  loadingOverlay.style.left = 0;
-  loadingOverlay.style.top = 0;
-  loadingOverlay.style.width = "100vw";
-  loadingOverlay.style.height = "100vh";
-  loadingOverlay.style.background = "#000";
+  configureDisplayOverlay(loadingOverlay);
+  loadingOverlay.style.background = "transparent";
   loadingOverlay.style.display = "flex";
   loadingOverlay.style.flexDirection = "column";
   loadingOverlay.style.justifyContent = "center";
   loadingOverlay.style.alignItems = "center";
-  loadingOverlay.style.zIndex = 1000;
-  // Loading background image
-  const loadingBg = document.createElement("img");
-  loadingBg.src = "slide4.png";
-  loadingBg.style.position = "absolute";
-  loadingBg.style.left = "50%";
-  loadingBg.style.top = "50%";
-  loadingBg.style.transform = "translate(-50%, -50%)";
-  loadingBg.style.width = "100vw";
-  loadingBg.style.height = "100vh";
-  loadingBg.style.objectFit = "cover";
-
-  // Gradient overlay for bottom fade effect
-  const loadingGradient = document.createElement("div");
-  loadingGradient.style.position = "absolute";
-  loadingGradient.style.left = "0";
-  loadingGradient.style.bottom = "0";
-  loadingGradient.style.width = "100vw";
-  loadingGradient.style.height = "180px";
-  loadingGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
-  loadingGradient.style.pointerEvents = "none";
-  loadingGradient.style.zIndex = 1;
-  loadingOverlay.appendChild(loadingGradient);
-  loadingBg.style.zIndex = 0;
-  loadingOverlay.appendChild(loadingBg);
   const loadingTitle = document.createElement("h1");
   loadingTitle.textContent = "SENTINEL";
   loadingTitle.style.cssText = SENTINEL_TITLE_STYLE;
@@ -688,23 +684,24 @@ window.onload = function () {
   });
   const introCinematicSlides = [
     {
-      image: "slide1.png",
       text: "Beneath the surface, behind reinforced steel and concrete, a new era of combat is being forged.",
       duration: 5500
     },
     {
-      image: "slide2.png",
       text: "The Combat Systems Division has authorized a new generation of autonomous combat machines. Their purpose: adapt, endure, and dominate.",
       duration: 6500
     },
     {
-      image: "slide3.png",
       text: "Prototype against prototype. Every machine has weaknesses. Every encounter produces data. Only the strongest configurations survive.",
       duration: 6500
     },
     {
-      image: "slide4.png",
       text: "Introducing SENTINEL. An experimental combat platform designed to evolve through modular combat protocols. Its limits remain unknown.",
+      duration: 6500
+    },
+    {
+      text: "",
+      trialFinale: true,
       duration: 6500
     }
   ];
@@ -718,26 +715,17 @@ window.onload = function () {
     let progressFrameId;
     let finished = false;
     let writingComplete = false;
-    let gameRevealActive = false;
     let gameStartedBehindOverlay = false;
 
     const overlay = document.createElement("div");
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-label", "Sentinel opening cinematic");
-    overlay.style.cssText = "position:fixed;inset:0;z-index:2000;overflow:hidden;background:#02070b;color:#e8fbff;font-family:Arial,sans-serif;";
+    configureDisplayOverlay(overlay);
+    overlay.style.cssText += "background:transparent;color:#e8fbff;font-family:Arial,sans-serif;";
     const cinematicFont = "'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace";
 
-    const image = document.createElement("img");
-    image.alt = "";
-    image.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 650ms ease;";
-    overlay.appendChild(image);
-
-    const shade = document.createElement("div");
-    shade.style.cssText = "position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,7,12,.28),rgba(0,7,12,.08) 35%,rgba(0,7,12,.88));";
-    overlay.appendChild(shade);
-
     const header = document.createElement("div");
-    header.style.cssText = `position:absolute;top:clamp(20px,5vh,48px);left:clamp(24px,6vw,88px);right:clamp(24px,6vw,88px);display:flex;justify-content:space-between;align-items:center;gap:16px;color:#8cecff;font-family:${cinematicFont};font-size:clamp(11px,1.3vw,15px);font-weight:bold;letter-spacing:.16em;text-shadow:0 0 8px rgba(0,191,255,.7);`;
+    header.style.cssText = `position:absolute;top:24px;left:24px;right:24px;box-sizing:border-box;padding:10px 12px;border-radius:4px;background:transparent;box-shadow:none;display:flex;justify-content:space-between;align-items:center;gap:16px;color:#8cecff;font-family:${cinematicFont};font-size:13px;font-weight:bold;letter-spacing:.16em;text-shadow:0 0 8px rgba(0,191,255,.7);`;
     header.style.transition = "opacity 450ms ease";
     const designation = document.createElement("span");
     designation.textContent = "SENTINEL // CLASSIFIED ARCHIVE";
@@ -746,22 +734,22 @@ window.onload = function () {
     overlay.appendChild(header);
 
     const caption = document.createElement("div");
-    caption.style.cssText = "position:absolute;left:clamp(28px,5vw,72px);bottom:clamp(100px,14vh,130px);width:min(40vw,600px);text-shadow:0 2px 14px rgba(0,0,0,.95);";
+    caption.style.cssText = "position:absolute;left:10%;bottom:120px;width:80%;box-sizing:border-box;padding:16px 18px;border-radius:0;background:transparent;box-shadow:none;text-shadow:0 2px 14px rgba(0,0,0,.95);";
     const consoleCursorStyle = document.createElement("style");
     consoleCursorStyle.textContent = "@keyframes sentinelCinematicCursor{50%{opacity:0}}#sentinelCinematicText::after{content:'_';color:#73ffc0;animation:sentinelCinematicCursor .8s steps(1) infinite;}";
     document.head.appendChild(consoleCursorStyle);
     const eyebrow = document.createElement("div");
     eyebrow.textContent = "COMBAT SYSTEMS DIVISION";
-    eyebrow.style.cssText = `margin-bottom:clamp(10px,2vh,18px);color:#72e8ef;font-family:${cinematicFont};font-size:clamp(11px,1.2vw,14px);font-weight:bold;letter-spacing:.14em;text-shadow:0 0 7px rgba(66,231,255,.45);`;
+    eyebrow.style.cssText = `margin-bottom:14px;color:#72e8ef;font-family:${cinematicFont};font-size:13px;font-weight:bold;letter-spacing:.14em;text-shadow:0 0 7px rgba(66,231,255,.45);`;
     const text = document.createElement("div");
     text.id = "sentinelCinematicText";
     text.setAttribute("aria-live", "polite");
-    text.style.cssText = `color:#d2f7f0;font-family:${cinematicFont};font-size:clamp(16px,1.65vw,23px);font-weight:500;line-height:1.55;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,235,220,.3);white-space:pre-wrap;`;
+    text.style.cssText = `color:#d2f7f0;font-family:${cinematicFont};font-size:19px;font-weight:500;line-height:1.55;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,235,220,.3);white-space:pre-wrap;`;
     caption.append(eyebrow, text);
     overlay.appendChild(caption);
 
     const footer = document.createElement("div");
-    footer.style.cssText = "position:absolute;left:clamp(24px,6vw,88px);right:clamp(24px,6vw,88px);bottom:clamp(20px,5vh,48px);display:flex;align-items:center;gap:18px;";
+    footer.style.cssText = "position:absolute;left:24px;right:24px;bottom:24px;box-sizing:border-box;padding:8px 10px;border-radius:0;background:transparent;box-shadow:none;display:flex;align-items:center;gap:18px;";
     footer.style.transition = "opacity 450ms ease";
     const progressTrack = document.createElement("div");
     progressTrack.style.cssText = "height:2px;flex:1;background:rgba(180,230,245,.35);";
@@ -772,9 +760,9 @@ window.onload = function () {
     const skipButton = document.createElement("button");
     skipButton.type = "button";
     skipButton.setAttribute("aria-label", "Hold to skip to the launch sequence");
-    skipButton.style.cssText = `position:relative;overflow:hidden;padding:12px 12px 14px;border:1px solid rgba(140,236,255,.38);background:rgba(0,14,22,.55);color:rgba(230,248,255,.86);font-family:${cinematicFont};font-size:12px;font-weight:bold;letter-spacing:.1em;cursor:pointer;`;
+    skipButton.style.cssText = `position:relative;overflow:hidden;padding:12px 12px 14px;border:0;background:transparent;color:rgba(230,248,255,.86);font-family:${cinematicFont};font-size:12px;font-weight:bold;letter-spacing:.1em;cursor:pointer;`;
     const skipLabel = document.createElement("span");
-    skipLabel.textContent = "Hold to skip";
+    skipLabel.textContent = "Skip";
     const skipHoldProgress = document.createElement("span");
     skipHoldProgress.style.cssText = "position:absolute;left:0;bottom:0;width:0;height:2px;background:#39eaff;box-shadow:0 0 10px #00cfff;pointer-events:none;";
     skipButton.append(skipLabel, skipHoldProgress);
@@ -810,7 +798,7 @@ window.onload = function () {
     const startSkipHold = (source, event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (finished || gameRevealActive || skipHoldActive) return;
+      if (finished || skipHoldActive) return;
 
       skipHoldActive = true;
       skipHoldSource = source;
@@ -828,7 +816,7 @@ window.onload = function () {
         skipHoldTimer = null;
         skipHoldActive = false;
         skipHoldSource = null;
-        beginGameReveal();
+        finish();
       }, SKIP_HOLD_DURATION);
     };
 
@@ -838,7 +826,7 @@ window.onload = function () {
       clearTimers();
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
-      overlay.removeEventListener("click", handleAdvanceInteraction);
+      document.removeEventListener("click", handleAdvanceInteraction);
       consoleCursorStyle.remove();
       overlay.style.transition = "opacity 350ms ease";
       overlay.style.opacity = "0";
@@ -848,89 +836,28 @@ window.onload = function () {
       }, 350);
     };
 
-    const endGameReveal = () => {
-      if (finished) return;
-      finished = true;
-      clearTimers();
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keyup", handleKeyUp);
-      overlay.removeEventListener("click", handleAdvanceInteraction);
-      consoleCursorStyle.remove();
-      overlay.style.transition = "opacity 450ms ease";
-      overlay.style.opacity = "0";
-      setTimeout(() => overlay.remove(), 450);
-    };
-
     const completeWriting = () => {
       if (writingComplete) return;
       clearInterval(typewriterId);
       text.textContent = `> ${currentText}`;
       writingComplete = true;
-      if (gameRevealActive) timerId = setTimeout(endGameReveal, 1200);
     };
 
-    const beginGameReveal = () => {
-      if (gameRevealActive || finished) return;
-      gameRevealActive = true;
+    const beginGameBehindFinalSlide = () => {
+      if (gameStartedBehindOverlay || finished) return;
       gameStartedBehindOverlay = true;
-      clearTimers();
       onComplete();
-      const playArea = canvas.getBoundingClientRect();
-      caption.style.left = `${playArea.left + playArea.width * 0.1}px`;
-      caption.style.top = `${playArea.top + playArea.height * 0.34}px`;
-      caption.style.bottom = "auto";
-      caption.style.width = `${playArea.width * 0.8}px`;
-      caption.style.padding = "18px 22px";
-      caption.style.boxSizing = "border-box";
-      caption.style.background = "rgba(0,12,22,.82)";
-      caption.style.border = "1px solid rgba(0,217,255,.72)";
-      caption.style.boxShadow = "0 0 24px rgba(0,217,255,.24), inset 0 0 18px rgba(0,100,150,.16)";
-      caption.style.backdropFilter = "blur(3px)";
-      eyebrow.style.color = "#00d9ff";
-      text.style.color = "#eaffff";
-
-      overlay.style.background = "transparent";
-      image.style.opacity = "0";
-      shade.style.transition = "opacity 900ms ease";
-      shade.style.opacity = "0";
-      header.style.opacity = "0";
-      footer.style.opacity = "0";
-      footer.style.pointerEvents = "none";
-      eyebrow.textContent = "COMBAT SYSTEMS DIVISION";
-      const trialLabel = String(completedTrialRuns + 1).padStart(2, "0");
-      slideNumber.textContent = `TRIAL ${trialLabel}`;
-      currentText = `Evaluation sequence authorized.\nCombat systems online.\nTrial ${trialLabel} commencing.`;
-      writingComplete = false;
-      text.textContent = "> ";
-
-      let typedCharacters = 0;
-      typewriterId = setInterval(() => {
-        typedCharacters += 1;
-        text.textContent = `> ${currentText.slice(0, typedCharacters)}`;
-        if (typedCharacters >= currentText.length) {
-          clearInterval(typewriterId);
-          writingComplete = true;
-          timerId = setTimeout(endGameReveal, 1200);
-        }
-      }, 24);
     };
 
     const renderSlide = () => {
       const slide = introCinematicSlides[currentSlide];
-      const slideIndex = currentSlide;
+      const trialLabel = String(completedTrialRuns + 1).padStart(2, "0");
+      const slideText = slide.trialFinale
+        ? `Evaluation sequence authorized.\nCombat systems online.\nTrial ${trialLabel} commencing.`
+        : slide.text;
       clearInterval(typewriterId);
-      currentText = slide.text;
+      currentText = slideText;
       writingComplete = false;
-      image.style.opacity = "0";
-      const revealImage = () => {
-        if (!finished && currentSlide === slideIndex) image.style.opacity = ".78";
-      };
-      image.onload = revealImage;
-      image.src = slide.image;
-      if (image.complete && image.naturalWidth > 0) {
-        requestAnimationFrame(revealImage);
-      }
-
       text.textContent = "";
       slideNumber.textContent = `TRANSMISSION ${String(currentSlide + 1).padStart(2, "0")} / ${String(introCinematicSlides.length).padStart(2, "0")}`;
       const slideStart = (currentSlide / introCinematicSlides.length) * 100;
@@ -943,14 +870,15 @@ window.onload = function () {
         progress.style.transition = `width ${slide.duration}ms linear`;
         progress.style.width = `${slideEnd}%`;
       });
+      if (slide.trialFinale) beginGameBehindFinalSlide();
 
       let typedCharacters = 0;
-      const typingInterval = Math.min(42, Math.max(12, (slide.duration * 0.45) / slide.text.length));
+      const typingInterval = Math.min(42, Math.max(12, (slide.duration * 0.45) / slideText.length));
       text.textContent = "> ";
       typewriterId = setInterval(() => {
         typedCharacters += 1;
-        text.textContent = `> ${slide.text.slice(0, typedCharacters)}`;
-        if (typedCharacters >= slide.text.length) {
+        text.textContent = `> ${slideText.slice(0, typedCharacters)}`;
+        if (typedCharacters >= slideText.length) {
           clearInterval(typewriterId);
           writingComplete = true;
         }
@@ -963,10 +891,9 @@ window.onload = function () {
       clearTimeout(timerId);
       clearInterval(typewriterId);
       if (currentSlide === introCinematicSlides.length - 1) {
-        beginGameReveal();
+        finish();
         return;
       }
-      image.style.opacity = "0";
       transitionId = setTimeout(() => {
         currentSlide += 1;
         renderSlide();
@@ -977,8 +904,6 @@ window.onload = function () {
       if (finished) return;
       if (!writingComplete) {
         completeWriting();
-      } else if (gameRevealActive) {
-        endGameReveal();
       } else {
         advance();
       }
@@ -987,8 +912,7 @@ window.onload = function () {
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (gameRevealActive) endGameReveal();
-        else finish();
+        finish();
       } else if (event.target === skipButton && (event.key === "Enter" || event.key === " ")) {
         startSkipHold("keyboard", event);
       } else if (event.key === "Enter" || event.key === " " || event.key === "ArrowRight") {
@@ -1008,7 +932,7 @@ window.onload = function () {
       event.preventDefault();
       event.stopPropagation();
     });
-    overlay.addEventListener("click", handleAdvanceInteraction);
+    document.addEventListener("click", handleAdvanceInteraction);
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("keyup", handleKeyUp);
     document.body.appendChild(overlay);
@@ -1018,6 +942,10 @@ window.onload = function () {
 
   // Menu screen
   function startGame(difficulty, startStatPoints, startHealth) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.style.visibility = "visible";
+    hudXrayCtx.clearRect(0, 0, hudXrayCanvas.width, hudXrayCanvas.height);
+    hudXrayCanvas.style.visibility = "visible";
     fadeOutMenuMusic();
     showIntroCinematic(() => beginGame(difficulty, startStatPoints, startHealth));
   }
@@ -1037,6 +965,9 @@ window.onload = function () {
     if (!isRestrictedDifficulty) {
       ProtocolSystem.setStarters(window._pendingStarterProtocols || []);
     }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.style.visibility = "visible";
+    hudXrayCanvas.style.visibility = "visible";
     showMenuScreen = false;
     window._bossMusicallyActive = false;
     stopBossMusic();
@@ -1145,85 +1076,90 @@ window.onload = function () {
     const discoveredProtocols = ProtocolSystem.getDiscovered();
     const starterOverlay = document.createElement("div");
     starterOverlay.id = "starterProtocolOverlay";
-    starterOverlay.style.position = "fixed";
-    starterOverlay.style.left = 0;
-    starterOverlay.style.top = 0;
-    starterOverlay.style.width = "100vw";
-    starterOverlay.style.height = "100vh";
-    starterOverlay.style.background = "#000";
+    configureDisplayOverlay(starterOverlay);
+    starterOverlay.style.background = "transparent";
     starterOverlay.style.display = "flex";
     starterOverlay.style.flexDirection = "column";
     starterOverlay.style.justifyContent = "center";
     starterOverlay.style.alignItems = "center";
-    starterOverlay.style.zIndex = 1002;
-
-    const protocolBg = document.createElement("img");
-    protocolBg.src = "slide2.png";
-    protocolBg.alt = "";
-    protocolBg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;";
-    starterOverlay.appendChild(protocolBg);
-
-    const protocolShade = document.createElement("div");
-    protocolShade.style.cssText = "position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.58),rgba(0,0,0,.78));z-index:1;pointer-events:none;";
-    starterOverlay.appendChild(protocolShade);
 
     const panel = document.createElement("div");
-    panel.style.width = "min(1100px, 95vw)";
-    panel.style.maxWidth = "1100px";
-    panel.style.maxHeight = "none";
-    panel.style.background = "rgba(0, 20, 30, 0.9)";
-    panel.style.border = "2px solid #00ffdd";
-    panel.style.borderRadius = "10px";
-    panel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+    panel.style.width = "calc(100% - 12px)";
+    panel.style.maxWidth = `${GAME_DISPLAY_WIDTH - 12}px`;
+    panel.style.maxHeight = "calc(100% - 42px)";
+    panel.style.background = "transparent";
+    panel.style.border = "0";
+    panel.style.borderRadius = "0";
+    panel.style.boxShadow = "none";
     panel.style.position = "absolute";
-    panel.style.top = "clamp(100px, 14vh, 150px)";
-    panel.style.bottom = "24px";
+    panel.style.top = "42px";
+    panel.style.bottom = "0";
     panel.style.left = "50%";
     panel.style.transform = "translateX(-50%)";
     panel.style.boxSizing = "border-box";
     panel.style.zIndex = 2;
     panel.style.display = "flex";
     panel.style.flexDirection = "column";
-    panel.style.padding = "20px";
+    panel.style.padding = "4px 6px";
     starterOverlay.appendChild(panel);
 
     const title = document.createElement("h2");
     title.textContent = source === "mainMenu" ? "PROTOCOLS DATABASE" : "SELECT YOUR STARTER PROTOCOLS";
     title.style.cssText = SELECTION_TITLE_STYLE;
-    title.style.fontSize = "clamp(24px, 4vw, 56px)";
+    title.style.fontSize = "26px";
+    title.style.top = "10px";
+    title.style.position = "fixed";
+    title.style.left = "0";
+    title.style.right = "0";
+    title.style.width = "100%";
+    title.style.transform = "none";
+    title.style.willChange = "transform";
+    title.style.overflowAnchor = "none";
+    title.style.textShadow = "0 0 8px #00d9ff, 0 3px 8px #000";
     starterOverlay.appendChild(title);
 
     const subtitle = document.createElement("div");
     subtitle.textContent = "Choose up to 2 discovered protocols to start your run with.";
     subtitle.setAttribute('data-protocol-subtitle', 'true');
     subtitle.style.color = "#aaf6ff";
-    subtitle.style.fontSize = "0.95rem";
+    subtitle.style.fontSize = "0.85rem";
     subtitle.style.textAlign = "center";
-    subtitle.style.marginBottom = "14px";
+    subtitle.style.marginBottom = "4px";
     panel.appendChild(subtitle);
+
+    const statusRow = document.createElement("div");
+    statusRow.style.display = "flex";
+    statusRow.style.justifyContent = "space-between";
+    statusRow.style.alignItems = "center";
+    statusRow.style.gap = "12px";
+    statusRow.style.marginBottom = "4px";
+    panel.appendChild(statusRow);
 
     // Add bytes display
     const bytesDisplay = document.createElement("div");
-    bytesDisplay.style.color = "#00ffdd";
-    bytesDisplay.style.textAlign = "center";
-    bytesDisplay.style.marginBottom = "12px";
-    bytesDisplay.style.fontSize = "1rem";
+    bytesDisplay.style.color = "#00d9ff";
+    bytesDisplay.style.textAlign = "left";
+    bytesDisplay.style.fontSize = "0.82rem";
     bytesDisplay.style.fontWeight = "bold";
     const playerBytes = totalCollectedBytes || 0;
     bytesDisplay.textContent = `Data: ${formatByteAmount(playerBytes)}`;
-    panel.appendChild(bytesDisplay);
+    statusRow.appendChild(bytesDisplay);
 
     const selectionCount = document.createElement("div");
-    selectionCount.style.color = "#00ffdd";
-    selectionCount.style.textAlign = "center";
-    selectionCount.style.marginBottom = "10px";
-    panel.appendChild(selectionCount);
+    selectionCount.style.color = "#00d9ff";
+    selectionCount.style.textAlign = "right";
+    selectionCount.style.fontSize = "0.82rem";
+    statusRow.appendChild(selectionCount);
 
     // Add total stat change display
     const totalStatDiv = document.createElement("div");
     totalStatDiv.style.color = "#aaf6ff";
     totalStatDiv.style.textAlign = "center";
-    totalStatDiv.style.marginBottom = "10px";
+    totalStatDiv.style.marginBottom = "4px";
+    totalStatDiv.style.fontSize = "0.78rem";
+    totalStatDiv.style.whiteSpace = "nowrap";
+    totalStatDiv.style.overflow = "hidden";
+    totalStatDiv.style.textOverflow = "ellipsis";
     totalStatDiv.setAttribute('data-stat-total', 'true');
     panel.appendChild(totalStatDiv);
 
@@ -1232,32 +1168,27 @@ window.onload = function () {
     content.style.minWidth = "0";
     content.style.minHeight = "0";
     content.style.overflowY = "auto";
-    content.style.border = "1px solid rgba(0,255,221,0.25)";
-    content.style.borderRadius = "8px";
-    content.style.padding = "12px";
+    content.style.border = "0";
+    content.style.borderRadius = "0";
+    content.style.padding = "2px 0";
     content.classList.add("scrollbar-themed");
     panel.appendChild(content);
 
     // Modal helper functions
     function showUpgradeConfirmModal(message, onConfirm, isDowngrade = false) {
       const confirmOverlay = document.createElement("div");
-      confirmOverlay.style.position = "fixed";
-      confirmOverlay.style.left = "0";
-      confirmOverlay.style.top = "0";
-      confirmOverlay.style.width = "100vw";
-      confirmOverlay.style.height = "100vh";
+      configureDisplayOverlay(confirmOverlay, 15);
       confirmOverlay.style.background = "rgba(0, 0, 0, 0.74)";
       confirmOverlay.style.display = "flex";
       confirmOverlay.style.alignItems = "center";
       confirmOverlay.style.justifyContent = "center";
-      confirmOverlay.style.zIndex = "1105";
 
       const confirmPanel = document.createElement("div");
-      confirmPanel.style.width = "min(460px, 90vw)";
+      confirmPanel.style.width = "min(460px, calc(100% - 48px))";
       confirmPanel.style.background = "rgba(0, 20, 30, 0.98)";
-      confirmPanel.style.border = "2px solid #00ffdd";
-      confirmPanel.style.borderRadius = "10px";
-      confirmPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      confirmPanel.style.border = "1px solid rgba(0, 217, 255, 0.45)";
+      confirmPanel.style.borderRadius = "4px";
+      confirmPanel.style.boxShadow = "0 0 20px rgba(0, 217, 255, 0.16)";
       confirmPanel.style.padding = "16px";
       confirmPanel.style.color = "#c8ffff";
       confirmPanel.style.fontFamily = "sans-serif";
@@ -1282,9 +1213,9 @@ window.onload = function () {
       cancelBtn.textContent = "Cancel";
       cancelBtn.style.padding = "0.5rem 0.85rem";
       cancelBtn.style.borderRadius = "6px";
-      cancelBtn.style.border = "1px solid #ffffff";
-      cancelBtn.style.background = "rgba(0,0,0,0.55)";
-      cancelBtn.style.color = "#ffffff";
+      cancelBtn.style.border = "1px solid rgba(0,217,255,0.55)";
+      cancelBtn.style.background = "rgba(0,20,30,0.72)";
+      cancelBtn.style.color = "#8cecff";
       cancelBtn.style.cursor = "pointer";
       actionRow.appendChild(cancelBtn);
 
@@ -1293,9 +1224,9 @@ window.onload = function () {
       confirmBtn.textContent = isDowngrade ? "Downgrade" : "Upgrade";
       confirmBtn.style.padding = "0.5rem 0.85rem";
       confirmBtn.style.borderRadius = "6px";
-      confirmBtn.style.border = isDowngrade ? "1px solid #ff6666" : "1px solid #00ffdd";
-      confirmBtn.style.background = "rgba(0,0,0,0.55)";
-      confirmBtn.style.color = isDowngrade ? "#ff6666" : "#00ffdd";
+      confirmBtn.style.border = "1px solid rgba(0,217,255,0.7)";
+      confirmBtn.style.background = "rgba(0,20,30,0.72)";
+      confirmBtn.style.color = "#8cecff";
       confirmBtn.style.cursor = "pointer";
       actionRow.appendChild(confirmBtn);
 
@@ -1329,23 +1260,18 @@ window.onload = function () {
 
     function showUpgradeInfoModal(titleText, message) {
       const infoOverlay = document.createElement("div");
-      infoOverlay.style.position = "fixed";
-      infoOverlay.style.left = "0";
-      infoOverlay.style.top = "0";
-      infoOverlay.style.width = "100vw";
-      infoOverlay.style.height = "100vh";
+      configureDisplayOverlay(infoOverlay, 15);
       infoOverlay.style.background = "rgba(0, 0, 0, 0.74)";
       infoOverlay.style.display = "flex";
       infoOverlay.style.alignItems = "center";
       infoOverlay.style.justifyContent = "center";
-      infoOverlay.style.zIndex = "1105";
 
       const infoPanel = document.createElement("div");
-      infoPanel.style.width = "min(460px, 90vw)";
+      infoPanel.style.width = "min(460px, calc(100% - 48px))";
       infoPanel.style.background = "rgba(0, 20, 30, 0.98)";
-      infoPanel.style.border = "2px solid #00ffdd";
-      infoPanel.style.borderRadius = "10px";
-      infoPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
+      infoPanel.style.border = "1px solid rgba(0, 217, 255, 0.45)";
+      infoPanel.style.borderRadius = "4px";
+      infoPanel.style.boxShadow = "0 0 20px rgba(0, 217, 255, 0.16)";
       infoPanel.style.padding = "16px";
       infoPanel.style.color = "#c8ffff";
       infoPanel.style.fontFamily = "sans-serif";
@@ -1353,7 +1279,7 @@ window.onload = function () {
 
       const infoTitle = document.createElement("div");
       infoTitle.textContent = titleText;
-      infoTitle.style.color = "#00ffdd";
+      infoTitle.style.color = "#00d9ff";
       infoTitle.style.fontWeight = "bold";
       infoTitle.style.fontSize = "1.05rem";
       infoTitle.style.marginBottom = "10px";
@@ -1378,9 +1304,9 @@ window.onload = function () {
       okBtn.textContent = "OK";
       okBtn.style.padding = "0.5rem 0.85rem";
       okBtn.style.borderRadius = "6px";
-      okBtn.style.border = "1px solid #00ffdd";
-      okBtn.style.background = "rgba(0,0,0,0.55)";
-      okBtn.style.color = "#00ffdd";
+      okBtn.style.border = "1px solid rgba(0,217,255,0.7)";
+      okBtn.style.background = "rgba(0,20,30,0.72)";
+      okBtn.style.color = "#8cecff";
       okBtn.style.cursor = "pointer";
       actionRow.appendChild(okBtn);
 
@@ -1430,9 +1356,8 @@ window.onload = function () {
       const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
       const statStrings = statOrder.map(stat => {
         const v = statTotals[stat];
-        let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
         let sign = v > 0 ? "+" : (v < 0 ? "" : "");
-        return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
+        return `<span style='color:#8cecff; font-weight:bold;'>${sign}${v} ${stat}</span>`;
       });
       totalStatDiv.innerHTML = `${statStrings.join(", ")}`;
     };
@@ -1440,48 +1365,49 @@ window.onload = function () {
     if (discoveredProtocols.length === 0) {
       const noneMsg = document.createElement("div");
       noneMsg.textContent = "No protocols discovered yet. You will start your run with 0 starter protocols.";
-      noneMsg.style.color = "#ffcc88";
+      noneMsg.style.color = "#aaf6ff";
       noneMsg.style.textAlign = "center";
       noneMsg.style.padding = "24px";
       content.appendChild(noneMsg);
     } else {
-      const familyGroups = { "Targeting": [], "Overdrive": [], "Utility": [] };
+      const familyGroups = { Targeting: [], Overdrive: [], Utility: [] };
       discoveredProtocols.forEach(protocolName => {
         const family = PROTOCOLS[protocolName]?.family;
-        if (familyGroups[family]) {
-          familyGroups[family].push(protocolName);
-        }
+        if (familyGroups[family]) familyGroups[family].push(protocolName);
       });
+
+      const grid = document.createElement("div");
+      grid.style.display = "grid";
+      grid.style.width = "100%";
+      grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(220px, 1fr))";
+      grid.style.alignItems = "stretch";
+      grid.style.height = "100%";
+      grid.style.minHeight = "0";
+      grid.style.boxSizing = "border-box";
+      grid.style.gap = "8px";
+      content.appendChild(grid);
 
       Object.entries(familyGroups).forEach(([familyName, protocols]) => {
         if (protocols.length === 0) return;
+        const familyColumn = document.createElement("div");
+        familyColumn.style.display = "flex";
+        familyColumn.style.flexDirection = "column";
+        familyColumn.style.gap = "2px";
+        familyColumn.style.minWidth = "0";
+        familyColumn.style.height = "100%";
+        grid.appendChild(familyColumn);
 
         const familyHeader = document.createElement("div");
         familyHeader.textContent = familyName;
-        familyHeader.style.color = "#00ffdd";
-        familyHeader.style.fontSize = "1.3rem";
+        familyHeader.style.color = "#8cecff";
+        familyHeader.style.fontSize = "0.78rem";
         familyHeader.style.fontWeight = "bold";
-        familyHeader.style.margin = "12px 4px 8px 4px";
-        familyHeader.style.borderBottom = "1px solid rgba(0,255,221,0.45)";
-        familyHeader.style.paddingBottom = "6px";
-        content.appendChild(familyHeader);
-
-        const grid = document.createElement("div");
-        grid.style.display = "grid";
-        grid.style.width = "100%";
-        grid.style.gridTemplateColumns = "repeat(4, minmax(0, 1fr))";
-        grid.style.gridAutoRows = "auto";
-        grid.style.alignItems = "stretch";
-        grid.style.justifyContent = "stretch";
-        grid.style.boxSizing = "border-box";
-        grid.style.gap = "32px";
-        grid.style.marginBottom = "24px";
-        grid.style.paddingLeft = "24px";
-        grid.style.paddingRight = "24px";
-        content.appendChild(grid);
+        familyHeader.style.letterSpacing = "0.08em";
+        familyHeader.style.padding = "0 2px 3px";
+        familyHeader.style.borderBottom = "1px solid rgba(0,217,255,0.35)";
+        familyColumn.appendChild(familyHeader);
 
         protocols.forEach(protocolName => {
-
           const proto = PROTOCOLS[protocolName];
           const rawUpgradeTier = ProtocolSystem.protocolBoard[protocolName]?.upgradeTier;
           const upgradeTier = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
@@ -1494,14 +1420,15 @@ window.onload = function () {
           card.type = "button";
           card.style.position = "relative";
           card.style.textAlign = "left";
-          card.style.padding = "8px";
-          card.style.borderRadius = "8px";
-          card.style.border = "2px solid " + getProtocolRarityColor(proto.rarity, proto.tier);
-          card.style.background = "rgba(0, 77, 92, 0.7)";
-          card.style.color = getProtocolRarityColor(proto.rarity, proto.tier);
+          card.style.padding = "5px";
+          card.style.borderRadius = "4px";
+          card.style.border = "1px solid rgba(0, 217, 255, 0.38)";
+          card.style.background = "rgba(4, 25, 42, 0.82)";
+          card.style.color = "#c8f7ff";
           card.style.cursor = "pointer";
           card.style.transition = "all 0.15s";
-          card.style.minHeight = "200px";
+          card.style.minHeight = "84px";
+          card.style.flexGrow = "1";
           card.style.minWidth = "0";
           card.style.display = "flex";
           card.style.flexDirection = "column";
@@ -1537,14 +1464,16 @@ window.onload = function () {
             .map(([k, v]) => `${v > 0 ? "+" : ""}${v} ${k}`)
             .join(", ");
 
-          card.innerHTML = `<div style="font-weight:bold; margin-bottom:8px; color:${getProtocolRarityColor(proto.rarity, proto.tier)}; font-size:1rem;">${protocolName}</div>
-                            <div style="color:${getProtocolRarityColor(proto.rarity, proto.tier)}; font-size:0.85rem; margin-bottom:8px;">${getProtocolRarityName(proto.rarity, proto.tier)}</div>
-                            <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:8px;">${proto.intent || "Unknown"}</div>
-                            <div style="color:#00ff88; font-size:0.8rem; margin-bottom:8px; line-height:1; min-height:2.1em; overflow:hidden;" data-mods>${mods || "No mods"}</div>
-                            <div style="font-size:0.8rem; color:#aaf6ff; margin-bottom:0px;" data-tier-info>${upgradeTier} (${currentTierIndex + 1}/${totalTierCount})</div>
-                            <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px; margin-bottom:0px;">
-                              <button class="upgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; background:rgba(0,0,0,0.4); color:${nextUpgradeCost === null ? "#005500" : "#00ffdd"}; font-size:0.78rem; cursor:${nextUpgradeCost === null ? "default" : "pointer"}; opacity:${nextUpgradeCost === null ? "0.65" : "1"};">Upgrade (${nextUpgradeCost === null ? "MAX" : `-${formatByteAmount(nextUpgradeCost)}`})</button>
-                              <button class="downgrade-btn" style="width:100%; padding:0.35rem 0.6rem; border-radius:6px; border:1px solid ${currentTierIndex > 0 ? "#ff6666" : "#550000"}; background:rgba(0,0,0,0.4); color:${currentTierIndex > 0 ? "#ff6666" : "#555"}; font-size:0.78rem; cursor:${currentTierIndex > 0 ? "pointer" : "default"}; opacity:${currentTierIndex > 0 ? "1" : "0.65"};">Downgrade${currentTierIndex > 0 && downgradeRefund ? ` (+${formatByteAmount(downgradeRefund)})` : ""}</button>
+          card.innerHTML = `<div style="font-weight:bold; margin-bottom:2px; padding-right:40px; color:#8cecff; font-size:0.9rem; line-height:1.15;">${protocolName}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:4px; padding-right:34px; min-height:16px; font-size:0.68rem; margin-bottom:2px;">
+                              <span style="color:${getProtocolRarityColor(proto.rarity, proto.tier)};">${getProtocolRarityName(proto.rarity, proto.tier)}</span>
+                              <span style="color:#aaf6ff; text-align:right; white-space:nowrap;" data-tier-info>${upgradeTier} (${currentTierIndex + 1}/${totalTierCount})</span>
+                            </div>
+                            <div style="font-size:0.75rem; color:#aaf6ff; line-height:1.15; min-height:1.15em; max-height:2.3em; overflow:hidden; margin-bottom:2px;">${proto.intent || "Unknown"}</div>
+                            <div style="color:#8cecff; font-size:0.72rem; line-height:1.1; min-height:1.1em; max-height:2.2em; overflow:hidden; margin-bottom:3px;" data-mods>${mods || "No mods"}</div>
+                            <div style="display:flex; gap:4px; margin-top:auto;">
+                              <button class="upgrade-btn" style="flex:1; min-width:0; padding:0.18rem 0.2rem; border-radius:3px; border:1px solid ${nextUpgradeCost === null ? "#34525c" : "rgba(0,217,255,0.7)"}; background:rgba(0,20,30,0.72); color:${nextUpgradeCost === null ? "#66818a" : "#8cecff"}; font-size:0.68rem; cursor:${nextUpgradeCost === null ? "default" : "pointer"}; opacity:${nextUpgradeCost === null ? "0.65" : "1"};">Upgrade (${nextUpgradeCost === null ? "MAX" : `-${formatByteAmount(nextUpgradeCost)}`})</button>
+                              <button class="downgrade-btn" style="flex:1; min-width:0; padding:0.18rem 0.2rem; border-radius:3px; border:1px solid ${currentTierIndex > 0 ? "rgba(0,217,255,0.55)" : "#34525c"}; background:rgba(0,20,30,0.72); color:${currentTierIndex > 0 ? "#8cecff" : "#66818a"}; font-size:0.68rem; cursor:${currentTierIndex > 0 ? "pointer" : "default"}; opacity:${currentTierIndex > 0 ? "1" : "0.65"};">Downgrade${currentTierIndex > 0 && downgradeRefund ? ` (+${formatByteAmount(downgradeRefund)})` : ""}</button>
                             </div>`;
 
           // Add button event listeners after setting innerHTML
@@ -1596,8 +1525,8 @@ window.onload = function () {
                     const upgradeBtnEl = card.querySelector('.upgrade-btn');
                     if (upgradeBtnEl) {
                       upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${formatByteAmount(newNextUpgradeCost)})`;
-                      upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#005500' : '#00ffdd';
-                      upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#005500' : '#00ffdd'}`;
+                      upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#66818a' : '#8cecff';
+                      upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#34525c' : 'rgba(0,217,255,0.7)'}`;
                       upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
                       upgradeBtnEl.style.cursor = newNextUpgradeCost === null ? 'default' : 'pointer';
                       upgradeBtnEl.disabled = newNextUpgradeCost === null;
@@ -1616,8 +1545,8 @@ window.onload = function () {
                     const downgradeBtnEl = card.querySelector('.downgrade-btn');
                     if (downgradeBtnEl) {
                       downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && newDowngradeRefund ? ` (+${formatByteAmount(newDowngradeRefund)})` : ''}`;
-                      downgradeBtnEl.style.color = newTierIndex > 0 ? '#ff6666' : '#555';
-                      downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? '#ff6666' : '#550000'}`;
+                      downgradeBtnEl.style.color = newTierIndex > 0 ? '#8cecff' : '#66818a';
+                      downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? 'rgba(0,217,255,0.55)' : '#34525c'}`;
                       downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
                       downgradeBtnEl.style.cursor = newTierIndex > 0 ? 'pointer' : 'default';
                       downgradeBtnEl.disabled = newTierIndex <= 0;
@@ -1637,9 +1566,8 @@ window.onload = function () {
                       const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
                       const statStrings = statOrder.map(stat => {
                         const v = statTotals[stat];
-                        let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
                         let sign = v > 0 ? "+" : (v < 0 ? "" : "");
-                        return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
+                        return `<span style='color:#8cecff; font-weight:bold;'>${sign}${v} ${stat}</span>`;
                       });
                       statTotalDiv.innerHTML = `${statStrings.join(", ")}`;
                     }
@@ -1686,8 +1614,8 @@ window.onload = function () {
                     const downgradeBtnEl = card.querySelector('.downgrade-btn');
                     if (downgradeBtnEl) {
                       downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && downgradeRefundNew ? ` (+${formatByteAmount(downgradeRefundNew)})` : ''}`;
-                      downgradeBtnEl.style.color = newTierIndex > 0 ? '#ff6666' : '#555';
-                      downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? '#ff6666' : '#550000'}`;
+                      downgradeBtnEl.style.color = newTierIndex > 0 ? '#8cecff' : '#66818a';
+                      downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? 'rgba(0,217,255,0.55)' : '#34525c'}`;
                       downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
                       downgradeBtnEl.style.cursor = newTierIndex > 0 ? 'pointer' : 'default';
                       downgradeBtnEl.disabled = newTierIndex <= 0;
@@ -1695,8 +1623,8 @@ window.onload = function () {
                     const upgradeBtnEl = card.querySelector('.upgrade-btn');
                     if (upgradeBtnEl) {
                       upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${formatByteAmount(newNextUpgradeCost)})`;
-                      upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#005500' : '#00ffdd';
-                      upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#005500' : '#00ffdd'}`;
+                      upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#66818a' : '#8cecff';
+                      upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#34525c' : 'rgba(0,217,255,0.7)'}`;
                       upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
                       upgradeBtnEl.style.cursor = newNextUpgradeCost === null ? 'default' : 'pointer';
                       upgradeBtnEl.disabled = newNextUpgradeCost === null;
@@ -1716,9 +1644,8 @@ window.onload = function () {
                       const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
                       const statStrings = statOrder.map(stat => {
                         const v = statTotals[stat];
-                        let color = v > 0 ? "#00ff88" : v < 0 ? "#ff4444" : "#bbbbbb";
                         let sign = v > 0 ? "+" : (v < 0 ? "" : "");
-                        return `<span style='color:${color}; font-weight:bold;'>${sign}${v} ${stat}</span>`;
+                        return `<span style='color:#8cecff; font-weight:bold;'>${sign}${v} ${stat}</span>`;
                       });
                       statTotalDiv.innerHTML = `${statStrings.join(", ")}`;
                     }
@@ -1730,16 +1657,16 @@ window.onload = function () {
           }
 
           // Tooltip: compare stat change if selected vs unselected
-          card.addEventListener("mouseenter", () => {
+          card.addEventListener("mouseenter", (event) => {
             // Show stat difference using: (x - a) + y and (x - b) + y
             const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
             const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
             const hoveredMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
               ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
               : (PROTOCOLS[protocolName]?.statMods || {});
-            let html = `<div style='min-width:220px; max-width:340px; font-family:sans-serif; font-size:1em; background:rgba(0,20,30,0.98); border-radius:10px; border:2px solid #00ffdd; box-shadow:0 0 18px #00ffdd44; padding:12px 14px;'>`;
+            let html = `<div style='min-width:220px; max-width:340px; font-family:sans-serif; font-size:1em; background:rgba(4,25,42,0.98); border-radius:4px; border:1px solid rgba(0,217,255,0.55); box-shadow:0 0 18px rgba(0,217,255,0.18); padding:12px 14px;'>`;
             if (selected.length === 0) {
-              html += `<div style='color:#00ffdd; font-size:1.01em; font-weight:bold; margin-bottom:4px;'>No protocol selected</div>`;
+              html += `<div style='color:#8cecff; font-size:1.01em; font-weight:bold; margin-bottom:4px;'>No protocol selected</div>`;
             } else if (selected.length === 1) {
               // Only one selected: show (x - a) + y, where x = a
               const aName = selected[0];
@@ -1748,7 +1675,7 @@ window.onload = function () {
                 : (PROTOCOLS[aName]?.statMods || {});
               // x = a
               // (x - a) + y = y
-              html += `<div style='color:#00ffdd; font-size:1.01em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${aName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
+              html += `<div style='color:#8cecff; font-size:1.01em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${aName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
               html += `<div style='font-size:0.97em; margin-bottom:6px;'>`;
               html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
               html += statOrder.map(stat => {
@@ -1776,7 +1703,7 @@ window.onload = function () {
               
               // Column 1: Protocol A
               html += `<div>`;
-              html += `<div style='color:#00ffdd; font-size:0.95em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${aName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
+              html += `<div style='color:#8cecff; font-size:0.95em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${aName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
               html += `<div style='font-size:0.92em;'>`;
               html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
               html += statOrder.map(stat => {
@@ -1795,7 +1722,7 @@ window.onload = function () {
               
               // Column 2: Protocol B
               html += `<div>`;
-              html += `<div style='color:#00ffdd; font-size:0.95em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${bName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
+              html += `<div style='color:#8cecff; font-size:0.95em; margin-bottom:2px;'><div style='font-weight:normal;'>If you replace</div><div style='font-weight:bold;'>${bName}</div><div style='font-weight:normal;'>with</div><div style='font-weight:bold;'>${protocolName}</div></div>`;
               html += `<div style='font-size:0.92em;'>`;
               html += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
               html += statOrder.map(stat => {
@@ -1815,26 +1742,60 @@ window.onload = function () {
               html += `</div>`;
             }
             html += `</div>`;
-            let tooltip = document.createElement("div");
-            tooltip.innerHTML = html;
-            tooltip.style.position = "fixed";
-            tooltip.style.zIndex = 9999;
-            tooltip.style.pointerEvents = "none";
-            document.body.appendChild(tooltip);
+            let tooltip = null;
+            let lastTooltipEvent = event;
+            const trackTooltipPointer = (pointerEvent) => {
+              lastTooltipEvent = pointerEvent;
+            };
             function moveTooltip(e) {
-              tooltip.style.left = (e.clientX + 18) + "px";
-              tooltip.style.top = (e.clientY + 8) + "px";
+              if (!tooltip) return;
+              const rect = starterOverlay.getBoundingClientRect();
+              const scale = rect.width / GAME_DISPLAY_WIDTH;
+              const left = (e.clientX - rect.left) / scale + 18;
+              const top = (e.clientY - rect.top) / scale + 8;
+              tooltip.style.left = `${Math.max(8, Math.min(left, GAME_DISPLAY_WIDTH - tooltip.offsetWidth - 8))}px`;
+              tooltip.style.top = `${Math.max(8, Math.min(top, GAME_DISPLAY_HEIGHT - tooltip.offsetHeight - 8))}px`;
             }
-            moveTooltip(window.event || {});
-            card._tooltip = tooltip;
-            card.addEventListener("mousemove", moveTooltip);
+            card._tooltipMoveHandler = moveTooltip;
+            card._tooltipPointerHandler = trackTooltipPointer;
+            card.addEventListener("mousemove", trackTooltipPointer);
+            card._tooltipTimer = window.setTimeout(() => {
+              if (!card.matches(":hover")) return;
+              tooltip = document.createElement("div");
+              tooltip.innerHTML = html;
+              tooltip.style.position = "absolute";
+              tooltip.style.zIndex = 29;
+              tooltip.style.pointerEvents = "none";
+              tooltip.style.maxWidth = "calc(100% - 16px)";
+              tooltip.style.maxHeight = "calc(100% - 16px)";
+              tooltip.style.overflow = "auto";
+              tooltip.style.boxSizing = "border-box";
+              starterOverlay.appendChild(tooltip);
+              card._tooltip = tooltip;
+              moveTooltip(lastTooltipEvent);
+              card.removeEventListener("mousemove", trackTooltipPointer);
+              card._tooltipPointerHandler = null;
+              card.addEventListener("mousemove", moveTooltip);
+              card._tooltipTimer = null;
+            }, TOOLTIP_HOVER_DELAY_MS);
           });
           card.addEventListener("mouseleave", () => {
+            if (card._tooltipTimer) {
+              clearTimeout(card._tooltipTimer);
+              card._tooltipTimer = null;
+            }
+            if (card._tooltipPointerHandler) {
+              card.removeEventListener("mousemove", card._tooltipPointerHandler);
+              card._tooltipPointerHandler = null;
+            }
             if (card._tooltip) {
-              document.body.removeChild(card._tooltip);
+              card._tooltip.remove();
               card._tooltip = null;
             }
-            card.removeEventListener("mousemove", () => {});
+            if (card._tooltipMoveHandler) {
+              card.removeEventListener("mousemove", card._tooltipMoveHandler);
+              card._tooltipMoveHandler = null;
+            }
           });
 
           const favoriteBadge = document.createElement("div");
@@ -1847,15 +1808,15 @@ window.onload = function () {
           favoriteBadge.style.height = "20px";
           favoriteBadge.style.boxSizing = "border-box";
           favoriteBadge.style.borderRadius = "50%";
-          favoriteBadge.style.border = "1px solid #00ffdd";
-          favoriteBadge.style.background = "rgba(0, 35, 40, 0.92)";
+          favoriteBadge.style.border = "1px solid rgba(0,217,255,0.7)";
+          favoriteBadge.style.background = "rgba(0, 20, 30, 0.92)";
           favoriteBadge.style.fontWeight = "bold";
           favoriteBadge.style.fontSize = "1.1rem";
           favoriteBadge.style.lineHeight = "1";
           favoriteBadge.style.display = "flex";
           favoriteBadge.style.alignItems = "center";
           favoriteBadge.style.justifyContent = "center";
-          favoriteBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+          favoriteBadge.style.boxShadow = "0 0 8px rgba(0,217,255,0.3)";
           favoriteBadge.style.cursor = "pointer";
           card.appendChild(favoriteBadge);
 
@@ -1868,16 +1829,16 @@ window.onload = function () {
           selectedBadge.style.width = "18px";
           selectedBadge.style.height = "18px";
           selectedBadge.style.borderRadius = "50%";
-          selectedBadge.style.border = "1px solid #00ffdd";
-          selectedBadge.style.background = "rgba(0, 35, 40, 0.92)";
-          selectedBadge.style.color = "#00ffdd";
+          selectedBadge.style.border = "1px solid rgba(0,217,255,0.7)";
+          selectedBadge.style.background = "rgba(0, 20, 30, 0.92)";
+          selectedBadge.style.color = "#8cecff";
           selectedBadge.style.fontWeight = "bold";
           selectedBadge.style.fontSize = "0.85rem";
           selectedBadge.style.lineHeight = "1";
           selectedBadge.style.display = "none";
           selectedBadge.style.alignItems = "center";
           selectedBadge.style.justifyContent = "center";
-          selectedBadge.style.boxShadow = "0 0 8px rgba(0,255,221,0.4)";
+          selectedBadge.style.boxShadow = "0 0 8px rgba(0,217,255,0.3)";
           selectedBadge.style.pointerEvents = "none";
           card.appendChild(selectedBadge);
 
@@ -1900,9 +1861,9 @@ window.onload = function () {
 
           const renderCardState = () => {
             const isSelected = selected.includes(protocolName);
-            card.style.background = isSelected ? "rgba(0, 255, 221, 0.22)" : "rgba(0, 77, 92, 0.7)";
-            card.style.borderColor = isSelected ? "#ffffff" : "#00ffdd";
-            card.style.boxShadow = isSelected ? "0 0 14px rgba(255,255,255,0.35)" : "none";
+            card.style.background = isSelected ? "rgba(0, 217, 255, 0.2)" : "rgba(4, 25, 42, 0.82)";
+            card.style.borderColor = isSelected ? "#00d9ff" : "rgba(0,217,255,0.38)";
+            card.style.boxShadow = isSelected ? "0 0 14px rgba(0,217,255,0.3)" : "none";
             selectedBadge.style.display = isSelected ? "flex" : "none";
           };
           renderCardState();
@@ -1938,28 +1899,23 @@ window.onload = function () {
             }
             // If already 2 selected, prompt to replace
             const modal = document.createElement("div");
-            modal.style.position = "fixed";
-            modal.style.left = 0;
-            modal.style.top = 0;
-            modal.style.width = "100vw";
-            modal.style.height = "100vh";
+            configureDisplayOverlay(modal, 15);
             modal.style.background = "rgba(0,0,0,0.7)";
             modal.style.display = "flex";
             modal.style.alignItems = "center";
             modal.style.justifyContent = "center";
-            modal.style.zIndex = 2000;
             const box = document.createElement("div");
-            box.style.background = "#01222b";
-            box.style.border = "2px solid #00ffdd";
-            box.style.borderRadius = "10px";
+            box.style.background = "#061525";
+            box.style.border = "1px solid rgba(0,217,255,0.55)";
+            box.style.borderRadius = "4px";
             box.style.padding = "28px 32px";
             box.style.display = "flex";
             box.style.flexDirection = "column";
             box.style.alignItems = "center";
-            box.style.boxShadow = "0 0 18px #00ffdd55";
+            box.style.boxShadow = "0 0 18px rgba(0,217,255,0.2)";
             const msg = document.createElement("div");
             msg.textContent = "Starter limit reached. Replace which starter?";
-            msg.style.color = "#00ffdd";
+            msg.style.color = "#8cecff";
             msg.style.fontWeight = "bold";
             msg.style.fontSize = "1.1rem";
             msg.style.marginBottom = "18px";
@@ -1982,10 +1938,10 @@ window.onload = function () {
               const btn = document.createElement("button");
               btn.textContent = selName;
               btn.style.padding = "0.6rem 1.2rem";
-              btn.style.background = "rgba(0,0,0,0.7)";
-              btn.style.color = "#00ffdd";
-              btn.style.border = "2px solid #00ffdd";
-              btn.style.borderRadius = "8px";
+              btn.style.background = "rgba(0,20,30,0.82)";
+              btn.style.color = "#8cecff";
+              btn.style.border = "1px solid rgba(0,217,255,0.7)";
+              btn.style.borderRadius = "4px";
               btn.style.fontSize = "1rem";
               btn.style.cursor = "pointer";
               btn.style.marginBottom = "6px";
@@ -2025,8 +1981,8 @@ window.onload = function () {
                 : (PROTOCOLS[protocolName]?.statMods || {});
               // x = a + b
               // (x - a) + y = c
-              let statHtml = `<div style='margin-bottom:2px; font-size:0.97em; background:rgba(0,20,30,0.92); border-radius:8px; border:1.5px solid #00ffdd; box-shadow:0 0 8px #00ffdd33; padding:7px 10px; width:100%;'>`;
-              statHtml += `<div style='color:#00ffdd; font-weight:bold; margin-bottom:2px; text-align:center;'>Result if replaced:</div>`;
+              let statHtml = `<div style='margin-bottom:2px; font-size:0.97em; background:rgba(4,25,42,0.92); border-radius:4px; border:1px solid rgba(0,217,255,0.4); box-shadow:0 0 8px rgba(0,217,255,0.12); padding:7px 10px; width:100%;'>`;
+              statHtml += `<div style='color:#8cecff; font-weight:bold; margin-bottom:2px; text-align:center;'>Result if replaced:</div>`;
               statHtml += `<div style='display:flex; flex-direction:column; gap:2px;'>`;
               statOrder.forEach((stat, i) => {
                 const a = Number(aMods[stat]) || 0;
@@ -2048,9 +2004,9 @@ window.onload = function () {
             cancelBtn.textContent = "Cancel";
             cancelBtn.style.padding = "0.5rem 1.1rem";
             cancelBtn.style.background = "rgba(0,0,0,0.5)";
-            cancelBtn.style.color = "#fff";
-            cancelBtn.style.border = "1.5px solid #aaa";
-            cancelBtn.style.borderRadius = "8px";
+            cancelBtn.style.color = "#8cecff";
+            cancelBtn.style.border = "1px solid rgba(0,217,255,0.55)";
+            cancelBtn.style.borderRadius = "4px";
             cancelBtn.style.fontSize = "1rem";
             cancelBtn.style.marginTop = "8px";
             cancelBtn.style.cursor = "pointer";
@@ -2064,7 +2020,7 @@ window.onload = function () {
 
           // Attach renderCardState to card for external refresh
           card.renderCardState = renderCardState;
-          grid.appendChild(card);
+          familyColumn.appendChild(card);
         });
       });
     }
@@ -2075,32 +2031,35 @@ window.onload = function () {
     actions.style.display = "flex";
     actions.style.justifyContent = "center";
     actions.style.alignItems = "center";
-    actions.style.gap = "18px";
-    actions.style.marginTop = "18px";
+    actions.style.gap = "12px";
+    actions.style.marginTop = "6px";
+    actions.style.flexShrink = "0";
     panel.appendChild(actions);
 
     const backBtn2 = document.createElement("button");
     backBtn2.textContent = "Back";
-    backBtn2.style.width = "150px"; 
-    backBtn2.style.fontSize = "1rem";
-    backBtn2.style.padding = "0.7rem 1.2rem";
-    backBtn2.style.background = "rgba(0,0,0,0.7)";
-    backBtn2.style.color = "#fff";
-    backBtn2.style.border = "2px solid #fff";
-    backBtn2.style.borderRadius = "8px";
+    backBtn2.style.width = "130px"; 
+    backBtn2.style.fontSize = "0.88rem";
+    backBtn2.style.padding = "0.45rem 0.8rem";
+    backBtn2.style.background = "rgba(0,20,30,0.82)";
+    backBtn2.style.color = "#8cecff";
+    backBtn2.style.border = "1px solid rgba(0,217,255,0.7)";
+    backBtn2.style.borderRadius = "4px";
     backBtn2.style.cursor = "pointer";
+    backBtn2.style.boxShadow = "inset 0 0 10px rgba(0,217,255,0.08)";
     actions.appendChild(backBtn2);
 
     const startBtn = document.createElement("button");
     startBtn.textContent = source === "mainMenu" ? "Play" : "Start Run";
-    startBtn.style.width = "150px"; 
-    startBtn.style.fontSize = "1rem";
-    startBtn.style.padding = "0.7rem 1.2rem";
-    startBtn.style.background = "rgba(0,0,0,0.7)";
-    startBtn.style.color = "#00ffdd";
-    startBtn.style.border = "2px solid #00ffdd";
-    startBtn.style.borderRadius = "8px";
+    startBtn.style.width = "130px"; 
+    startBtn.style.fontSize = "0.88rem";
+    startBtn.style.padding = "0.45rem 0.8rem";
+    startBtn.style.background = "rgba(0,20,30,0.82)";
+    startBtn.style.color = "#8cecff";
+    startBtn.style.border = "1px solid rgba(0,217,255,0.7)";
+    startBtn.style.borderRadius = "4px";
     startBtn.style.cursor = "pointer";
+    startBtn.style.boxShadow = "0 0 14px rgba(0,217,255,0.18), inset 0 0 10px rgba(0,217,255,0.08)";
     actions.appendChild(startBtn);
 
     backBtn2.addEventListener("click", () => {
@@ -2125,8 +2084,11 @@ window.onload = function () {
     document.body.appendChild(starterOverlay);
   }
   function showMenu() {
-    hudFrameOverlay.style.display = "none";
+    canvas.style.visibility = "hidden";
+    hudXrayCanvas.style.visibility = "hidden";
     hudWaveDisplay.style.display = "none";
+    const previousMenuOverlay = document.getElementById("menuOverlay");
+    if (previousMenuOverlay) previousMenuOverlay.remove();
     const ENEMY_GLOSSARY = {
       factionName: "UNCLASSIFIED HOSTILES",
       factionDescription: "Faction designation pending. This index summarizes observed hostile combat roles and behavior patterns.",
@@ -2149,40 +2111,20 @@ window.onload = function () {
     function showEnemyGlossary() {
       const glossaryOverlay = document.createElement("div");
       glossaryOverlay.id = "enemyGlossaryOverlay";
-      glossaryOverlay.style.position = "fixed";
-      glossaryOverlay.style.left = 0;
-      glossaryOverlay.style.top = 0;
-      glossaryOverlay.style.width = "100vw";
-      glossaryOverlay.style.height = "100vh";
-      glossaryOverlay.style.background = "#000";
+      configureDisplayOverlay(glossaryOverlay);
+      glossaryOverlay.style.background = "transparent";
       glossaryOverlay.style.display = "flex";
       glossaryOverlay.style.flexDirection = "column";
       glossaryOverlay.style.justifyContent = "center";
       glossaryOverlay.style.alignItems = "center";
-      glossaryOverlay.style.zIndex = 1001;
-
-      const glossaryBg = document.createElement("img");
-      glossaryBg.src = "slide3.png";
-      glossaryBg.style.position = "absolute";
-      glossaryBg.style.left = "50%";
-      glossaryBg.style.top = "50%";
-      glossaryBg.style.transform = "translate(-50%, -50%)";
-      glossaryBg.style.width = "100vw";
-      glossaryBg.style.height = "100vh";
-      glossaryBg.style.objectFit = "cover";
-      glossaryBg.style.zIndex = 0;
-      glossaryOverlay.appendChild(glossaryBg);
-
       const panel = document.createElement("div");
       panel.style.position = "relative";
       panel.style.zIndex = 2;
-      panel.style.width = "940px";
-      panel.style.maxHeight = "720px";
-      panel.style.background = "rgba(0, 20, 30, 0.96)";
-      panel.style.border = "2px solid #00ffdd";
-      panel.style.borderRadius = "10px";
-      panel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
-      panel.style.padding = "16px";
+      panel.style.width = "calc(100% - 24px)";
+      panel.style.height = "calc(100% - 24px)";
+      panel.style.boxSizing = "border-box";
+      panel.style.background = "transparent";
+      panel.style.padding = "14px 18px";
       panel.style.display = "flex";
       panel.style.flexDirection = "column";
       glossaryOverlay.appendChild(panel);
@@ -2191,79 +2133,81 @@ window.onload = function () {
       topRow.style.display = "flex";
       topRow.style.alignItems = "center";
       topRow.style.justifyContent = "space-between";
-      topRow.style.marginBottom = "10px";
+      topRow.style.marginBottom = "12px";
       panel.appendChild(topRow);
 
       const title = document.createElement("h2");
       title.textContent = "ENEMY GLOSSARY";
-      title.style.color = "#00ffdd";
+      title.style.color = "#eaffff";
       title.style.margin = "0";
-      title.style.fontSize = "2rem";
-      title.style.textShadow = "0 0 14px rgba(0,255,221,0.7)";
+      title.style.fontSize = "1.8rem";
+      title.style.letterSpacing = "2px";
+      title.style.textShadow = "0 0 14px rgba(0,217,255,0.65)";
       topRow.appendChild(title);
 
       const backBtn = document.createElement("button");
       backBtn.textContent = "← Back to Menu";
       backBtn.style.fontSize = "0.95rem";
       backBtn.style.padding = "0.45rem 0.95rem";
-      backBtn.style.background = "rgba(0,0,0,0.7)";
-      backBtn.style.color = "#00ffdd";
-      backBtn.style.border = "2px solid #00ffdd";
-      backBtn.style.borderRadius = "6px";
+      backBtn.style.background = "rgba(0,20,30,0.82)";
+      backBtn.style.color = "#8cecff";
+      backBtn.style.border = "1px solid rgba(0,217,255,0.7)";
+      backBtn.style.borderRadius = "4px";
       backBtn.style.cursor = "pointer";
-      backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
-      backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
+      backBtn.style.boxShadow = "inset 0 0 10px rgba(0,217,255,0.08)";
+      backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,45,58,0.94)");
+      backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,20,30,0.82)");
       topRow.appendChild(backBtn);
 
       const factionBlock = document.createElement("div");
-      factionBlock.style.border = "1px solid rgba(0,255,221,0.45)";
-      factionBlock.style.borderRadius = "8px";
-      factionBlock.style.padding = "10px 12px";
-      factionBlock.style.marginBottom = "12px";
-      factionBlock.style.background = "rgba(0, 35, 45, 0.52)";
+      factionBlock.style.borderLeft = "2px solid rgba(0,217,255,0.65)";
+      factionBlock.style.padding = "8px 12px";
+      factionBlock.style.marginBottom = "10px";
+      factionBlock.style.background = "rgba(0, 35, 55, 0.28)";
       panel.appendChild(factionBlock);
 
       const factionName = document.createElement("div");
       factionName.textContent = `Faction: ${ENEMY_GLOSSARY.factionName}`;
-      factionName.style.color = "#7ff9ff";
+      factionName.style.color = "#8cecff";
       factionName.style.fontWeight = "bold";
       factionName.style.marginBottom = "4px";
       factionBlock.appendChild(factionName);
 
       const factionDesc = document.createElement("div");
       factionDesc.textContent = ENEMY_GLOSSARY.factionDescription;
-      factionDesc.style.color = "#c9feff";
-      factionDesc.style.fontSize = "0.92rem";
+      factionDesc.style.color = "#c8f7ff";
+      factionDesc.style.fontSize = "0.9rem";
       factionBlock.appendChild(factionDesc);
 
       const listWrap = document.createElement("div");
       listWrap.style.flex = "1";
+      listWrap.style.minHeight = "0";
       listWrap.style.overflowY = "auto";
-      listWrap.style.border = "1px solid rgba(0,255,221,0.28)";
-      listWrap.style.borderRadius = "8px";
-      listWrap.style.padding = "10px";
+      listWrap.style.padding = "4px";
       listWrap.classList.add("scrollbar-themed");
       panel.appendChild(listWrap);
+
+      const entryGrid = document.createElement("div");
+      entryGrid.style.display = "grid";
+      entryGrid.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+      entryGrid.style.gap = "8px";
+      listWrap.appendChild(entryGrid);
 
       ENEMY_GLOSSARY.entries.forEach((entry) => {
         const card = document.createElement("div");
         card.style.display = "grid";
-        card.style.gridTemplateColumns = "64px 1fr";
+        card.style.gridTemplateColumns = "56px minmax(0, 1fr)";
         card.style.columnGap = "12px";
-        card.style.alignItems = "center";
-        card.style.border = "1px solid rgba(0,255,221,0.28)";
-        card.style.borderRadius = "8px";
-        card.style.padding = "10px";
-        card.style.marginBottom = "8px";
-        card.style.background = "rgba(0, 50, 64, 0.44)";
-        listWrap.appendChild(card);
+        card.style.alignItems = "start";
+        card.style.borderLeft = "2px solid rgba(0,217,255,0.32)";
+        card.style.padding = "8px";
+        card.style.background = "rgba(0, 35, 55, 0.34)";
+        entryGrid.appendChild(card);
 
         const spriteWrap = document.createElement("div");
-        spriteWrap.style.width = "64px";
-        spriteWrap.style.height = "64px";
-        spriteWrap.style.border = "1px solid rgba(0,255,221,0.45)";
-        spriteWrap.style.borderRadius = "6px";
-        spriteWrap.style.background = "rgba(0, 20, 30, 0.8)";
+        spriteWrap.style.width = "56px";
+        spriteWrap.style.height = "56px";
+        spriteWrap.style.background = "rgba(0, 217, 255, 0.06)";
         spriteWrap.style.display = "flex";
         spriteWrap.style.alignItems = "center";
         spriteWrap.style.justifyContent = "center";
@@ -2273,14 +2217,14 @@ window.onload = function () {
         const sprite = document.createElement("img");
         sprite.src = entry.image || "";
         sprite.alt = entry.name;
-        sprite.style.maxWidth = "56px";
-        sprite.style.maxHeight = "56px";
+        sprite.style.maxWidth = "52px";
+        sprite.style.maxHeight = "52px";
         sprite.style.objectFit = "contain";
         sprite.addEventListener("error", () => {
           sprite.remove();
           const fallback = document.createElement("div");
           fallback.textContent = entry.name.slice(0, 2).toUpperCase();
-          fallback.style.color = "#8ffaff";
+          fallback.style.color = "#8cecff";
           fallback.style.fontSize = "0.82rem";
           fallback.style.fontWeight = "bold";
           spriteWrap.appendChild(fallback);
@@ -2294,22 +2238,22 @@ window.onload = function () {
 
         const name = document.createElement("div");
         name.textContent = entry.name;
-        name.style.color = "#00ffdd";
+        name.style.color = "#8cecff";
         name.style.fontWeight = "bold";
-        name.style.fontSize = "1rem";
+        name.style.fontSize = "0.98rem";
         textCol.appendChild(name);
 
         const role = document.createElement("div");
         role.textContent = `Role: ${entry.role}`;
-        role.style.color = "#8ffaff";
-        role.style.fontSize = "0.88rem";
+        role.style.color = "#79cfdf";
+        role.style.fontSize = "0.82rem";
         role.style.marginTop = "2px";
         textCol.appendChild(role);
 
         const desc = document.createElement("div");
         desc.textContent = entry.description;
-        desc.style.color = "#d4fcff";
-        desc.style.fontSize = "0.9rem";
+        desc.style.color = "#c8f7ff";
+        desc.style.fontSize = "0.82rem";
         desc.style.marginTop = "5px";
         textCol.appendChild(desc);
       });
@@ -2324,19 +2268,15 @@ window.onload = function () {
 
     function showLeaderboardOverlay() {
       const DIFFICULTIES = ["Normal", "Hardcore", "Apocalypse"];
-      const DIFF_COLORS = { Normal: "#00ffdd", Hardcore: "#ffb300", Apocalypse: "#ff3c3c" };
-      const COLS = "28px 1fr 80px 60px";
+      const DIFF_COLORS = { Normal: "#00d9ff", Hardcore: "#00d9ff", Apocalypse: "#00d9ff" };
+      const COLS = "42px minmax(0, 1fr) 120px 90px";
 
       const lbOverlay = document.createElement("div");
-      lbOverlay.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1001;font-family:sans-serif;";
-
-      const lbBg = document.createElement("img");
-      lbBg.src = "slide4.png";
-      lbBg.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100vw;height:100vh;object-fit:cover;z-index:0;";
-      lbOverlay.appendChild(lbBg);
+      configureDisplayOverlay(lbOverlay);
+      lbOverlay.style.cssText += "background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;";
 
       const panel = document.createElement("div");
-      panel.style.cssText = "position:relative;z-index:2;width:min(700px,94vw);max-height:88vh;background:rgba(0,10,15,0.97);border:2px solid #00ffdd;border-radius:12px;box-shadow:0 0 32px rgba(0,255,221,0.3);padding:22px 20px 18px;display:flex;flex-direction:column;gap:12px;";
+      panel.style.cssText = "position:relative;z-index:2;width:calc(100% - 24px);height:calc(100% - 24px);box-sizing:border-box;background:transparent;padding:16px 18px;display:flex;flex-direction:column;gap:12px;";
       lbOverlay.appendChild(panel);
 
       const topRow = document.createElement("div");
@@ -2345,19 +2285,19 @@ window.onload = function () {
 
       const lbTitle = document.createElement("h2");
       lbTitle.textContent = "LEADERBOARDS";
-      lbTitle.style.cssText = "color:#00ffdd;margin:0;font-size:1.8rem;letter-spacing:3px;text-shadow:0 0 14px rgba(0,255,221,0.6);";
+      lbTitle.style.cssText = "color:#eaffff;margin:0;font-size:2rem;letter-spacing:3px;text-shadow:0 0 14px rgba(0,217,255,0.6);";
       topRow.appendChild(lbTitle);
 
       const backBtn = document.createElement("button");
       backBtn.textContent = "← Back to Menu";
-      backBtn.style.cssText = "font-size:0.95rem;padding:0.45rem 0.95rem;background:rgba(0,0,0,0.7);color:#00ffdd;border:2px solid #00ffdd;border-radius:6px;cursor:pointer;";
+      backBtn.style.cssText = "font-size:0.95rem;padding:0.45rem 0.95rem;background:rgba(0,20,30,0.82);color:#8cecff;border:1px solid rgba(0,217,255,0.7);border-radius:4px;cursor:pointer;box-shadow:inset 0 0 10px rgba(0,217,255,0.08);";
       backBtn.addEventListener("click", () => { lbOverlay.remove(); showMenu(); });
       topRow.appendChild(backBtn);
 
       // Tabs
       let activeTab = "Normal";
       const tabRow = document.createElement("div");
-      tabRow.style.cssText = "display:flex;gap:8px;";
+      tabRow.style.cssText = "display:flex;gap:8px;flex-shrink:0;";
       panel.appendChild(tabRow);
 
       // Headers + table
@@ -2366,18 +2306,18 @@ window.onload = function () {
       [("#"), "Name", "Score", "Waves"].forEach((t, idx) => {
         const h = document.createElement("div");
         h.textContent = t;
-        h.style.cssText = `color:#555;font-size:0.72rem;letter-spacing:1px;text-transform:uppercase;text-align:${idx >= 2 ? "right" : "left"};`;
+        h.style.cssText = `color:#79b9c9;font-size:0.82rem;letter-spacing:1px;text-transform:uppercase;text-align:${idx >= 2 ? "right" : "left"};`;
         lbHeaders.appendChild(h);
       });
       panel.appendChild(lbHeaders);
 
       const lbTable = document.createElement("div");
-      lbTable.style.cssText = "width:100%;display:flex;flex-direction:column;gap:3px;height:380px;overflow-y:auto;";
+      lbTable.style.cssText = "width:100%;display:flex;flex:1;flex-direction:column;gap:6px;min-height:0;overflow-y:auto;";
       lbTable.classList.add("scrollbar-themed");
       panel.appendChild(lbTable);
 
       const emptyNote = document.createElement("div");
-      emptyNote.style.cssText = "color:#444;font-size:0.9rem;text-align:center;padding:24px 0;display:none;";
+      emptyNote.style.cssText = "color:#8cecff;font-size:1rem;text-align:center;padding:24px 0;display:none;";
       emptyNote.textContent = "No entries yet.";
       lbTable.appendChild(emptyNote);
 
@@ -2385,36 +2325,36 @@ window.onload = function () {
         const color = DIFF_COLORS[diff];
         tabRow.querySelectorAll("button").forEach(b => {
           const isSel = b.dataset.diff === diff;
-          b.style.background = isSel ? `rgba(0,0,0,0.9)` : "rgba(0,0,0,0.5)";
-          b.style.color = isSel ? color : "#555";
-          b.style.borderColor = isSel ? color : "#333";
+          b.style.background = isSel ? "rgba(0,45,58,0.94)" : "rgba(0,20,30,0.7)";
+          b.style.color = isSel ? color : "#8cecff";
+          b.style.borderColor = isSel ? color : "rgba(0,217,255,0.28)";
         });
-        lbHeaders.querySelectorAll("div").forEach(h => h.style.color = "#555");
+        lbHeaders.querySelectorAll("div").forEach(h => h.style.color = "#79b9c9");
 
         function renderRows(entries) {
           lbTable.innerHTML = "";
           if (!entries.length) {
             const note = document.createElement("div");
             note.textContent = "No entries yet.";
-            note.style.cssText = "color:#444;font-size:0.9rem;text-align:center;padding:24px 0;";
+            note.style.cssText = "color:#8cecff;font-size:1rem;text-align:center;padding:24px 0;";
             lbTable.appendChild(note);
             return;
           }
           entries.forEach((entry, i) => {
             const row = document.createElement("div");
-            row.style.cssText = `display:grid;grid-template-columns:${COLS};gap:4px;align-items:center;padding:5px 8px;border-radius:5px;background:rgba(0,255,221,0.04);border:1px solid rgba(0,255,221,0.09);`;
+            row.style.cssText = `display:grid;grid-template-columns:${COLS};gap:8px;align-items:center;padding:9px 10px;background:rgba(0,35,55,0.38);border-left:2px solid rgba(0,217,255,0.34);`;
             const rank = document.createElement("div");
             rank.textContent = `#${i + 1}`;
-            rank.style.cssText = `color:${i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#555"};font-weight:bold;font-size:0.85rem;`;
+            rank.style.cssText = `color:${i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#79b9c9"};font-weight:bold;font-size:0.95rem;`;
             const nameEl = document.createElement("div");
             nameEl.textContent = entry.name || "???";
-            nameEl.style.cssText = "color:#e0ffff;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+            nameEl.style.cssText = "color:#d8f7ff;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
             const sc = document.createElement("div");
             sc.textContent = entry.score;
-            sc.style.cssText = "color:#ffdd00;font-weight:bold;font-size:0.85rem;text-align:right;";
+            sc.style.cssText = "color:#8cecff;font-weight:bold;font-size:0.95rem;text-align:right;";
             const wv = document.createElement("div");
             wv.textContent = `W${entry.waves}`;
-            wv.style.cssText = "color:#aaf6ff;font-size:0.82rem;text-align:right;";
+            wv.style.cssText = "color:#aaf6ff;font-size:0.9rem;text-align:right;";
             row.appendChild(rank); row.appendChild(nameEl); row.appendChild(sc); row.appendChild(wv);
             lbTable.appendChild(row);
           });
@@ -2437,7 +2377,7 @@ window.onload = function () {
         const tab = document.createElement("button");
         tab.textContent = diff;
         tab.dataset.diff = diff;
-        tab.style.cssText = `font-size:0.95rem;padding:0.4rem 1.1rem;border-radius:6px;border:2px solid #333;cursor:pointer;color:#555;background:rgba(0,0,0,0.5);`;
+        tab.style.cssText = `font-size:0.95rem;padding:0.5rem 1.2rem;border-radius:4px;border:1px solid rgba(0,217,255,0.28);cursor:pointer;color:#8cecff;background:rgba(0,20,30,0.72);`;
         tab.addEventListener("click", () => { activeTab = diff; renderTab(diff); });
         tabRow.appendChild(tab);
       });
@@ -2448,41 +2388,12 @@ window.onload = function () {
 
     const menuOverlay = document.createElement("div");
     menuOverlay.id = "menuOverlay";
-    menuOverlay.style.position = "fixed";
-    menuOverlay.style.left = 0;
-    menuOverlay.style.top = 0;
-    menuOverlay.style.width = "100vw";
-    menuOverlay.style.height = "100vh";
-    menuOverlay.style.background = "#000";
+    configureDisplayOverlay(menuOverlay);
+    menuOverlay.style.background = "transparent";
     menuOverlay.style.display = "flex";
     menuOverlay.style.flexDirection = "column";
     menuOverlay.style.justifyContent = "center";
     menuOverlay.style.alignItems = "center";
-    menuOverlay.style.zIndex = 1000;
-    // Menu background image
-    const menuBg = document.createElement("img");
-    menuBg.src = "slide4.png";
-    menuBg.style.position = "absolute";
-    menuBg.style.left = "50%";
-    menuBg.style.top = "50%";
-    menuBg.style.transform = "translate(-50%, -50%)";
-    menuBg.style.width = "100vw";
-    menuBg.style.height = "100vh";
-    menuBg.style.objectFit = "cover";
-
-    // Gradient overlay for bottom fade effect
-    const menuGradient = document.createElement("div");
-    menuGradient.style.position = "absolute";
-    menuGradient.style.left = "0";
-    menuGradient.style.bottom = "0";
-    menuGradient.style.width = "100vw";
-    menuGradient.style.height = "180px";
-    menuGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
-    menuGradient.style.pointerEvents = "none";
-    menuGradient.style.zIndex = 1;
-    menuOverlay.appendChild(menuGradient);
-    menuBg.style.zIndex = 0;
-    menuOverlay.appendChild(menuBg);
     // Game title
     const title = document.createElement("h1");
     title.textContent = "SENTINEL";
@@ -2490,10 +2401,11 @@ window.onload = function () {
     menuOverlay.appendChild(title);
     // Main menu buttons
     const buttonContainer = document.createElement("div");
+    buttonContainer.id = "mainMenuButtons";
     buttonContainer.style.display = "flex";
     buttonContainer.style.flexDirection = "column";
-    buttonContainer.style.gap = "1.2rem";
-    buttonContainer.style.marginTop = "1.5rem";
+    buttonContainer.style.gap = "0.5rem";
+    buttonContainer.style.marginTop = "1rem";
     buttonContainer.style.position = "relative";
     buttonContainer.style.zIndex = 1;
     buttonContainer.style.opacity = "0";
@@ -2502,26 +2414,26 @@ window.onload = function () {
     function makeMenuButton(label, color) {
       const btn = document.createElement("button");
       btn.textContent = label;
-      btn.style.fontSize = "2rem";
-      btn.style.padding = "1rem 2.5rem";
-      btn.style.background = "rgba(0,0,0,0.7)";
+      btn.style.fontSize = "1.2rem";
+      btn.style.padding = "0.4rem 1.5rem";
+      btn.style.background = "rgba(0,20,30,0.82)";
       btn.style.color = color;
       btn.style.border = `2px solid ${color}`;
-      btn.style.borderRadius = "12px";
+      btn.style.borderRadius = "4px";
       btn.style.cursor = "pointer";
-      btn.style.boxShadow = "0 0 24px #000";
+      btn.style.boxShadow = "0 0 14px rgba(0,217,255,0.18), inset 0 0 10px rgba(0,217,255,0.08)";
       btn.style.transition = "background 0.2s, color 0.2s";
-      btn.addEventListener("mouseover",()=>{btn.style.background="rgba(0,0,0,0.9)";});
-      btn.addEventListener("mouseout",()=>{btn.style.background="rgba(0,0,0,0.7)";});
+      btn.addEventListener("mouseover",()=>{btn.style.background="rgba(0,45,58,0.94)";});
+      btn.addEventListener("mouseout",()=>{btn.style.background="rgba(0,20,30,0.82)";});
       return btn;
     }
 
     // Add main menu buttons (Play and Protocols)
-    const playBtn = makeMenuButton("Play", "#fff");
-    const protocolBtn = makeMenuButton("Protocols", "#39ff8a");
-    const enemyGlossaryBtn = makeMenuButton("Enemy Glossary", "#ff4444");
-    const leaderboardBtn = makeMenuButton("Leaderboards", "#ffdd00");
-    const exitBtn = makeMenuButton("Exit", "#ff5555");
+    const playBtn = makeMenuButton("Play", "#8cecff");
+    const protocolBtn = makeMenuButton("Protocols", "#8cecff");
+    const enemyGlossaryBtn = makeMenuButton("Enemy Glossary", "#8cecff");
+    const leaderboardBtn = makeMenuButton("Leaderboards", "#8cecff");
+    const exitBtn = makeMenuButton("Exit", "#8cecff");
     buttonContainer.appendChild(playBtn);
     buttonContainer.appendChild(protocolBtn);
     buttonContainer.appendChild(leaderboardBtn);
@@ -2534,7 +2446,7 @@ window.onload = function () {
 
     // Store reference to main menu for back button
     window._showMainMenu = () => {
-      menuOverlay.style.display = "block";
+      menuOverlay.style.display = "flex";
       fadeMenuElementsIn([buttonContainer]);
     };
 
@@ -2571,27 +2483,23 @@ window.onload = function () {
     exitBtn.addEventListener("click", function() {
       showExitConfirmation();
     });
+    return menuOverlay;
   }
 
   function showExitConfirmation() {
     const exitOverlay = document.createElement("div");
-    exitOverlay.style.position = "fixed";
-    exitOverlay.style.left = "0";
-    exitOverlay.style.top = "0";
-    exitOverlay.style.width = "100vw";
-    exitOverlay.style.height = "100vh";
+    configureDisplayOverlay(exitOverlay, 15);
     exitOverlay.style.background = "rgba(0, 0, 0, 0.75)";
     exitOverlay.style.display = "flex";
     exitOverlay.style.alignItems = "center";
     exitOverlay.style.justifyContent = "center";
-    exitOverlay.style.zIndex = 2000;
 
     const exitPanel = document.createElement("div");
-    exitPanel.style.width = "min(460px, 90vw)";
+    exitPanel.style.width = "min(460px, calc(100% - 48px))";
     exitPanel.style.background = "rgba(0, 20, 30, 0.98)";
-    exitPanel.style.border = "2px solid #ff5555";
+    exitPanel.style.border = "2px solid #00d9ff";
     exitPanel.style.borderRadius = "10px";
-    exitPanel.style.boxShadow = "0 0 28px rgba(255, 85, 85, 0.35)";
+    exitPanel.style.boxShadow = "0 0 28px rgba(0, 217, 255, 0.25)";
     exitPanel.style.padding = "16px";
     exitPanel.style.color = "#c8ffff";
     exitPanel.style.fontFamily = "sans-serif";
@@ -2599,7 +2507,7 @@ window.onload = function () {
 
     const exitTitle = document.createElement("div");
     exitTitle.textContent = "EXIT APPLICATION";
-    exitTitle.style.color = "#ff5555";
+    exitTitle.style.color = "#00d9ff";
     exitTitle.style.fontWeight = "bold";
     exitTitle.style.fontSize = "1.05rem";
     exitTitle.style.marginBottom = "10px";
@@ -2635,9 +2543,9 @@ window.onload = function () {
     exitBtnConfirm.textContent = "Exit";
     exitBtnConfirm.style.padding = "0.5rem 0.85rem";
     exitBtnConfirm.style.borderRadius = "6px";
-    exitBtnConfirm.style.border = "1px solid #ff5555";
+    exitBtnConfirm.style.border = "1px solid #00d9ff";
     exitBtnConfirm.style.background = "rgba(0,0,0,0.55)";
-    exitBtnConfirm.style.color = "#ff5555";
+    exitBtnConfirm.style.color = "#8cecff";
     exitBtnConfirm.style.cursor = "pointer";
     actionRow.appendChild(exitBtnConfirm);
 
@@ -2665,61 +2573,31 @@ window.onload = function () {
   function showDifficultyMenu() {
     const diffOverlay = document.createElement("div");
     diffOverlay.id = "difficultyOverlay";
-    diffOverlay.style.position = "fixed";
-    diffOverlay.style.left = 0;
-    diffOverlay.style.top = 0;
-    diffOverlay.style.width = "100vw";
-    diffOverlay.style.height = "100vh";
-    diffOverlay.style.background = "#000";
+    configureDisplayOverlay(diffOverlay);
+    diffOverlay.style.background = "transparent";
     diffOverlay.style.display = "flex";
     diffOverlay.style.flexDirection = "column";
     diffOverlay.style.justifyContent = "center";
     diffOverlay.style.alignItems = "center";
-    diffOverlay.style.zIndex = 1000;
-    // Background image
-    const diffBg = document.createElement("img");
-    diffBg.src = "slide1.png";
-    diffBg.style.position = "absolute";
-    diffBg.style.left = "50%";
-    diffBg.style.top = "50%";
-    diffBg.style.transform = "translate(-50%, -50%)";
-    diffBg.style.width = "100vw";
-    diffBg.style.height = "100vh";
-    diffBg.style.objectFit = "cover";
-
-    // Gradient overlay
-    const diffGradient = document.createElement("div");
-    diffGradient.style.position = "absolute";
-    diffGradient.style.left = "0";
-    diffGradient.style.bottom = "0";
-    diffGradient.style.width = "100vw";
-    diffGradient.style.height = "180px";
-    diffGradient.style.background = "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%)";
-    diffGradient.style.pointerEvents = "none";
-    diffGradient.style.zIndex = 1;
-    diffOverlay.appendChild(diffGradient);
-    diffBg.style.zIndex = 0;
-    diffOverlay.appendChild(diffBg);
-
     // Back button - positioned absolutely inside the menu area
     const backBtn = document.createElement("button");
     backBtn.textContent = "← Back";
     backBtn.style.position = "absolute";
     backBtn.style.top = "auto";
-    backBtn.style.bottom = "clamp(24px, 5vh, 48px)";
-    backBtn.style.left = "clamp(24px, 6vw, 88px)";
+    backBtn.style.bottom = "24px";
+    backBtn.style.left = "24px";
     backBtn.style.transform = "none";
     backBtn.style.fontSize = "1.2rem";
     backBtn.style.padding = "0.5rem 1.5rem";
-    backBtn.style.background = "rgba(0,0,0,0.7)";
-    backBtn.style.color = "#fff";
-    backBtn.style.border = "2px solid #fff";
-    backBtn.style.borderRadius = "8px";
+    backBtn.style.background = "rgba(0,20,30,0.82)";
+    backBtn.style.color = "#8cecff";
+    backBtn.style.border = "1px solid rgba(0,217,255,0.7)";
+    backBtn.style.borderRadius = "4px";
     backBtn.style.cursor = "pointer";
     backBtn.style.zIndex = 2;
     backBtn.style.transition = "background 0.2s";
-    backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
-    backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
+    backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,45,58,0.94)");
+    backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,20,30,0.82)");
     diffOverlay.appendChild(backBtn);
 
     // Title
@@ -2746,21 +2624,21 @@ window.onload = function () {
       btn.textContent = label;
       btn.style.fontSize = "2rem";
       btn.style.padding = "1rem 2.5rem";
-      btn.style.background = "rgba(0,0,0,0.7)";
+      btn.style.background = "rgba(0,20,30,0.82)";
       btn.style.color = color;
       btn.style.border = `2px solid ${color}`;
-      btn.style.borderRadius = "12px";
+      btn.style.borderRadius = "4px";
       btn.style.cursor = "pointer";
-      btn.style.boxShadow = "0 0 24px #000";
+      btn.style.boxShadow = "0 0 14px rgba(0,217,255,0.18), inset 0 0 10px rgba(0,217,255,0.08)";
       btn.style.transition = "background 0.2s";
-      btn.addEventListener("mouseover",()=>{btn.style.background="rgba(0,0,0,0.9)";});
-      btn.addEventListener("mouseout",()=>{btn.style.background="rgba(0,0,0,0.7)";});
+      btn.addEventListener("mouseover",()=>{btn.style.background="rgba(0,45,58,0.94)";});
+      btn.addEventListener("mouseout",()=>{btn.style.background="rgba(0,20,30,0.82)";});
       return btn;
     }
 
-    const normalBtn = makeButton("Normal", "#fff");
-    const hardcoreBtn = makeButton("Hardcore", "#ffb300");
-    const apocalypseBtn = makeButton("Apocalypse", "#ff3c3c");
+    const normalBtn = makeButton("Normal", "#8cecff");
+    const hardcoreBtn = makeButton("Hardcore", "#8cecff");
+    const apocalypseBtn = makeButton("Apocalypse", "#8cecff");
     buttonContainer.appendChild(normalBtn);
     buttonContainer.appendChild(hardcoreBtn);
     buttonContainer.appendChild(apocalypseBtn);
@@ -2774,38 +2652,31 @@ window.onload = function () {
     function showWaveSelectionMenu(difficulty, startStatPoints, startHealth) {
       const waveOverlay = document.createElement("div");
       waveOverlay.id = "waveSelectionOverlay";
-      waveOverlay.style.position = "fixed";
-      waveOverlay.style.left = 0;
-      waveOverlay.style.top = 0;
-      waveOverlay.style.width = "100vw";
-      waveOverlay.style.height = "100vh";
+      configureDisplayOverlay(waveOverlay);
       waveOverlay.style.background = "transparent";
       waveOverlay.style.display = "flex";
       waveOverlay.style.flexDirection = "column";
       waveOverlay.style.justifyContent = "center";
       waveOverlay.style.alignItems = "center";
-      waveOverlay.style.zIndex = 1000;
-      waveOverlay.appendChild(diffGradient);
-      waveOverlay.appendChild(diffBg);
-
       // Back button
       const backBtn = document.createElement("button");
       backBtn.textContent = "← Back";
       backBtn.style.position = "absolute";
       backBtn.style.top = "auto";
-      backBtn.style.bottom = "clamp(24px, 5vh, 48px)";
-      backBtn.style.left = "clamp(24px, 6vw, 88px)";
+      backBtn.style.bottom = "24px";
+      backBtn.style.left = "24px";
       backBtn.style.fontSize = "1.2rem";
       backBtn.style.padding = "0.5rem 1.5rem";
-      backBtn.style.background = "rgba(0,0,0,0.7)";
-      backBtn.style.color = "#fff";
-      backBtn.style.border = "2px solid #fff";
-      backBtn.style.borderRadius = "8px";
+      backBtn.style.background = "rgba(0,20,30,0.82)";
+      backBtn.style.color = "#8cecff";
+      backBtn.style.border = "1px solid rgba(0,217,255,0.7)";
+      backBtn.style.borderRadius = "4px";
       backBtn.style.cursor = "pointer";
       backBtn.style.zIndex = 2;
       backBtn.style.transition = "background 0.2s";
-      backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,0,0,0.9)");
-      backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,0,0,0.7)");
+      backBtn.style.boxShadow = "inset 0 0 10px rgba(0,217,255,0.08)";
+      backBtn.addEventListener("mouseover", () => backBtn.style.background = "rgba(0,45,58,0.94)");
+      backBtn.addEventListener("mouseout", () => backBtn.style.background = "rgba(0,20,30,0.82)");
       waveOverlay.appendChild(backBtn);
 
       // Title
@@ -2820,7 +2691,7 @@ window.onload = function () {
       const buttonContainer = document.createElement("div");
       buttonContainer.style.display = "flex";
       buttonContainer.style.flexDirection = "column";
-      buttonContainer.style.gap = "1.2rem";
+      buttonContainer.style.gap = "0.45rem";
       buttonContainer.style.position = "relative";
       buttonContainer.style.zIndex = 1;
       buttonContainer.style.opacity = "0";
@@ -2830,20 +2701,20 @@ window.onload = function () {
         const btn = document.createElement("button");
         const label = `Wave ${waveNum}`;
         btn.textContent = label;
-        btn.style.fontSize = "1.8rem";
-        btn.style.padding = "0.8rem 2rem";
-        btn.style.background = isUnlocked ? "rgba(0,0,0,0.8)" : "rgba(0,0,0,0.6)";
-        btn.style.color = isUnlocked ? "#fff" : "#666";
-        btn.style.border = `2px solid ${isUnlocked ? "#fff" : "#444"}`;
-        btn.style.borderRadius = "10px";
+        btn.style.fontSize = "1.1rem";
+        btn.style.padding = "0.35rem 1.2rem";
+        btn.style.background = isUnlocked ? "rgba(0,20,30,0.82)" : "rgba(0,14,22,0.64)";
+        btn.style.color = isUnlocked ? "#dffcff" : "#52646c";
+        btn.style.border = `1px solid ${isUnlocked ? "rgba(0,217,255,0.7)" : "#28404a"}`;
+        btn.style.borderRadius = "4px";
         btn.style.cursor = isUnlocked ? "pointer" : "not-allowed";
-        btn.style.boxShadow = isUnlocked ? "0 0 24px #000" : "none";
+        btn.style.boxShadow = isUnlocked ? "0 0 14px rgba(0,217,255,0.16), inset 0 0 10px rgba(0,217,255,0.08)" : "none";
         btn.style.transition = "background 0.2s";
         btn.style.opacity = isUnlocked ? 1 : 0.5;
         
         if (isUnlocked) {
-          btn.addEventListener("mouseover", () => btn.style.background = "rgba(0,0,0,0.9)");
-          btn.addEventListener("mouseout", () => btn.style.background = "rgba(0,0,0,0.7)");
+          btn.addEventListener("mouseover", () => btn.style.background = "rgba(0,45,58,0.94)");
+          btn.addEventListener("mouseout", () => btn.style.background = "rgba(0,20,30,0.82)");
           btn.addEventListener("click", () => {
             fadeMenuElementsOut([title, buttonContainer], () => {
               waveOverlay.remove();
@@ -2877,8 +2748,6 @@ window.onload = function () {
       backBtn.addEventListener("click", () => {
         fadeMenuElementsOut([title, buttonContainer], () => {
           waveOverlay.remove();
-          diffOverlay.insertBefore(diffGradient, diffOverlay.firstChild);
-          diffOverlay.insertBefore(diffBg, diffGradient.nextSibling);
           fadeMenuElementsIn([difficultyTitle, difficultyButtons]);
         });
       });
@@ -2897,15 +2766,15 @@ window.onload = function () {
         ]
       };
 
-      const colors = { Hardcore: "#ffb300", Apocalypse: "#ff3c3c" };
-      const color = colors[difficulty] || "#fff";
+      const color = "#00d9ff";
       const lines = descriptions[difficulty] || [];
 
       const overlay = document.createElement("div");
-      overlay.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.78);display:flex;align-items:center;justify-content:center;z-index:1100;";
+      configureDisplayOverlay(overlay, 15);
+      overlay.style.cssText += "background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;";
 
       const panel = document.createElement("div");
-      panel.style.cssText = `width:min(480px,90vw);background:rgba(0,15,20,0.98);border:2px solid ${color};border-radius:10px;box-shadow:0 0 28px ${color}55;padding:24px;font-family:sans-serif;`;
+      panel.style.cssText = `width:min(480px,calc(100% - 48px));background:rgba(0,15,20,0.98);border:2px solid ${color};border-radius:10px;box-shadow:0 0 28px ${color}55;padding:24px;font-family:sans-serif;`;
       overlay.appendChild(panel);
 
       const titleEl = document.createElement("div");
@@ -3109,8 +2978,6 @@ window.onload = function () {
   const canvas = document.getElementById("gameCanvas");
   const ctx = canvas.getContext("2d");
   const gameStage = document.getElementById("gameStage");
-  const GAME_STAGE_WIDTH = 1365;
-  const GAME_STAGE_HEIGHT = 768;
 
   function updateGameStageScale() {
     const viewportScaleX = window.innerWidth / GAME_STAGE_WIDTH;
@@ -3120,6 +2987,10 @@ window.onload = function () {
     const scale = viewportAspect < 4 / 3 || viewportAspect > stageAspect
       ? Math.min(viewportScaleX, viewportScaleY)
       : Math.max(viewportScaleX, viewportScaleY);
+    document.documentElement.style.setProperty("--game-stage-scale", String(scale));
+    document.documentElement.style.setProperty("--game-display-offset-y", `${GAME_DISPLAY_OFFSET_Y * scale}px`);
+    document.documentElement.style.setProperty("--game-display-width", `${GAME_DISPLAY_WIDTH}px`);
+    document.documentElement.style.setProperty("--game-display-height", `${GAME_DISPLAY_HEIGHT}px`);
     gameStage.style.setProperty("--game-stage-scale", String(scale));
   }
 
@@ -3129,17 +3000,115 @@ window.onload = function () {
   const hudFrameOverlay = document.createElement("img");
   hudFrameOverlay.src = "lidhud2_16x9.png";
   hudFrameOverlay.alt = "";
-  hudFrameOverlay.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:20;display:none;pointer-events:none;user-select:none;";
-  gameStage.appendChild(hudFrameOverlay);
+  hudFrameOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:20;display:block;pointer-events:none;user-select:none;";
+  document.body.appendChild(hudFrameOverlay);
+  const hudStageOverlay = document.createElement("div");
+  hudStageOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:21;pointer-events:none;user-select:none;";
+  document.body.appendChild(hudStageOverlay);
   const hudXrayCanvas = document.createElement("canvas");
   hudXrayCanvas.width = canvas.width;
   hudXrayCanvas.height = canvas.height;
-  hudXrayCanvas.style.cssText = "position:absolute;left:50%;top:0;width:1024px;height:768px;transform:translateX(-50%);z-index:21;pointer-events:none;user-select:none;background:transparent;";
-  gameStage.appendChild(hudXrayCanvas);
+  hudXrayCanvas.style.cssText = `position:absolute;left:${(GAME_STAGE_WIDTH - canvas.width) / 2}px;top:0;width:${canvas.width}px;height:${canvas.height}px;z-index:0;pointer-events:none;user-select:none;background:transparent;`;
+  hudStageOverlay.appendChild(hudXrayCanvas);
   const hudXrayCtx = hudXrayCanvas.getContext("2d");
   const hudWaveDisplay = document.createElement("div");
-  hudWaveDisplay.style.cssText = "position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:21;display:none;color:#00d9ff;font:bold 32px sans-serif;text-align:center;white-space:nowrap;text-shadow:0 0 18px #00d9ff,0 0 4px #000;pointer-events:none;user-select:none;";
-  gameStage.appendChild(hudWaveDisplay);
+  hudWaveDisplay.id = "hudWaveDisplay";
+  hudWaveDisplay.style.cssText = "position:absolute;top:12px;left:50%;width:1365px;height:52px;transform:translateX(-50%);z-index:1;display:none;color:#00d9ff;font:bold 28px sans-serif;text-align:center;line-height:52px;white-space:nowrap;text-shadow:0 0 18px #00d9ff,0 0 4px #000;pointer-events:none;user-select:none;";
+  hudWaveDisplay.setAttribute("aria-label", "Current wave");
+  hudStageOverlay.appendChild(hudWaveDisplay);
+  const hudSignalDisplay = document.createElement("div");
+  hudSignalDisplay.id = "hudSignalDisplay";
+  hudSignalDisplay.style.cssText = "position:absolute;top:24px;left:calc(50% - 150px);height:30px;display:flex;align-items:center;gap:6px;color:#00d9ff;font:10px sans-serif;text-shadow:0 0 6px #00d9ff;pointer-events:none;user-select:none;";
+  hudSignalDisplay.setAttribute("aria-label", "Frame rate");
+  hudSignalDisplay.title = "Frame rate";
+  const hudSignalBars = document.createElement("div");
+  hudSignalBars.style.cssText = "height:20px;display:flex;align-items:flex-end;gap:2px;";
+  const hudSignalBarHeights = [7, 11, 15, 19];
+  const hudSignalBarElements = hudSignalBarHeights.map((height) => {
+    const bar = document.createElement("div");
+    bar.style.cssText = `width:4px;height:${height}px;background:rgba(0,217,255,0.22);box-shadow:0 0 4px rgba(0,217,255,0.45);`;
+    hudSignalBars.appendChild(bar);
+    return bar;
+  });
+  const hudFpsValue = document.createElement("span");
+  hudFpsValue.textContent = "-- FPS";
+  hudFpsValue.style.cssText = "min-width:40px;font-weight:bold;white-space:nowrap;";
+  hudSignalDisplay.appendChild(hudSignalBars);
+  hudSignalDisplay.appendChild(hudFpsValue);
+  hudStageOverlay.appendChild(hudSignalDisplay);
+
+  const hudBatteryDisplay = document.createElement("div");
+  hudBatteryDisplay.id = "hudBatteryDisplay";
+  hudBatteryDisplay.style.cssText = "position:absolute;top:24px;right:calc(50% - 150px);height:30px;display:flex;align-items:center;gap:5px;color:#00d9ff;font:bold 10px sans-serif;text-shadow:0 0 6px #00d9ff;pointer-events:none;user-select:none;";
+  hudBatteryDisplay.setAttribute("aria-label", "Computer battery status");
+  hudBatteryDisplay.title = "Computer battery status";
+  const hudBatteryShell = document.createElement("div");
+  hudBatteryShell.style.cssText = "position:relative;width:24px;height:14px;box-sizing:border-box;padding:2px;border:1.5px solid #00d9ff;box-shadow:0 0 6px rgba(0,217,255,0.45);";
+  const hudBatteryFill = document.createElement("div");
+  hudBatteryFill.style.cssText = "width:0%;height:100%;background:#00d9ff;transition:width 0.3s ease,background 0.3s ease;";
+  hudBatteryShell.appendChild(hudBatteryFill);
+  const hudBatteryTerminal = document.createElement("div");
+  hudBatteryTerminal.style.cssText = "width:3px;height:6px;background:#00d9ff;box-shadow:0 0 5px rgba(0,217,255,0.5);";
+  const hudBatteryValue = document.createElement("span");
+  hudBatteryValue.textContent = "--%";
+  hudBatteryValue.style.cssText = "min-width:30px;white-space:nowrap;";
+  hudBatteryDisplay.appendChild(hudBatteryShell);
+  hudBatteryDisplay.appendChild(hudBatteryTerminal);
+  hudBatteryDisplay.appendChild(hudBatteryValue);
+  hudStageOverlay.appendChild(hudBatteryDisplay);
+
+  let hudFpsFrameCount = 0;
+  let hudFpsSampleStart = performance.now();
+  function updateHudSignal(timestamp) {
+    hudFpsFrameCount += 1;
+    const elapsed = timestamp - hudFpsSampleStart;
+    if (elapsed >= 1000) {
+      const fps = Math.round((hudFpsFrameCount * 1000) / elapsed);
+      const activeBars = fps >= 55 ? 4 : fps >= 40 ? 3 : fps >= 25 ? 2 : fps > 0 ? 1 : 0;
+      const signalColor = fps < 20 ? "#ffb347" : "#00d9ff";
+      hudFpsValue.textContent = `${fps} FPS`;
+      hudSignalDisplay.title = `Frame rate: ${fps} FPS`;
+      hudSignalDisplay.setAttribute("aria-label", `Frame rate: ${fps} FPS`);
+      hudSignalBarElements.forEach((bar, index) => {
+        const active = index < activeBars;
+        bar.style.background = active ? signalColor : "rgba(0,217,255,0.22)";
+        bar.style.boxShadow = active ? `0 0 5px ${signalColor}` : "0 0 4px rgba(0,217,255,0.25)";
+      });
+      hudFpsFrameCount = 0;
+      hudFpsSampleStart = timestamp;
+    }
+  }
+
+  function setHudBatteryStatus(level, charging) {
+    if (!Number.isFinite(level)) {
+      hudBatteryValue.textContent = "--%";
+      hudBatteryFill.style.width = "0%";
+      hudBatteryDisplay.title = "Computer battery status unavailable";
+      hudBatteryDisplay.setAttribute("aria-label", "Computer battery status unavailable");
+      return;
+    }
+    const percent = Math.max(0, Math.min(100, Math.round(level * 100)));
+    const color = percent <= 20 ? "#ff6b6b" : percent <= 40 ? "#ffcc66" : "#00d9ff";
+    hudBatteryValue.textContent = `${percent}%`;
+    hudBatteryFill.style.width = `${percent}%`;
+    hudBatteryFill.style.background = color;
+    hudBatteryDisplay.title = `Computer battery: ${percent}%${charging ? " (charging)" : ""}`;
+    hudBatteryDisplay.setAttribute("aria-label", hudBatteryDisplay.title);
+  }
+
+  if (typeof navigator.getBattery === "function") {
+    navigator.getBattery().then((battery) => {
+      const updateBatteryDisplay = () => setHudBatteryStatus(battery.level, battery.charging);
+      battery.addEventListener("levelchange", updateBatteryDisplay);
+      battery.addEventListener("chargingchange", updateBatteryDisplay);
+      updateBatteryDisplay();
+    }).catch((error) => {
+      console.warn("Unable to read computer battery status.", error);
+      setHudBatteryStatus(Number.NaN, false);
+    });
+  } else {
+    setHudBatteryStatus(Number.NaN, false);
+  }
 
   function getCanvasMousePos(e) {
     const rect = canvas.getBoundingClientRect();
@@ -3337,6 +3306,8 @@ window.onload = function () {
 
   function returnToMainMenu() {
     finalizeRunBytes();
+    canvas.style.visibility = "hidden";
+    hudXrayCanvas.style.visibility = "hidden";
     gameOver = false;
     window._gameOverTime = undefined;
     window._playerUsedContinue = false;
@@ -3370,6 +3341,8 @@ window.onload = function () {
   window._getTotalBytes = () => totalCollectedBytes;
   let selectedProtocol = -1;
   let hoveredProtocol = -1;
+  let lastHoveredProtocol = -1;
+  let hoveredProtocolSince = 0;
   // Block game loop if loading/menu is active
   function isGameBlocked() {
     return showLoadingScreen || showMenuScreen;
@@ -3385,53 +3358,56 @@ window.onload = function () {
     const previousFollowMouse = followMouse;
     const previousPaused = paused;
     const previousShowStats = showStats;
+    const previousCanvasVisibility = canvas.style.visibility;
+    const previousXrayVisibility = hudXrayCanvas.style.visibility;
+    const previousWaveDisplay = hudWaveDisplay.style.display;
 
+    canvas.style.visibility = "hidden";
+    hudXrayCanvas.style.visibility = "hidden";
+    hudWaveDisplay.style.display = "none";
     followMouse = false;
     paused = true;
     showStats = true;
 
     const confirmOverlay = document.createElement("div");
-    confirmOverlay.style.position = "fixed";
-    confirmOverlay.style.left = "0";
-    confirmOverlay.style.top = "0";
-    confirmOverlay.style.width = "100vw";
-    confirmOverlay.style.height = "100vh";
-    confirmOverlay.style.background = "rgba(0, 0, 0, 0.74)";
+    configureDisplayOverlay(confirmOverlay, 15);
+    confirmOverlay.style.background = "transparent";
     confirmOverlay.style.display = "flex";
     confirmOverlay.style.alignItems = "center";
     confirmOverlay.style.justifyContent = "center";
-    confirmOverlay.style.zIndex = "1200";
 
     const confirmPanel = document.createElement("div");
-    confirmPanel.style.width = "min(460px, 90vw)";
-    confirmPanel.style.background = "rgba(0, 20, 30, 0.98)";
-    confirmPanel.style.border = "2px solid #00ffdd";
-    confirmPanel.style.borderRadius = "10px";
-    confirmPanel.style.boxShadow = "0 0 28px rgba(0, 255, 221, 0.35)";
-    confirmPanel.style.padding = "16px";
+    confirmPanel.style.width = "min(560px, calc(100% - 48px))";
+    confirmPanel.style.background = "transparent";
+    confirmPanel.style.border = "0";
+    confirmPanel.style.boxShadow = "none";
+    confirmPanel.style.padding = "12px";
     confirmPanel.style.color = "#c8ffff";
     confirmPanel.style.fontFamily = "sans-serif";
+    confirmPanel.style.textAlign = "center";
     confirmOverlay.appendChild(confirmPanel);
 
     const confirmTitle = document.createElement("div");
     confirmTitle.textContent = "RETURN TO MAIN MENU";
-    confirmTitle.style.color = "#00ffdd";
+    confirmTitle.style.color = "#eaffff";
     confirmTitle.style.fontWeight = "bold";
-    confirmTitle.style.fontSize = "1.05rem";
+    confirmTitle.style.fontSize = "1.3rem";
+    confirmTitle.style.letterSpacing = "0.08em";
+    confirmTitle.style.textShadow = "0 0 14px rgba(0, 217, 255, 0.65)";
     confirmTitle.style.marginBottom = "10px";
     confirmPanel.appendChild(confirmTitle);
 
     const confirmMessage = document.createElement("div");
     confirmMessage.textContent = "Do you want to go back to the main menu?";
     confirmMessage.style.color = "#aaf6ff";
-    confirmMessage.style.fontSize = "0.95rem";
+    confirmMessage.style.fontSize = "1rem";
     confirmMessage.style.lineHeight = "1.4";
     confirmMessage.style.marginBottom = "14px";
     confirmPanel.appendChild(confirmMessage);
 
     const actionRow = document.createElement("div");
     actionRow.style.display = "flex";
-    actionRow.style.justifyContent = "flex-end";
+    actionRow.style.justifyContent = "center";
     actionRow.style.gap = "8px";
     confirmPanel.appendChild(actionRow);
 
@@ -3439,10 +3415,10 @@ window.onload = function () {
     cancelBtn.type = "button";
     cancelBtn.textContent = "Cancel";
     cancelBtn.style.padding = "0.5rem 0.85rem";
-    cancelBtn.style.borderRadius = "6px";
-    cancelBtn.style.border = "1px solid #2f9cad";
-    cancelBtn.style.background = "rgba(0,0,0,0.45)";
-    cancelBtn.style.color = "#c8ffff";
+    cancelBtn.style.borderRadius = "0";
+    cancelBtn.style.border = "1px solid rgba(0,217,255,0.5)";
+    cancelBtn.style.background = "transparent";
+    cancelBtn.style.color = "#8cecff";
     cancelBtn.style.cursor = "pointer";
     actionRow.appendChild(cancelBtn);
 
@@ -3450,10 +3426,10 @@ window.onload = function () {
     confirmBtn.type = "button";
     confirmBtn.textContent = "Main Menu";
     confirmBtn.style.padding = "0.5rem 0.85rem";
-    confirmBtn.style.borderRadius = "6px";
-    confirmBtn.style.border = "1px solid #00ffdd";
-    confirmBtn.style.background = "rgba(0,0,0,0.55)";
-    confirmBtn.style.color = "#00ffdd";
+    confirmBtn.style.borderRadius = "0";
+    confirmBtn.style.border = "1px solid rgba(0,217,255,0.8)";
+    confirmBtn.style.background = "transparent";
+    confirmBtn.style.color = "#8cecff";
     confirmBtn.style.cursor = "pointer";
     actionRow.appendChild(confirmBtn);
 
@@ -3465,6 +3441,9 @@ window.onload = function () {
       if (confirmed) {
         returnToMainMenu();
       } else {
+        canvas.style.visibility = previousCanvasVisibility;
+        hudXrayCanvas.style.visibility = previousXrayVisibility;
+        hudWaveDisplay.style.display = previousWaveDisplay;
         followMouse = previousFollowMouse;
         paused = previousPaused;
         showStats = previousShowStats;
@@ -3518,14 +3497,15 @@ window.onload = function () {
   function showVictoryConsole(onComplete) {
     clearVictoryConsole();
     const panel = document.createElement("div");
-    panel.style.cssText = `position:absolute;left:${(GAME_STAGE_WIDTH - canvas.width) / 2 + canvas.width * 0.1}px;top:${canvas.height * 0.34}px;width:${canvas.width * 0.8}px;box-sizing:border-box;padding:18px 22px;background:rgba(0,12,22,.86);border:1px solid rgba(0,217,255,.72);box-shadow:0 0 24px rgba(0,217,255,.24),inset 0 0 18px rgba(0,100,150,.16);color:#eaffff;z-index:22;pointer-events:none;`;
+    const displayLeft = (GAME_STAGE_WIDTH - canvas.width) / 2 + LOOT_XRAY_CORNER_SIDE_DISTANCE;
+    panel.style.cssText = `position:absolute;left:${displayLeft + GAME_DISPLAY_WIDTH * 0.1}px;top:${LOOT_XRAY_CORNER_TOP_DISTANCE + GAME_DISPLAY_HEIGHT * 0.34}px;width:${GAME_DISPLAY_WIDTH * 0.8}px;box-sizing:border-box;padding:14px 18px;background:transparent;border:0;box-shadow:none;color:#eaffff;z-index:22;pointer-events:none;`;
     const heading = document.createElement("div");
     heading.textContent = "COMBAT SYSTEMS DIVISION // VICTORY PROTOCOL";
     heading.style.cssText = "margin-bottom:12px;color:#00d9ff;font:700 13px 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.1em;text-shadow:0 0 7px rgba(0,217,255,.6);";
     const message = document.createElement("div");
-    message.style.cssText = "color:#eaffff;font:500 21px/1.55 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,200,255,.3);white-space:pre-wrap;";
+    message.style.cssText = "color:#eaffff;font:500 18px/1.45 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,200,255,.3);white-space:pre-wrap;";
     panel.append(heading, message);
-    gameStage.appendChild(panel);
+    hudStageOverlay.appendChild(panel);
     window._victoryConsoleOverlay = panel;
 
     const fullMessage = "Trial completed.\nAuto-destruction sequence activated.";
@@ -4488,6 +4468,12 @@ window.onload = function () {
         }
         showLoadingScreen = false;
         showMenuScreen = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.style.visibility = "visible";
+        hudXrayCtx.clearRect(0, 0, hudXrayCanvas.width, hudXrayCanvas.height);
+        hudXrayCanvas.style.visibility = "visible";
+        hudFrameOverlay.style.display = "block";
+        hudWaveDisplay.style.display = "block";
         restartGame();
         gameStarted = true;
       }
@@ -4786,14 +4772,16 @@ window.onload = function () {
       const alpha = Math.max(0, Math.min(1, warning.timer / 40));
       const y = 128 + (i * 30);
 
-      ctx.globalAlpha = 0.62 * alpha;
-      ctx.fillStyle = "#00161d";
-      ctx.fillRect(canvas.width / 2 - 305, y - 12, 610, 24);
+      if (!warning.transparent) {
+        ctx.globalAlpha = 0.62 * alpha;
+        ctx.fillStyle = "#00161d";
+        ctx.fillRect(canvas.width / 2 - 305, y - 12, 610, 24);
 
-      ctx.globalAlpha = 0.95 * alpha;
-      ctx.strokeStyle = warning.color;
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(canvas.width / 2 - 305, y - 12, 610, 24);
+        ctx.globalAlpha = 0.95 * alpha;
+        ctx.strokeStyle = warning.color;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(canvas.width / 2 - 305, y - 12, 610, 24);
+      }
 
       ctx.font = "bold 14px sans-serif";
       ctx.fillStyle = warning.color;
@@ -5426,12 +5414,6 @@ const droplifelenght = 280;
     }
   }
 
-  const LOOT_XRAY_SIDE_DISTANCE = 35;
-  const LOOT_XRAY_TOP_DISTANCE = 80;
-  const LOOT_XRAY_BOTTOM_DISTANCE = 58;
-  const LOOT_XRAY_CORNER_SIDE_DISTANCE = 110;
-  const LOOT_XRAY_CORNER_TOP_DISTANCE = 150;
-  const LOOT_XRAY_CORNER_BOTTOM_DISTANCE = 120;
   function isEnemyInPlayArea(enemy) {
     return enemy.x >= 0 &&
       enemy.x <= canvas.width &&
@@ -5669,6 +5651,7 @@ const droplifelenght = 280;
 
   function drawHUD() {
     hudWaveDisplay.textContent = "Wave " + wave;
+    hudWaveDisplay.setAttribute("aria-label", "Wave " + wave);
     // ...existing code...
     const menuSlideProgress = 1 - Math.pow(1 - statsMenuAnimationProgress, 3);
     const statsSlideX = -330 * (1 - menuSlideProgress);
@@ -5699,16 +5682,9 @@ const droplifelenght = 280;
       ctx.save();
       ctx.globalAlpha = 0.75;
       ctx.fillStyle = '#0b1b2b';
+      ctx.shadowColor = 'rgba(0, 217, 255, 0.22)';
+      ctx.shadowBlur = 12;
       ctx.fillRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
-      // Blue glowing border
-      ctx.globalAlpha = 1.0;
-      ctx.shadowColor = '#00d9ff';
-      ctx.shadowBlur = 18;
-      ctx.strokeStyle = '#00d9ff';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
-      ctx.shadowBlur = 0;
-      ctx.shadowColor = 'transparent';
       ctx.restore();
       ctx.fillStyle = "#00d9ff";
       ctx.textAlign = "left";
@@ -5837,14 +5813,10 @@ const droplifelenght = 280;
       ctx.translate(0, hotkeySlideY);
         ctx.globalAlpha = 0.75;
         ctx.fillStyle = '#0b1b2b';
+        ctx.shadowColor = 'rgba(0, 217, 255, 0.22)';
+        ctx.shadowBlur = 12;
         ctx.fillRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
         ctx.globalAlpha = 1.0;
-        ctx.shadowColor = '#00d9ff';
-        ctx.shadowBlur = 18;
-        ctx.strokeStyle = '#00d9ff';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
-        ctx.shadowBlur = 0;
         ctx.fillStyle = "#00d9ff";
         ctx.font = "bold 16px sans-serif";
         ctx.textAlign = "center";
@@ -5865,16 +5837,9 @@ const droplifelenght = 280;
       ctx.save();
       ctx.globalAlpha = 0.75;
       ctx.fillStyle = '#0b1b2b';
+      ctx.shadowColor = 'rgba(0, 217, 255, 0.22)';
+      ctx.shadowBlur = 12;
       ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-      // Blue glowing border
-      ctx.globalAlpha = 1.0;
-      ctx.shadowColor = '#00d9ff';
-      ctx.shadowBlur = 18;
-      ctx.strokeStyle = '#00d9ff';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-      ctx.shadowBlur = 0;
-      ctx.shadowColor = 'transparent';
       ctx.restore();
       
       ctx.fillStyle = "#00d9ff";
@@ -5957,10 +5922,6 @@ const droplifelenght = 280;
           ctx.globalAlpha = 0.92;
           ctx.fillStyle = isActive ? _prc : (isDiscovered ? "#222" : "#1a1a1a");
           ctx.fillRect(cardX, y, cardWidth, 26);
-          ctx.strokeStyle = isActive ? _prc : (isDiscovered ? _prc : "#4a5a56");
-          ctx.lineWidth = 2;
-          ctx.strokeRect(cardX, y, cardWidth, 26);
-          
           ctx.font = "bold 12px sans-serif";
           ctx.fillStyle = isActive ? "#061525" : (isDiscovered ? _prc : "#7f8f8b");
           ctx.textAlign = "center";
@@ -6008,9 +5969,8 @@ const droplifelenght = 280;
             ctx.globalAlpha = np;
             ctx.shadowColor = '#00d9ff';
             ctx.shadowBlur = 18;
-            ctx.strokeStyle = '#00d9ff';
-            ctx.lineWidth = 2.5;
-            ctx.strokeRect(box.x - 4, box.y - 4, box.w + 8, box.h + 8);
+            ctx.fillStyle = 'rgba(0, 217, 255, 0.22)';
+            ctx.fillRect(box.x - 2, box.y - 2, box.w + 4, box.h + 4);
           }
         });
         ctx.restore();
@@ -6032,18 +5992,6 @@ const droplifelenght = 280;
       // Tutorial protocol panel draw hook
       if (typeof window._tutDrawOnProtocols === 'function') {
         window._tutDrawOnProtocols(ctx, window._protocolSelectorBoxes, panelX, panelY, panelWidth, panelHeight, contentY, contentHeight);
-      }
-      // Persistent: pulse panel outline whenever there are unread new protocols
-      if (window._newlyPickedProtocols && window._newlyPickedProtocols.size > 0 && typeof window._tutDrawOnProtocols !== 'function') {
-        const pulse = 0.35 + 0.55 * Math.abs(Math.sin(Date.now() / 500));
-        ctx.save();
-        ctx.globalAlpha = pulse;
-        ctx.shadowColor = '#00d9ff';
-        ctx.shadowBlur = 20;
-        ctx.strokeStyle = '#00d9ff';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(panelX + 2, panelY + 2, panelWidth - 4, panelHeight - 4);
-        ctx.restore();
       }
       // Tutorial auto-scroll: bring the picked-up protocol card into view
       if (window._tutScrollToProtocol) {
@@ -6075,7 +6023,7 @@ const droplifelenght = 280;
       ctx.restore();
       
       // Display hovered protocol details following mouse cursor
-      if (!window._protocolReplaceMode && hoveredProtocol >= 0) {
+      if (!window._protocolReplaceMode && hoveredProtocol >= 0 && Date.now() - hoveredProtocolSince >= TOOLTIP_HOVER_DELAY_MS) {
         const hoveredBox = (window._protocolSelectorBoxes || []).find(box => box.index === hoveredProtocol);
         if (hoveredBox && hoveredBox.name) {
           const proto = PROTOCOLS[hoveredBox.name];
@@ -9239,6 +9187,7 @@ const droplifelenght = 280;
 
   let _lastDebugLog = 0;
   function gameLoop(currentTimestamp) {
+    updateHudSignal(currentTimestamp);
     if (typeof isGameBlocked === 'function' && isGameBlocked()) {
       requestAnimationFrame(gameLoop);
       return;
@@ -10597,6 +10546,10 @@ const droplifelenght = 280;
           window._newPickHoverStart = {};
         }
       }
+      if (hoveredProtocol !== lastHoveredProtocol) {
+        lastHoveredProtocol = hoveredProtocol;
+        hoveredProtocolSince = hoveredProtocol >= 0 ? Date.now() : 0;
+      }
       // Update hovered replace card
       window._protocolReplaceHovered = null;
       if (window._protocolReplaceMode && window._protocolReplacePanelBoxes) {
@@ -10903,89 +10856,102 @@ const droplifelenght = 280;
             }
 
             // --- Build overlay ---
-            const overlay = document.createElement("div");
+            const overlay = showMenu();
+            if (!overlay) throw new Error("Unable to create the game-over menu.");
             overlay.id = "gameOverOverlay";
-            overlay.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:800;font-family:sans-serif;";
+            overlay.style.background = "#000";
+            overlay.style.fontFamily = "sans-serif";
+            const menuTitle = overlay.querySelector("h1");
+            if (menuTitle) {
+              menuTitle.style.top = "8px";
+              menuTitle.style.fontSize = "32px";
+              menuTitle.style.textShadow = "0 0 14px #00d9ff, 0 3px 8px #000";
+            }
+            const menuButtons = document.getElementById("mainMenuButtons");
+            if (menuButtons) menuButtons.remove();
 
             const resultColor = isVictory ? "#ffd700" : "#ff3c3c";
             const panel = document.createElement("div");
-            panel.style.cssText = `width:min(600px,92vw);max-height:92vh;overflow-y:auto;background:rgba(0,10,15,0.97);border:2px solid ${resultColor};border-radius:12px;box-shadow:0 0 32px ${resultColor}55;padding:28px 24px 22px;display:flex;flex-direction:column;align-items:center;gap:10px;`;
+            panel.style.cssText = `position:absolute;top:52px;left:12px;right:12px;bottom:8px;width:auto;max-width:${GAME_DISPLAY_WIDTH - 24}px;height:auto;box-sizing:border-box;overflow:hidden;background:transparent;border:0;border-radius:0;box-shadow:none;padding:8px 12px;display:grid;grid-template-columns:minmax(220px,0.8fr) minmax(0,1.2fr);grid-template-rows:minmax(0,1fr) auto;align-items:stretch;gap:8px 16px;`;
             panel.classList.add("scrollbar-themed");
             overlay.appendChild(panel);
+
+            const summary = document.createElement("div");
+            summary.style.cssText = "min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;";
+            panel.appendChild(summary);
 
             // Result title
             const title = document.createElement("div");
             title.textContent = isVictory ? "VICTORY!" : "GAME OVER";
-            title.style.cssText = `color:${resultColor};font-size:2.6rem;font-weight:bold;letter-spacing:4px;text-shadow:0 0 18px ${resultColor}99;margin-bottom:4px;`;
-            panel.appendChild(title);
+            title.style.cssText = `color:${resultColor};font-size:1.75rem;font-weight:bold;letter-spacing:3px;text-align:center;text-shadow:0 0 18px ${resultColor}99;margin-bottom:4px;`;
+            summary.appendChild(title);
 
             if (window._editorSessionActive) {
               const edNote = document.createElement("div");
               edNote.textContent = "Press O to open Editor and spawn a wave";
               edNote.style.cssText = "color:#ffe26c;font-size:0.95rem;";
-              panel.appendChild(edNote);
+              summary.appendChild(edNote);
             }
 
             // Stats row
             const statsRow = document.createElement("div");
-            statsRow.style.cssText = "display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin:6px 0;";
+            statsRow.style.cssText = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;margin:6px 0;";
             [[formatByteAmount(runCollectedBytes), "Earned", "#00ffdd"], [`${runWavesCleared}`, "Waves", "#aaf6ff"], [`${Math.floor(runHealthLost)}`, "HP Lost", "#ff8888"]].forEach(([val, label, color]) => {
               const box = document.createElement("div");
               box.style.cssText = "display:flex;flex-direction:column;align-items:center;";
               const v = document.createElement("div");
               v.textContent = val;
-              v.style.cssText = `color:${color};font-size:1.5rem;font-weight:bold;`;
+              v.style.cssText = `color:${color};font-size:1.2rem;font-weight:bold;`;
               const l = document.createElement("div");
               l.textContent = label;
-              l.style.cssText = "color:#aaa;font-size:0.78rem;letter-spacing:1px;";
+              l.style.cssText = "color:#aaf6ff;font-size:0.72rem;letter-spacing:1px;text-shadow:0 1px 5px rgba(0,0,0,0.9);";
               box.appendChild(v); box.appendChild(l);
               statsRow.appendChild(box);
             });
-            panel.appendChild(statsRow);
+            summary.appendChild(statsRow);
 
             // Score
             const scoreEl = document.createElement("div");
-            scoreEl.style.cssText = "color:#ffdd00;font-size:1.5rem;font-weight:bold;text-shadow:0 0 10px #ffdd0066;";
+            scoreEl.style.cssText = "color:#ffdd00;font-size:2rem;font-weight:bold;text-shadow:0 0 12px #ffdd0080;";
             scoreEl.textContent = `Score: ${runScore}`;
-            panel.appendChild(scoreEl);
+            summary.appendChild(scoreEl);
             const scoreFormula = document.createElement("div");
             scoreFormula.textContent = `(${runWavesCleared - runStartWaves} waves × 100 − ${Math.floor(runHealthLost)} HP × 2)`;
-            scoreFormula.style.cssText = "color:#888;font-size:0.8rem;margin-top:-4px;";
-            panel.appendChild(scoreFormula);
-
-            // Divider
-            const div1 = document.createElement("div");
-            div1.style.cssText = "width:100%;height:1px;background:rgba(0,255,221,0.25);margin:6px 0;";
-            panel.appendChild(div1);
+            scoreFormula.style.cssText = "color:#aaf6ff;font-size:0.72rem;text-align:center;margin-top:-4px;text-shadow:0 1px 5px rgba(0,0,0,0.9);";
+            summary.appendChild(scoreFormula);
 
             // --- Insert current run and render leaderboard ---
             const diffColor = runDifficulty === "Apocalypse" ? "#ff3c3c" : runDifficulty === "Hardcore" ? "#ffb300" : "#00ffdd";
             const newEntry = { name: "", score: runScore, waves: runWavesCleared, bytes: runCollectedBytes, _pending: true };
             let lbNameInput = null;
 
+            const leaderboardPanel = document.createElement("div");
+            leaderboardPanel.style.cssText = "min-width:0;min-height:0;display:flex;flex-direction:column;align-items:stretch;border-left:1px solid rgba(0,217,255,0.3);padding-left:12px;";
+            panel.appendChild(leaderboardPanel);
+
             // Leaderboard title
             const lbTitle = document.createElement("div");
             lbTitle.textContent = `${runDifficulty.toUpperCase()} LEADERBOARD`;
-            lbTitle.style.cssText = `color:${diffColor};font-size:1rem;font-weight:bold;letter-spacing:2px;margin-bottom:2px;`;
-            panel.appendChild(lbTitle);
+            lbTitle.style.cssText = `color:${diffColor};font-size:1rem;font-weight:bold;letter-spacing:2px;margin-bottom:6px;text-align:center;`;
+            leaderboardPanel.appendChild(lbTitle);
 
             // Column headers
-            const COLS = "28px 1fr 80px 60px";
+            const COLS = "32px 1fr 92px 70px";
             const lbHeaders = document.createElement("div");
             lbHeaders.style.cssText = `width:100%;display:grid;grid-template-columns:${COLS};gap:4px;padding:0 8px;box-sizing:border-box;`;
             [["#", false], ["Name", false], ["Score", true], ["Waves", true]].forEach(([t, right]) => {
               const h = document.createElement("div");
               h.textContent = t;
-              h.style.cssText = `color:#555;font-size:0.72rem;letter-spacing:1px;text-transform:uppercase;text-align:${right ? "right" : "left"};`;
+              h.style.cssText = `color:#8cecff;font-size:0.8rem;letter-spacing:1px;text-transform:uppercase;text-align:${right ? "right" : "left"};text-shadow:0 1px 5px rgba(0,0,0,0.9);`;
               lbHeaders.appendChild(h);
             });
-            panel.appendChild(lbHeaders);
+            leaderboardPanel.appendChild(lbHeaders);
 
             // Leaderboard table
             const lbTable = document.createElement("div");
-            lbTable.style.cssText = "width:100%;display:flex;flex-direction:column;gap:3px;max-height:260px;overflow-y:auto;";
+            lbTable.style.cssText = "width:100%;display:flex;flex:1;flex-direction:column;gap:3px;min-height:0;overflow-y:auto;";
             lbTable.classList.add("scrollbar-themed");
-            panel.appendChild(lbTable);
+            leaderboardPanel.appendChild(lbTable);
 
             function renderLbRows(cloudEntries, pendingEntry) {
               lbTable.innerHTML = "";
@@ -10996,7 +10962,7 @@ const droplifelenght = 280;
               const top = merged.slice(0, 25);
               if (top.length === 0) {
                 const empty = document.createElement("div");
-                empty.style.cssText = "color:#555;font-size:0.85rem;text-align:center;padding:12px;";
+                empty.style.cssText = "color:#8cecff;font-size:0.85rem;text-align:center;padding:12px;";
                 empty.textContent = "No entries yet.";
                 lbTable.appendChild(empty);
                 return;
@@ -11004,10 +10970,10 @@ const droplifelenght = 280;
               top.forEach((entry, i) => {
                 const isMe = entry === pendingEntry;
                 const row = document.createElement("div");
-                row.style.cssText = `display:grid;grid-template-columns:${COLS};gap:4px;align-items:center;padding:4px 8px;border-radius:5px;background:${isMe ? "rgba(255,221,0,0.12)" : "rgba(0,255,221,0.05)"};border:1px solid ${isMe ? "rgba(255,221,0,0.45)" : "rgba(0,255,221,0.1)"};`;
+                row.style.cssText = `display:grid;grid-template-columns:${COLS};gap:4px;align-items:center;padding:5px 8px;border-bottom:1px solid ${isMe ? "rgba(255,221,0,0.45)" : "rgba(0,217,255,0.16)"};background:transparent;`;
                 const rank = document.createElement("div");
                 rank.textContent = `#${i + 1}`;
-                rank.style.cssText = `color:${i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#555"};font-weight:bold;font-size:0.85rem;`;
+                rank.style.cssText = `color:${i === 0 ? "#ffd700" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#8cecff"};font-weight:bold;font-size:0.95rem;`;
                 let nameEl;
                 if (isMe) {
                   nameEl = document.createElement("div");
@@ -11016,11 +10982,11 @@ const droplifelenght = 280;
                   nameInput.type = "text";
                   nameInput.maxLength = 18;
                   nameInput.placeholder = "Your name…";
-                  nameInput.style.cssText = "flex:1;min-width:0;font-size:0.85rem;padding:1px 4px;background:rgba(0,0,0,0.6);color:#ffdd00;border:1px solid #ffdd0088;border-radius:4px;outline:none;box-sizing:border-box;";
+                  nameInput.style.cssText = "flex:1;min-width:0;font-size:0.85rem;padding:1px 4px;background:transparent;color:#ffdd00;border:1px solid #ffdd0088;border-radius:0;outline:none;box-sizing:border-box;";
                   lbNameInput = nameInput;
                   const okBtn = document.createElement("button");
                   okBtn.textContent = "OK";
-                  okBtn.style.cssText = "font-size:0.75rem;padding:1px 6px;background:rgba(0,0,0,0.7);color:#ffdd00;border:1px solid #ffdd0088;border-radius:4px;white-space:nowrap;flex-shrink:0;";
+                  okBtn.style.cssText = "font-size:0.75rem;padding:1px 6px;background:transparent;color:#ffdd00;border:1px solid #ffdd0088;border-radius:0;white-space:nowrap;flex-shrink:0;";
                   const confirmName = () => {
                     const finalName = nameInput.value.trim() || "???";
                     entry._named = true;
@@ -11048,14 +11014,14 @@ const droplifelenght = 280;
                 } else {
                   nameEl = document.createElement("div");
                   nameEl.textContent = entry.name || "???";
-                  nameEl.style.cssText = "color:#e0ffff;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+                  nameEl.style.cssText = "color:#e0ffff;font-size:0.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
                 }
                 const sc = document.createElement("div");
                 sc.textContent = entry.score;
-                sc.style.cssText = "color:#ffdd00;font-weight:bold;font-size:0.85rem;text-align:right;";
+                sc.style.cssText = "color:#ffdd00;font-weight:bold;font-size:1.1rem;text-align:right;text-shadow:0 0 6px rgba(255,221,0,0.5);";
                 const wv = document.createElement("div");
                 wv.textContent = `W${entry.waves}`;
-                wv.style.cssText = "color:#aaf6ff;font-size:0.82rem;text-align:right;";
+                wv.style.cssText = "color:#aaf6ff;font-size:0.95rem;text-align:right;";
                 row.appendChild(rank); row.appendChild(nameEl); row.appendChild(sc); row.appendChild(wv);
                 lbTable.appendChild(row);
                 if (isMe) requestAnimationFrame(() => row.scrollIntoView({ block: "nearest" }));
@@ -11063,7 +11029,7 @@ const droplifelenght = 280;
             }
 
             // Show loading state, fetch from Firestore (fallback to localStorage)
-            lbTable.innerHTML = `<div style="color:#555;font-size:0.85rem;text-align:center;padding:12px;">Loading leaderboard…</div>`;
+            lbTable.innerHTML = `<div style="color:#8cecff;font-size:0.85rem;text-align:center;padding:12px;">Loading leaderboard…</div>`;
             if (window.fbLB) {
               window.fbLB.load(runDifficulty)
                 .then(cloudEntries => { if (window._gameOverOverlay) renderLbRows(cloudEntries, newEntry); })
@@ -11090,19 +11056,15 @@ const droplifelenght = 280;
 
             // Return button
             if (!window._editorSessionActive) {
-              const div2 = document.createElement("div");
-              div2.style.cssText = "width:100%;height:1px;background:rgba(0,255,221,0.2);margin:6px 0;";
-              panel.appendChild(div2);
               const btn = document.createElement("button");
               btn.textContent = "Return to Menu";
-              btn.style.cssText = "font-size:1.1rem;padding:0.6rem 2rem;background:rgba(0,0,0,0.75);color:#00ffdd;border:2px solid #00ffdd;border-radius:8px;margin-top:4px;";
+              btn.style.cssText = "grid-column:1 / -1;justify-self:center;font-size:1rem;padding:0.4rem 1.6rem;background:transparent;color:#8cecff;border:1px solid rgba(0,217,255,0.8);border-radius:0;";
               btn.addEventListener("click", doReturnToMenuFinal);
               panel.appendChild(btn);
             }
 
             overlay.style.opacity = "0";
             overlay.style.transition = "opacity 0.8s ease";
-            document.body.appendChild(overlay);
             requestAnimationFrame(() => { overlay.style.opacity = "1"; });
             window._gameOverOverlay = overlay;
             finalizeRunBytes();
