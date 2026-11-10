@@ -596,9 +596,10 @@ window.onload = function () {
   const LOOT_XRAY_CORNER_BOTTOM_DISTANCE = 120;
   const GAME_CANVAS_WIDTH = 1024;
   const GAME_CANVAS_HEIGHT = 768;
+  const GAME_DISPLAY_VERTICAL_MARGIN = 30;
   const GAME_DISPLAY_WIDTH = GAME_CANVAS_WIDTH - LOOT_XRAY_CORNER_SIDE_DISTANCE * 2;
-  const GAME_DISPLAY_HEIGHT = GAME_CANVAS_HEIGHT - LOOT_XRAY_CORNER_TOP_DISTANCE - LOOT_XRAY_CORNER_BOTTOM_DISTANCE;
-  const GAME_DISPLAY_OFFSET_Y = LOOT_XRAY_CORNER_TOP_DISTANCE + GAME_DISPLAY_HEIGHT / 2 - GAME_CANVAS_HEIGHT / 2;
+  const GAME_DISPLAY_HEIGHT = GAME_CANVAS_HEIGHT - LOOT_XRAY_TOP_DISTANCE - LOOT_XRAY_BOTTOM_DISTANCE - GAME_DISPLAY_VERTICAL_MARGIN * 2;
+  const GAME_DISPLAY_OFFSET_Y = LOOT_XRAY_TOP_DISTANCE + GAME_DISPLAY_VERTICAL_MARGIN + GAME_DISPLAY_HEIGHT / 2 - GAME_CANVAS_HEIGHT / 2;
   const GAME_STAGE_WIDTH = 1365;
   const GAME_STAGE_HEIGHT = 768;
   const TOOLTIP_HOVER_DELAY_MS = 2000;
@@ -1050,6 +1051,13 @@ window.onload = function () {
     }
     return "#c8c8c8";
   }
+  function getProtocolRarityBackgroundColor(rarity, tier) {
+    const color = getProtocolRarityColor(rarity, tier).slice(1);
+    const red = parseInt(color.slice(0, 2), 16);
+    const green = parseInt(color.slice(2, 4), 16);
+    const blue = parseInt(color.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, 0.32)`;
+  }
   function getProtocolRarityName(rarity, tier) {
     const rarityNames = {
       Common: { Lower: "Lesser", Standard: "Common", Higher: "Uncommon" },
@@ -1086,14 +1094,15 @@ window.onload = function () {
     const panel = document.createElement("div");
     panel.style.width = "calc(100% - 12px)";
     panel.style.maxWidth = `${GAME_DISPLAY_WIDTH - 12}px`;
-    panel.style.maxHeight = "calc(100% - 42px)";
+    panel.style.height = "100%";
+    panel.style.maxHeight = "none";
     panel.style.background = "transparent";
     panel.style.border = "0";
     panel.style.borderRadius = "0";
     panel.style.boxShadow = "none";
     panel.style.position = "absolute";
-    panel.style.top = "42px";
-    panel.style.bottom = "0";
+    panel.style.top = "0";
+    panel.style.bottom = "auto";
     panel.style.left = "50%";
     panel.style.transform = "translateX(-50%)";
     panel.style.boxSizing = "border-box";
@@ -1107,16 +1116,19 @@ window.onload = function () {
     title.textContent = source === "mainMenu" ? "PROTOCOLS DATABASE" : "SELECT YOUR STARTER PROTOCOLS";
     title.style.cssText = SELECTION_TITLE_STYLE;
     title.style.fontSize = "26px";
-    title.style.top = "10px";
-    title.style.position = "fixed";
-    title.style.left = "0";
-    title.style.right = "0";
+    title.style.position = "relative";
+    title.style.top = "auto";
+    title.style.left = "auto";
+    title.style.right = "auto";
     title.style.width = "100%";
     title.style.transform = "none";
+    title.style.flex = "0 0 auto";
+    title.style.margin = "0 0 4px";
+    title.style.lineHeight = "1.2";
     title.style.willChange = "transform";
     title.style.overflowAnchor = "none";
     title.style.textShadow = "0 0 8px #00d9ff, 0 3px 8px #000";
-    starterOverlay.appendChild(title);
+    panel.appendChild(title);
 
     const subtitle = document.createElement("div");
     subtitle.textContent = "Choose up to 2 discovered protocols to start your run with.";
@@ -1370,31 +1382,42 @@ window.onload = function () {
       noneMsg.style.padding = "24px";
       content.appendChild(noneMsg);
     } else {
-      const familyGroups = { Targeting: [], Overdrive: [], Utility: [] };
+      const rarityOrder = ["Lesser", "Common", "Uncommon", "Rare", "Epic", "Legendary"];
+      const familyGroups = Object.fromEntries(
+        ["Targeting", "Overdrive", "Utility"].map(family => [
+          family,
+          Object.fromEntries(rarityOrder.map(rarity => [rarity, []]))
+        ])
+      );
       discoveredProtocols.forEach(protocolName => {
-        const family = PROTOCOLS[protocolName]?.family;
-        if (familyGroups[family]) familyGroups[family].push(protocolName);
+        const proto = PROTOCOLS[protocolName];
+        const rarityName = proto && getProtocolRarityName(proto.rarity, proto.tier);
+        const rarityGroup = proto && familyGroups[proto.family]?.[rarityName];
+        if (rarityGroup) rarityGroup.push(protocolName);
       });
+      const raritySlotCounts = Object.fromEntries(rarityOrder.map(rarity => [
+        rarity,
+        Math.max(...Object.values(familyGroups).map(group => group[rarity].length))
+      ]));
+      const totalGridRows = 1 + rarityOrder.reduce((sum, rarity) => sum + raritySlotCounts[rarity], 0);
 
       const grid = document.createElement("div");
       grid.style.display = "grid";
       grid.style.width = "100%";
-      grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(220px, 1fr))";
+      grid.style.gridTemplateColumns = `repeat(${Object.keys(familyGroups).length}, minmax(0, 1fr))`;
+      grid.style.gridTemplateRows = `repeat(${totalGridRows}, auto)`;
+      grid.style.gridAutoFlow = "column";
       grid.style.alignItems = "stretch";
-      grid.style.height = "100%";
-      grid.style.minHeight = "0";
+      grid.style.alignContent = "start";
+      grid.style.height = "auto";
       grid.style.boxSizing = "border-box";
-      grid.style.gap = "8px";
+      grid.style.columnGap = "8px";
+      grid.style.rowGap = "2px";
       content.appendChild(grid);
 
-      Object.entries(familyGroups).forEach(([familyName, protocols]) => {
-        if (protocols.length === 0) return;
+      Object.entries(familyGroups).forEach(([familyName, protocolsByRarity]) => {
         const familyColumn = document.createElement("div");
-        familyColumn.style.display = "flex";
-        familyColumn.style.flexDirection = "column";
-        familyColumn.style.gap = "2px";
-        familyColumn.style.minWidth = "0";
-        familyColumn.style.height = "100%";
+        familyColumn.style.display = "contents";
         grid.appendChild(familyColumn);
 
         const familyHeader = document.createElement("div");
@@ -1407,7 +1430,31 @@ window.onload = function () {
         familyHeader.style.borderBottom = "1px solid rgba(0,217,255,0.35)";
         familyColumn.appendChild(familyHeader);
 
-        protocols.forEach(protocolName => {
+        rarityOrder.forEach(rarityName => {
+          const protocols = protocolsByRarity[rarityName];
+          for (let slot = 0; slot < raritySlotCounts[rarityName]; slot++) {
+            const protocolName = protocols[slot];
+            if (!protocolName) {
+              const rarityGap = document.createElement("div");
+              rarityGap.textContent = "MISSING DATA";
+              rarityGap.setAttribute("role", "note");
+              rarityGap.style.display = "flex";
+              rarityGap.style.alignItems = "center";
+              rarityGap.style.justifyContent = "center";
+              rarityGap.style.minHeight = "84px";
+              rarityGap.style.padding = "5px";
+              rarityGap.style.boxSizing = "border-box";
+              rarityGap.style.borderRadius = "4px";
+              rarityGap.style.border = "1px dashed rgba(0, 217, 255, 0.28)";
+              rarityGap.style.background = "rgba(4, 25, 42, 0.45)";
+              rarityGap.style.color = "#66818a";
+              rarityGap.style.fontSize = "0.72rem";
+              rarityGap.style.fontWeight = "bold";
+              rarityGap.style.letterSpacing = "0.12em";
+              rarityGap.style.textAlign = "center";
+              familyColumn.appendChild(rarityGap);
+              continue;
+            }
           const proto = PROTOCOLS[protocolName];
           const rawUpgradeTier = ProtocolSystem.protocolBoard[protocolName]?.upgradeTier;
           const upgradeTier = (typeof ProtocolSystem.normalizeUpgradeTier === "function")
@@ -1416,6 +1463,7 @@ window.onload = function () {
           const effectiveStarterMods = (typeof ProtocolSystem.getProtocolEffectiveMods === "function")
             ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
             : proto.statMods;
+          const rarityBackgroundColor = getProtocolRarityBackgroundColor(proto.rarity, proto.tier);
           const card = document.createElement("button");
           card.type = "button";
           card.style.position = "relative";
@@ -1423,12 +1471,12 @@ window.onload = function () {
           card.style.padding = "5px";
           card.style.borderRadius = "4px";
           card.style.border = "1px solid rgba(0, 217, 255, 0.38)";
-          card.style.background = "rgba(4, 25, 42, 0.82)";
+          card.style.background = rarityBackgroundColor;
           card.style.color = "#c8f7ff";
           card.style.cursor = "pointer";
           card.style.transition = "all 0.15s";
           card.style.minHeight = "84px";
-          card.style.flexGrow = "1";
+          card.style.flex = "0 0 auto";
           card.style.minWidth = "0";
           card.style.display = "flex";
           card.style.flexDirection = "column";
@@ -1465,15 +1513,15 @@ window.onload = function () {
             .join(", ");
 
           card.innerHTML = `<div style="font-weight:bold; margin-bottom:2px; padding-right:40px; color:#8cecff; font-size:0.9rem; line-height:1.15;">${protocolName}</div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; gap:4px; padding-right:34px; min-height:16px; font-size:0.68rem; margin-bottom:2px;">
-                              <span style="color:${getProtocolRarityColor(proto.rarity, proto.tier)};">${getProtocolRarityName(proto.rarity, proto.tier)}</span>
-                              <span style="color:#aaf6ff; text-align:right; white-space:nowrap;" data-tier-info>${upgradeTier} (${currentTierIndex + 1}/${totalTierCount})</span>
+                            <div style="display:flex; flex-direction:column; align-items:flex-start; gap:1px; padding-right:34px; min-height:28px; font-size:0.68rem; margin-bottom:2px;">
+                              <span style="color:#8cecff;">${getProtocolRarityName(proto.rarity, proto.tier)}</span>
+                              <span style="color:#aaf6ff; white-space:nowrap;" data-tier-info>${upgradeTier} (${currentTierIndex + 1}/${totalTierCount})</span>
                             </div>
                             <div style="font-size:0.75rem; color:#aaf6ff; line-height:1.15; min-height:1.15em; max-height:2.3em; overflow:hidden; margin-bottom:2px;">${proto.intent || "Unknown"}</div>
                             <div style="color:#8cecff; font-size:0.72rem; line-height:1.1; min-height:1.1em; max-height:2.2em; overflow:hidden; margin-bottom:3px;" data-mods>${mods || "No mods"}</div>
-                            <div style="display:flex; gap:4px; margin-top:auto;">
-                              <button class="upgrade-btn" style="flex:1; min-width:0; padding:0.18rem 0.2rem; border-radius:3px; border:1px solid ${nextUpgradeCost === null ? "#34525c" : "rgba(0,217,255,0.7)"}; background:rgba(0,20,30,0.72); color:${nextUpgradeCost === null ? "#66818a" : "#8cecff"}; font-size:0.68rem; cursor:${nextUpgradeCost === null ? "default" : "pointer"}; opacity:${nextUpgradeCost === null ? "0.65" : "1"};">Upgrade (${nextUpgradeCost === null ? "MAX" : `-${formatByteAmount(nextUpgradeCost)}`})</button>
-                              <button class="downgrade-btn" style="flex:1; min-width:0; padding:0.18rem 0.2rem; border-radius:3px; border:1px solid ${currentTierIndex > 0 ? "rgba(0,217,255,0.55)" : "#34525c"}; background:rgba(0,20,30,0.72); color:${currentTierIndex > 0 ? "#8cecff" : "#66818a"}; font-size:0.68rem; cursor:${currentTierIndex > 0 ? "pointer" : "default"}; opacity:${currentTierIndex > 0 ? "1" : "0.65"};">Downgrade${currentTierIndex > 0 && downgradeRefund ? ` (+${formatByteAmount(downgradeRefund)})` : ""}</button>
+                            <div style="display:flex; gap:4px; margin-top:0;">
+                              <button class="upgrade-btn" style="flex:1; min-width:0; min-height:34px; padding:2px 0.2rem; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border-radius:3px; border:1px solid ${nextUpgradeCost === null ? "#34525c" : "rgba(0,217,255,0.7)"}; background:rgba(0,20,30,0.72); color:${nextUpgradeCost === null ? "#66818a" : "#8cecff"}; font-size:0.68rem; line-height:1.05; cursor:${nextUpgradeCost === null ? "default" : "pointer"}; opacity:${nextUpgradeCost === null ? "0.65" : "1"};"><span>Upgrade</span><span data-upgrade-cost>${nextUpgradeCost === null ? "MAX" : `-${formatByteAmount(nextUpgradeCost)}`}</span></button>
+                              <button class="downgrade-btn" style="flex:1; min-width:0; min-height:34px; padding:2px 0.2rem; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; border-radius:3px; border:1px solid ${currentTierIndex > 0 ? "rgba(0,217,255,0.55)" : "#34525c"}; background:rgba(0,20,30,0.72); color:${currentTierIndex > 0 ? "#8cecff" : "#66818a"}; font-size:0.68rem; line-height:1.05; cursor:${currentTierIndex > 0 ? "pointer" : "default"}; opacity:${currentTierIndex > 0 ? "1" : "0.65"};"><span>Downgrade</span><span data-downgrade-refund>${currentTierIndex > 0 && downgradeRefund !== null ? `+${formatByteAmount(downgradeRefund)}` : "—"}</span></button>
                             </div>`;
 
           // Add button event listeners after setting innerHTML
@@ -1524,7 +1572,7 @@ window.onload = function () {
                     card.querySelector('[data-mods]').textContent = newModsText || "No mods";
                     const upgradeBtnEl = card.querySelector('.upgrade-btn');
                     if (upgradeBtnEl) {
-                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${formatByteAmount(newNextUpgradeCost)})`;
+                      upgradeBtnEl.querySelector('[data-upgrade-cost]').textContent = newNextUpgradeCost === null ? 'MAX' : `-${formatByteAmount(newNextUpgradeCost)}`;
                       upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#66818a' : '#8cecff';
                       upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#34525c' : 'rgba(0,217,255,0.7)'}`;
                       upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
@@ -1544,7 +1592,7 @@ window.onload = function () {
                       : null;
                     const downgradeBtnEl = card.querySelector('.downgrade-btn');
                     if (downgradeBtnEl) {
-                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && newDowngradeRefund ? ` (+${formatByteAmount(newDowngradeRefund)})` : ''}`;
+                      downgradeBtnEl.querySelector('[data-downgrade-refund]').textContent = newTierIndex > 0 && newDowngradeRefund !== null ? `+${formatByteAmount(newDowngradeRefund)}` : '—';
                       downgradeBtnEl.style.color = newTierIndex > 0 ? '#8cecff' : '#66818a';
                       downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? 'rgba(0,217,255,0.55)' : '#34525c'}`;
                       downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
@@ -1613,7 +1661,7 @@ window.onload = function () {
                     // Update downgrade button display
                     const downgradeBtnEl = card.querySelector('.downgrade-btn');
                     if (downgradeBtnEl) {
-                      downgradeBtnEl.textContent = `Downgrade${newTierIndex > 0 && downgradeRefundNew ? ` (+${formatByteAmount(downgradeRefundNew)})` : ''}`;
+                      downgradeBtnEl.querySelector('[data-downgrade-refund]').textContent = newTierIndex > 0 && downgradeRefundNew !== null ? `+${formatByteAmount(downgradeRefundNew)}` : '—';
                       downgradeBtnEl.style.color = newTierIndex > 0 ? '#8cecff' : '#66818a';
                       downgradeBtnEl.style.border = `1px solid ${newTierIndex > 0 ? 'rgba(0,217,255,0.55)' : '#34525c'}`;
                       downgradeBtnEl.style.opacity = newTierIndex > 0 ? '1' : '0.65';
@@ -1622,7 +1670,7 @@ window.onload = function () {
                     }
                     const upgradeBtnEl = card.querySelector('.upgrade-btn');
                     if (upgradeBtnEl) {
-                      upgradeBtnEl.textContent = newNextUpgradeCost === null ? 'MAX' : `Upgrade (-${formatByteAmount(newNextUpgradeCost)})`;
+                      upgradeBtnEl.querySelector('[data-upgrade-cost]').textContent = newNextUpgradeCost === null ? 'MAX' : `-${formatByteAmount(newNextUpgradeCost)}`;
                       upgradeBtnEl.style.color = newNextUpgradeCost === null ? '#66818a' : '#8cecff';
                       upgradeBtnEl.style.border = `1px solid ${newNextUpgradeCost === null ? '#34525c' : 'rgba(0,217,255,0.7)'}`;
                       upgradeBtnEl.style.opacity = newNextUpgradeCost === null ? '0.65' : '1';
@@ -1861,7 +1909,7 @@ window.onload = function () {
 
           const renderCardState = () => {
             const isSelected = selected.includes(protocolName);
-            card.style.background = isSelected ? "rgba(0, 217, 255, 0.2)" : "rgba(4, 25, 42, 0.82)";
+            card.style.background = rarityBackgroundColor;
             card.style.borderColor = isSelected ? "#00d9ff" : "rgba(0,217,255,0.38)";
             card.style.boxShadow = isSelected ? "0 0 14px rgba(0,217,255,0.3)" : "none";
             selectedBadge.style.display = isSelected ? "flex" : "none";
@@ -2021,6 +2069,7 @@ window.onload = function () {
           // Attach renderCardState to card for external refresh
           card.renderCardState = renderCardState;
           familyColumn.appendChild(card);
+          }
         });
       });
     }
@@ -5649,6 +5698,18 @@ const droplifelenght = 280;
     ctx.stroke();
   }
 
+  function drawDisplayPrompt(text, centerX, centerY, color = "#00d9ff") {
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = color;
+    ctx.font = "bold 14px monospace";
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.fillText(text, centerX, centerY);
+    ctx.restore();
+  }
+
   function drawHUD() {
     hudWaveDisplay.textContent = "Wave " + wave;
     hudWaveDisplay.setAttribute("aria-label", "Wave " + wave);
@@ -5659,15 +5720,7 @@ const droplifelenght = 280;
     const hotkeySlideY = 110 * (1 - menuSlideProgress);
     const isStatsMenuVisible = showStats || statsMenuAnimationProgress > 0;
     if (window._editorSessionActive && gameStarted && !gameOver) {
-      ctx.save();
-      ctx.font = "bold 16px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillStyle = "#ffe26c";
-      ctx.shadowColor = "rgba(0,0,0,0.8)";
-      ctx.shadowBlur = 10;
-      ctx.fillText("Press O to open editor", canvas.width / 2, 65);
-      ctx.restore();
+      drawDisplayPrompt("PRESS O TO OPEN EDITOR", canvas.width / 2, 78);
     }
     if (isStatsMenuVisible) {
       // ...existing code for stats panel...
@@ -5685,6 +5738,13 @@ const droplifelenght = 280;
       ctx.shadowColor = 'rgba(0, 217, 255, 0.22)';
       ctx.shadowBlur = 12;
       ctx.fillRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = "rgba(0, 217, 255, 0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = "#00d9ff";
+      ctx.shadowBlur = 8;
+      ctx.strokeRect(statsPanelX, statsPanelY, statsPanelWidth, statsPanelHeight);
       ctx.restore();
       ctx.fillStyle = "#00d9ff";
       ctx.textAlign = "left";
@@ -5816,6 +5876,13 @@ const droplifelenght = 280;
         ctx.shadowColor = 'rgba(0, 217, 255, 0.22)';
         ctx.shadowBlur = 12;
         ctx.fillRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
+        ctx.save();
+        ctx.strokeStyle = "rgba(0, 217, 255, 0.8)";
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = "#00d9ff";
+        ctx.shadowBlur = 8;
+        ctx.strokeRect(canvas.width / 2 - 330, canvas.height - 110, 660, 110);
+        ctx.restore();
         ctx.globalAlpha = 1.0;
         ctx.fillStyle = "#00d9ff";
         ctx.font = "bold 16px sans-serif";
@@ -5840,6 +5907,13 @@ const droplifelenght = 280;
       ctx.shadowColor = 'rgba(0, 217, 255, 0.22)';
       ctx.shadowBlur = 12;
       ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = "rgba(0, 217, 255, 0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = "#00d9ff";
+      ctx.shadowBlur = 8;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
       ctx.restore();
       
       ctx.fillStyle = "#00d9ff";
@@ -6023,7 +6097,7 @@ const droplifelenght = 280;
       ctx.restore();
       
       // Display hovered protocol details following mouse cursor
-      if (!window._protocolReplaceMode && hoveredProtocol >= 0 && Date.now() - hoveredProtocolSince >= TOOLTIP_HOVER_DELAY_MS) {
+      if (!window._protocolReplaceMode && hoveredProtocol >= 0) {
         const hoveredBox = (window._protocolSelectorBoxes || []).find(box => box.index === hoveredProtocol);
         if (hoveredBox && hoveredBox.name) {
           const proto = PROTOCOLS[hoveredBox.name];
@@ -10481,12 +10555,7 @@ const droplifelenght = 280;
       //-======================HUD AND STAT ALLOCATION======================-
       drawProtocolWarnings();
       if (gameStarted && !gameOver && !followMouse && !window._protocolReplaceMode && window._introPhase !== "animating") {
-        ctx.save();
-        ctx.fillStyle = "white";
-        ctx.font = "bold 16px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("Hold RIGHT-CLICK or SPACE to play", canvas.width / 2, canvas.height / 2 - 80);
-        ctx.restore();
+        drawDisplayPrompt("HOLD RIGHT-CLICK OR SPACE TO PLAY", canvas.width / 2, canvas.height / 2 - 80);
       }
       drawHUD();
       drawLootXray(shakeOffsetX, shakeOffsetY);
@@ -10778,9 +10847,7 @@ const droplifelenght = 280;
             ctx.font = "bold 40px sans-serif";
             ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
             ctx.shadowBlur = 0;
-            ctx.font = "bold 20px sans-serif";
-            ctx.fillStyle = "white";
-            ctx.fillText(`Right-click to Continue (${remainingSeconds}s)`, canvas.width / 2, canvas.height / 2 + 30);
+            drawDisplayPrompt(`RIGHT-CLICK TO CONTINUE (${remainingSeconds}s)`, canvas.width / 2, canvas.height / 2 + 30, "#ff3c3c");
           }
           ctx.restore();
         } else {
