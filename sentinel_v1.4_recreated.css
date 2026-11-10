@@ -1,8 +1,8 @@
 /* Protocol card selected state */
 .selected {
-  background: rgba(0, 255, 221, 0.22) !important;
-  border-color: #ffffff !important;
-  box-shadow: 0 0 14px rgba(255,255,255,0.35) !important;
+  background: rgba(0, 217, 255, 0.22) !important;
+  border-color: #00d9ff !important;
+  box-shadow: 0 0 14px rgba(0,217,255,0.35) !important;
   transition: all 0.15s;
 }
 body {

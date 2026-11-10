@@ -53,10 +53,10 @@
       top: 128px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 22, 29, 0.62);
+      background: transparent;
       color: #00ffdd;
-      border: 1.5px solid #00ffdd;
-      box-shadow: 0 0 10px rgba(0,255,221,0.6);
+      border: 0;
+      box-shadow: none;
       text-shadow: 0 0 10px rgba(0,255,221,0.8);
       font-family: sans-serif;
       font-size: 14px;
@@ -72,43 +72,65 @@
     }
     .tut-modal-overlay {
       position: fixed;
-      inset: 0;
+      left: 50%;
+      top: calc(50% + var(--game-display-offset-y, 0px));
+      width: var(--game-display-width, 804px);
+      height: var(--game-display-height, 498px);
+      transform: translate(-50%, -50%) scale(var(--game-stage-scale, 1));
+      transform-origin: center;
+      box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
-      background: rgba(0, 0, 0, 0.78);
+      overflow: auto;
+      background: transparent;
       z-index: 11000;
     }
     .tut-modal-panel {
-      width: min(520px, 94vw);
-      padding: 20px;
+      width: min(640px, 100%);
+      max-height: 100%;
+      overflow-y: auto;
+      box-sizing: border-box;
+      padding: clamp(16px, 2.4vw, 28px);
       color: #c8ffff;
       font-family: sans-serif;
-      background: rgba(0, 20, 30, 0.98);
-      border: 2px solid #00ffdd;
-      box-shadow: 0 0 28px rgba(0, 255, 221, 0.35);
+      background: transparent;
+      border: 0;
+      box-shadow: none;
     }
     .tut-modal-title {
-      margin: 0 0 12px;
-      color: #00ffdd;
-      font-size: 1.15rem;
+      margin: 0 0 14px;
+      color: #eaffff;
+      font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+      letter-spacing: 0.08em;
       text-align: center;
+      text-shadow: 0 0 14px rgba(0, 217, 255, 0.65);
     }
     .tut-modal-message {
       color: #aaf6ff;
-      font-size: 1rem;
+      font-size: 1.05rem;
       line-height: 1.5;
       white-space: pre-line;
+      text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 217, 255, 0.28);
     }
     .tut-modal-button {
       display: block;
-      margin: 18px 0 0 auto;
-      padding: 0.55rem 1rem;
-      color: #00ffdd;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid #00ffdd;
+      margin: 20px 0 0 auto;
+      padding: 0.6rem 1.2rem;
+      color: #8cecff;
+      background: rgba(0, 20, 30, 0.88);
+      border: 1px solid rgba(0, 217, 255, 0.72);
       cursor: pointer;
+      font: inherit;
+      font-weight: bold;
+    }
+    .tut-modal-button:hover {
+      background: rgba(0, 45, 58, 0.94);
+    }
+    .tut-modal-button:focus-visible {
+      outline: 2px solid #00d9ff;
+      outline-offset: 3px;
     }
   `;
   document.head.appendChild(styleEl);
@@ -369,7 +391,7 @@
     removeBanner(id);
     if (window._tutPersistentBanner === undefined) window._tutPersistentBanner = null;
     // Push into the game's warning queue with Infinity timer (never fades)
-    const entry = { text: message, color: '#00ffdd', timer: Infinity, _tutId: id };
+    const entry = { text: message, color: '#00ffdd', timer: Infinity, _tutId: id, transparent: true };
     const warnings = window._tutProtocolWarningsRef;
     if (warnings) {
       warnings.push(entry);
