@@ -18,35 +18,45 @@
   styleEl.id = 'tutorial-styles';
   styleEl.textContent = `
     @keyframes tut-btn-pulse {
-      0%,  100% { box-shadow: 0 0 8px 2px rgba(0,255,221,0.35), 0 0 24px #000; }
-      50%        { box-shadow: 0 0 28px 10px rgba(0,255,221,0.9), 0 0 40px rgba(0,255,221,0.35); }
+      0%,  100% { outline-color: rgba(0,217,255,0.35); box-shadow: 0 0 16px 3px rgba(0,217,255,0.3); }
+      50%        { outline-color: rgba(0,217,255,1); box-shadow: 0 0 16px 3px rgba(0,217,255,0.85); }
     }
     .tut-pulse {
       animation: tut-btn-pulse 1s ease-in-out infinite !important;
+      outline: 2px solid rgba(0,217,255,0.35) !important;
+      outline-offset: 3px;
+      transform: none !important;
+      transition: none !important;
+      will-change: auto !important;
     }
 
     @keyframes tut-card-outline {
-      0%,  100% { outline: 2px solid rgba(0,255,221,0.35); outline-offset: 2px; }
-      50%        { outline: 2px solid rgba(0,255,221,0.95); outline-offset: 2px; }
+      0%,  100% { outline: 2px solid rgba(0,217,255,0.35); outline-offset: 2px; }
+      50%        { outline: 2px solid rgba(0,217,255,0.95); outline-offset: 2px; }
     }
     .tut-card {
       animation: tut-card-outline 1.2s ease-in-out infinite !important;
+      transform: none !important;
+      transition: none !important;
     }
 
     @keyframes tut-text-glow {
       0%,  100% { color: #aaf6ff; text-shadow: none; }
-      50%        { color: #00ffdd; text-shadow: 0 0 10px rgba(0,255,221,0.7); }
+      50%        { color: #00d9ff; text-shadow: 0 0 10px rgba(0,217,255,0.7); }
     }
     .tut-text {
       animation: tut-text-glow 1.2s ease-in-out infinite !important;
       font-weight: bold !important;
     }
     @keyframes tut-upgrade-pulse {
-      0%,  100% { outline: 2px solid rgba(0,255,221,0.35); outline-offset: 2px; }
-      50%        { outline: 2px solid rgba(0,255,221,1);    outline-offset: 2px; }
+      0%,  100% { outline: 2px solid rgba(0,217,255,0.35); outline-offset: 2px; }
+      50%        { outline: 2px solid rgba(0,217,255,1);    outline-offset: 2px; }
     }
     .tut-upgrade-pulse {
       animation: tut-upgrade-pulse 1s ease-in-out infinite !important;
+      transform: none !important;
+      transition: none !important;
+      will-change: auto !important;
     }
     .tut-banner {
       position: fixed;
@@ -54,10 +64,10 @@
       left: 50%;
       transform: translateX(-50%);
       background: transparent;
-      color: #00ffdd;
+      color: #00d9ff;
       border: 0;
       box-shadow: none;
-      text-shadow: 0 0 10px rgba(0,255,221,0.8);
+      text-shadow: 0 0 10px rgba(0,217,255,0.8);
       font-family: sans-serif;
       font-size: 14px;
       font-weight: bold;
@@ -95,9 +105,10 @@
       padding: clamp(16px, 2.4vw, 28px);
       color: #c8ffff;
       font-family: sans-serif;
-      background: transparent;
-      border: 0;
-      box-shadow: none;
+      background: linear-gradient(145deg, rgba(5, 28, 43, 0.98), rgba(2, 13, 24, 0.98));
+      border: 1px solid rgba(0, 217, 255, 0.7);
+      border-radius: 6px;
+      box-shadow: 0 0 24px rgba(0, 217, 255, 0.22), inset 0 0 20px rgba(0, 217, 255, 0.06);
     }
     .tut-modal-title {
       margin: 0 0 14px;
@@ -116,10 +127,10 @@
     }
     .tut-modal-button {
       display: block;
-      margin: 20px 0 0 auto;
+      margin: 20px auto 0;
       padding: 0.6rem 1.2rem;
       color: #8cecff;
-      background: rgba(0, 20, 30, 0.88);
+      background: linear-gradient(180deg, rgba(0, 42, 56, 0.95), rgba(0, 20, 30, 0.96));
       border: 1px solid rgba(0, 217, 255, 0.72);
       cursor: pointer;
       font: inherit;
@@ -293,7 +304,7 @@
   function applyProtocol(overlay) {
     showTutorialModal(
       'WHAT ARE PROTOCOLS?',
-      'Protocols are upgrades that change your Sentinel’s stats and playstyle. Collect protocol orbs during runs to discover more protocols. Choose 2 discovered protocols here to start each run; discoveries are saved to your Protocol Database for future runs.'
+      'Protocols are upgrades that change your Sentinel’s stats and playstyle. Collect protocol orbs during runs to discover more protocols. Choose 2 discovered protocols here to start each run.'
     );
 
     // Pulse the subtitle ("Choose up to 2 discovered protocols…")
@@ -305,10 +316,10 @@
       }
     }
 
-    // Highlight every protocol card button inside the scrollable content
+    // Highlight selectable protocol cards, not their upgrade controls
     const content = overlay.querySelector('.scrollbar-themed');
     if (content) {
-      content.querySelectorAll('button').forEach((card) => {
+      content.querySelectorAll('.protocol-database-card').forEach((card) => {
         card.classList.add('tut-card');
       });
     }
@@ -355,7 +366,7 @@
         setStartButtonState(count >= 2);
         // Remove card highlights once 2 are selected
         if (content) {
-          content.querySelectorAll('button').forEach((card) => {
+          content.querySelectorAll('.protocol-database-card').forEach((card) => {
             if (count >= 2) card.classList.remove('tut-card');
             else card.classList.add('tut-card');
           });
@@ -391,7 +402,7 @@
     removeBanner(id);
     if (window._tutPersistentBanner === undefined) window._tutPersistentBanner = null;
     // Push into the game's warning queue with Infinity timer (never fades)
-    const entry = { text: message, color: '#00ffdd', timer: Infinity, _tutId: id, transparent: true };
+    const entry = { text: message, color: '#00d9ff', timer: Infinity, _tutId: id, transparent: true };
     const warnings = window._tutProtocolWarningsRef;
     if (warnings) {
       warnings.push(entry);
@@ -432,9 +443,9 @@
       const pulse = 0.35 + 0.55 * Math.abs(Math.sin(Date.now() / 400));
       ctx.save();
       ctx.globalAlpha = pulse;
-      ctx.shadowColor = '#00ffdd';
+      ctx.shadowColor = '#00d9ff';
       ctx.shadowBlur = 18;
-      ctx.strokeStyle = '#00ffdd';
+      ctx.strokeStyle = '#00d9ff';
       ctx.lineWidth = 2;
       // Each + button only (no allocation points row)
       for (const box of boxes) {
@@ -479,9 +490,9 @@
       const pulse = 0.35 + 0.55 * Math.abs(Math.sin(Date.now() / 500));
       ctx.save();
       ctx.globalAlpha = pulse;
-      ctx.shadowColor = '#00ffdd';
+      ctx.shadowColor = '#00d9ff';
       ctx.shadowBlur = 20;
-      ctx.strokeStyle = '#00ffdd';
+      ctx.strokeStyle = '#00d9ff';
       ctx.lineWidth = 3;
       ctx.strokeRect(panelX + 2, panelY + 2, panelW - 4, panelH - 4);
       // Pulse discovered (non-active) card for the picked-up protocol
@@ -502,8 +513,8 @@
     if (pickedName) window._tutScrollToProtocol = pickedName;
     installProtocolHighlight(pickedName);
     showTutorialModal(
-      'PROTOCOLS DURING A RUN',
-      'Your 2 starter protocols begin active. You can have up to 6 protocols active at once. Click OK to open the paused Stats menu, then click the highlighted protocol in the Active Protocols list to activate it. During play, release Spacebar or the right mouse button to open this menu.\n\nRun discoveries are added to your permanent Protocol Database for future runs. Protocol orbs award data based on their rarity; your run’s data is added to your saved balance when the run ends. The first protocol orb you collect that is not already active each run also grants a +350 KB bonus. Data is displayed in KB (1 MB = 1,024 KB).',
+      'NEW PROTOCOL ACQUIRED',
+      'Select OK to open the Stats menu, then choose the highlighted protocol in Active Protocols to activate it. You can have up to 6 active protocols at once. Protocols discovered during a run are added to your Database and can be selected as starters in future runs.',
       true,
       () => window.SentinelEditorBridge.openTutorialStatsMenu(),
       'OK'
@@ -547,10 +558,10 @@
     if (subtitleEl) {
       subtitleEl.textContent = 'Upgrade a discovered protocol to permanently improve its power.';
       subtitleEl.style.visibility = 'visible'; // force visible even if refreshCount already hid it
-      subtitleEl.style.color = '#00ffdd';
+      subtitleEl.style.color = '#00d9ff';
       subtitleEl.style.fontSize = '1rem';
       subtitleEl.style.fontWeight = 'bold';
-      subtitleEl.style.textShadow = '0 0 8px rgba(0,255,221,0.7)';
+      subtitleEl.style.textShadow = '0 0 8px rgba(0,217,255,0.7)';
     }
     // Highlight only upgrade buttons using outline (no bleed onto card)
     overlay.querySelectorAll('.upgrade-btn').forEach((btn) => {

@@ -577,7 +577,23 @@ window.onload = function () {
       transform: translateY(1px) scale(0.98);
       filter: brightness(0.94);
     }
+    .protocol-database-card .upgrade-btn,
+    .protocol-database-card .downgrade-btn,
+    .protocol-database-card .upgrade-btn:active,
+    .protocol-database-card .downgrade-btn:active {
+      transform: none !important;
+      transition: none !important;
+      will-change: auto;
+    }
+    .protocol-database-card .upgrade-btn:hover,
+    .protocol-database-card .downgrade-btn:hover {
+      filter: none !important;
+    }
     button:focus-visible {
+      outline: 2px solid #00ffdd;
+      outline-offset: 2px;
+    }
+    .protocol-database-card:focus-visible {
       outline: 2px solid #00ffdd;
       outline-offset: 2px;
     }
@@ -602,6 +618,7 @@ window.onload = function () {
   const GAME_DISPLAY_OFFSET_Y = LOOT_XRAY_TOP_DISTANCE + GAME_DISPLAY_VERTICAL_MARGIN + GAME_DISPLAY_HEIGHT / 2 - GAME_CANVAS_HEIGHT / 2;
   const GAME_STAGE_WIDTH = 1365;
   const GAME_STAGE_HEIGHT = 768;
+  const TITLE_SCREEN_IMAGE_SRC = "titlescreen_img2.png";
   const TOOLTIP_HOVER_DELAY_MS = 2000;
   const SENTINEL_TITLE_STYLE = "position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:48px;font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
   const SELECTION_TITLE_STYLE = "position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:2;margin:0;color:#eaffff;font-size:30px;font-weight:800;letter-spacing:.16em;text-align:center;text-shadow:0 0 24px #00d9ff,0 3px 8px #000;pointer-events:none;white-space:nowrap;";
@@ -650,6 +667,12 @@ window.onload = function () {
   loadingOverlay.style.flexDirection = "column";
   loadingOverlay.style.justifyContent = "center";
   loadingOverlay.style.alignItems = "center";
+  const titleScreenImage = document.createElement("img");
+  titleScreenImage.src = TITLE_SCREEN_IMAGE_SRC;
+  titleScreenImage.alt = "";
+  titleScreenImage.style.cssText = "position:absolute;left:50%;top:50%;width:50%;height:50%;transform:translate(-50%,-50%);object-fit:contain;object-position:center;pointer-events:none;z-index:0;";
+  titleScreenImage.style.opacity = "0.85";
+  loadingOverlay.appendChild(titleScreenImage);
   const loadingTitle = document.createElement("h1");
   loadingTitle.textContent = "SENTINEL";
   loadingTitle.style.cssText = SENTINEL_TITLE_STYLE;
@@ -686,24 +709,24 @@ window.onload = function () {
   const introCinematicSlides = [
     {
       text: "Beneath the surface, behind reinforced steel and concrete, a new era of combat is being forged.",
-      duration: 5500
+      duration: 3000
     },
     {
       text: "The Combat Systems Division has authorized a new generation of autonomous combat machines. Their purpose: adapt, endure, and dominate.",
-      duration: 6500
+      duration: 3500
     },
     {
       text: "Prototype against prototype. Every machine has weaknesses. Every encounter produces data. Only the strongest configurations survive.",
-      duration: 6500
+      duration: 3500
     },
     {
       text: "Introducing SENTINEL. An experimental combat platform designed to evolve through modular combat protocols. Its limits remain unknown.",
-      duration: 6500
+      duration: 3500
     },
     {
       text: "",
       trialFinale: true,
-      duration: 6500
+      duration: 3500
     }
   ];
 
@@ -715,14 +738,18 @@ window.onload = function () {
     let typewriterId;
     let progressFrameId;
     let finished = false;
+    let transitionPending = false;
     let writingComplete = false;
     let gameStartedBehindOverlay = false;
+    let currentSlideStartedAt = 0;
 
     const overlay = document.createElement("div");
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-label", "Sentinel opening cinematic");
-    configureDisplayOverlay(overlay);
+    configureDisplayOverlay(overlay, 11);
     overlay.style.cssText += "background:transparent;color:#e8fbff;font-family:Arial,sans-serif;";
+    const cinematicBackdrop = document.createElement("div");
+    cinematicBackdrop.style.cssText = "position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 700ms ease;z-index:10;";
     const cinematicFont = "'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace";
 
     const header = document.createElement("div");
@@ -735,9 +762,9 @@ window.onload = function () {
     overlay.appendChild(header);
 
     const caption = document.createElement("div");
-    caption.style.cssText = "position:absolute;left:10%;bottom:120px;width:80%;box-sizing:border-box;padding:16px 18px;border-radius:0;background:transparent;box-shadow:none;text-shadow:0 2px 14px rgba(0,0,0,.95);";
+    caption.style.cssText = "position:absolute;left:10%;right:10%;top:92px;bottom:120px;box-sizing:border-box;padding:16px 18px;border-radius:0;background:transparent;box-shadow:none;text-shadow:0 2px 14px rgba(0,0,0,.95);display:flex;flex-direction:column;overflow:hidden;";
     const consoleCursorStyle = document.createElement("style");
-    consoleCursorStyle.textContent = "@keyframes sentinelCinematicCursor{50%{opacity:0}}#sentinelCinematicText::after{content:'_';color:#73ffc0;animation:sentinelCinematicCursor .8s steps(1) infinite;}";
+    consoleCursorStyle.textContent = "@keyframes sentinelCinematicCursor{50%{opacity:0}}#sentinelCinematicText::after{content:'_';color:#00d9ff;animation:sentinelCinematicCursor .8s steps(1) infinite;}";
     document.head.appendChild(consoleCursorStyle);
     const eyebrow = document.createElement("div");
     eyebrow.textContent = "COMBAT SYSTEMS DIVISION";
@@ -745,9 +772,10 @@ window.onload = function () {
     const text = document.createElement("div");
     text.id = "sentinelCinematicText";
     text.setAttribute("aria-live", "polite");
-    text.style.cssText = `color:#d2f7f0;font-family:${cinematicFont};font-size:19px;font-weight:500;line-height:1.55;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,235,220,.3);white-space:pre-wrap;`;
+    text.style.cssText = `flex:1;min-height:0;overflow:hidden;color:#d2f7f0;font-family:${cinematicFont};font-size:11.5px;font-weight:500;line-height:1.55;letter-spacing:.025em;text-shadow:0 0 7px rgba(0,217,255,.32);white-space:pre-wrap;`;
     caption.append(eyebrow, text);
     overlay.appendChild(caption);
+    let currentParagraph = null;
 
     const footer = document.createElement("div");
     footer.style.cssText = "position:absolute;left:24px;right:24px;bottom:24px;box-sizing:border-box;padding:8px 10px;border-radius:0;background:transparent;box-shadow:none;display:flex;align-items:center;gap:18px;";
@@ -829,29 +857,42 @@ window.onload = function () {
       document.removeEventListener("keyup", handleKeyUp);
       document.removeEventListener("click", handleAdvanceInteraction);
       consoleCursorStyle.remove();
+      cinematicBackdrop.style.transition = "opacity 350ms ease";
+      cinematicBackdrop.style.opacity = "0";
       overlay.style.transition = "opacity 350ms ease";
       overlay.style.opacity = "0";
       setTimeout(() => {
         overlay.remove();
+        cinematicBackdrop.remove();
         if (!gameStartedBehindOverlay) onComplete();
       }, 350);
     };
 
     const completeWriting = () => {
-      if (writingComplete) return;
+      if (writingComplete || !currentParagraph) return;
       clearInterval(typewriterId);
-      text.textContent = `> ${currentText}`;
+      currentParagraph.textContent = `> ${currentText}`;
+      text.scrollTop = text.scrollHeight;
       writingComplete = true;
+      if (introCinematicSlides[currentSlide].trialFinale) beginGameBehindFinalSlide();
     };
 
     const beginGameBehindFinalSlide = () => {
       if (gameStartedBehindOverlay || finished) return;
       gameStartedBehindOverlay = true;
       onComplete();
+      const slide = introCinematicSlides[currentSlide];
+      const fadeDuration = Math.max(0, slide.duration - (performance.now() - currentSlideStartedAt));
+      cinematicBackdrop.style.transition = `opacity ${fadeDuration}ms linear`;
+      requestAnimationFrame(() => {
+        if (!finished) cinematicBackdrop.style.opacity = "0";
+      });
     };
 
     const renderSlide = () => {
       const slide = introCinematicSlides[currentSlide];
+      if (finished || !slide) return;
+      currentSlideStartedAt = performance.now();
       const trialLabel = String(completedTrialRuns + 1).padStart(2, "0");
       const slideText = slide.trialFinale
         ? `Evaluation sequence authorized.\nCombat systems online.\nTrial ${trialLabel} commencing.`
@@ -859,7 +900,11 @@ window.onload = function () {
       clearInterval(typewriterId);
       currentText = slideText;
       writingComplete = false;
-      text.textContent = "";
+      currentParagraph = document.createElement("div");
+      currentParagraph.style.flex = "0 0 auto";
+      currentParagraph.style.marginBottom = "16px";
+      text.appendChild(currentParagraph);
+      text.scrollTop = text.scrollHeight;
       slideNumber.textContent = `TRANSMISSION ${String(currentSlide + 1).padStart(2, "0")} / ${String(introCinematicSlides.length).padStart(2, "0")}`;
       const slideStart = (currentSlide / introCinematicSlides.length) * 100;
       const slideEnd = ((currentSlide + 1) / introCinematicSlides.length) * 100;
@@ -871,17 +916,17 @@ window.onload = function () {
         progress.style.transition = `width ${slide.duration}ms linear`;
         progress.style.width = `${slideEnd}%`;
       });
-      if (slide.trialFinale) beginGameBehindFinalSlide();
-
       let typedCharacters = 0;
       const typingInterval = Math.min(42, Math.max(12, (slide.duration * 0.45) / slideText.length));
-      text.textContent = "> ";
+      currentParagraph.textContent = "> ";
       typewriterId = setInterval(() => {
         typedCharacters += 1;
-        text.textContent = `> ${slideText.slice(0, typedCharacters)}`;
+        currentParagraph.textContent = `> ${slideText.slice(0, typedCharacters)}`;
+        text.scrollTop = text.scrollHeight;
         if (typedCharacters >= slideText.length) {
           clearInterval(typewriterId);
           writingComplete = true;
+          if (slide.trialFinale) beginGameBehindFinalSlide();
         }
       }, typingInterval);
 
@@ -889,20 +934,25 @@ window.onload = function () {
     };
 
     const advance = () => {
+      if (finished || transitionPending) return;
       clearTimeout(timerId);
       clearInterval(typewriterId);
       if (currentSlide === introCinematicSlides.length - 1) {
         finish();
         return;
       }
+      transitionPending = true;
       transitionId = setTimeout(() => {
+        transitionId = null;
+        if (finished) return;
         currentSlide += 1;
+        transitionPending = false;
         renderSlide();
-      }, 350);
+      }, 80);
     };
 
     function handleAdvanceInteraction() {
-      if (finished) return;
+      if (finished || transitionPending) return;
       if (!writingComplete) {
         completeWriting();
       } else {
@@ -936,7 +986,11 @@ window.onload = function () {
     document.addEventListener("click", handleAdvanceInteraction);
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("keyup", handleKeyUp);
+    document.body.appendChild(cinematicBackdrop);
     document.body.appendChild(overlay);
+    requestAnimationFrame(() => {
+      if (!finished) cinematicBackdrop.style.opacity = "0.92";
+    });
     renderSlide();
     skipButton.focus();
   }
@@ -1180,6 +1234,8 @@ window.onload = function () {
     content.style.minWidth = "0";
     content.style.minHeight = "0";
     content.style.overflowY = "auto";
+    content.style.scrollbarGutter = "stable";
+    content.style.overflowAnchor = "none";
     content.style.border = "0";
     content.style.borderRadius = "0";
     content.style.padding = "2px 0";
@@ -1464,8 +1520,11 @@ window.onload = function () {
             ? ProtocolSystem.getProtocolEffectiveMods(protocolName)
             : proto.statMods;
           const rarityBackgroundColor = getProtocolRarityBackgroundColor(proto.rarity, proto.tier);
-          const card = document.createElement("button");
-          card.type = "button";
+          const card = document.createElement("div");
+          card.classList.add("protocol-database-card");
+          card.setAttribute("role", "button");
+          card.setAttribute("aria-pressed", "false");
+          card.tabIndex = 0;
           card.style.position = "relative";
           card.style.textAlign = "left";
           card.style.padding = "5px";
@@ -1474,7 +1533,7 @@ window.onload = function () {
           card.style.background = rarityBackgroundColor;
           card.style.color = "#c8f7ff";
           card.style.cursor = "pointer";
-          card.style.transition = "all 0.15s";
+          card.style.transition = "border-color 0.15s ease, box-shadow 0.15s ease";
           card.style.minHeight = "84px";
           card.style.flex = "0 0 auto";
           card.style.minWidth = "0";
@@ -1557,6 +1616,7 @@ window.onload = function () {
                   if (result.success) {
                     totalCollectedBytes = Math.max(0, totalCollectedBytes - result.cost);
                     saveCollectedBytes();
+                    updateHudDataDisplay();
                     window.dispatchEvent(new CustomEvent('tut:protocolUpgraded'));
                     bytesDisplay.textContent = `Data: ${formatByteAmount(totalCollectedBytes)}`;
                     // Update the card with new tier info
@@ -1636,6 +1696,7 @@ window.onload = function () {
                   if (result.success) {
                     totalCollectedBytes += result.refund || 0;
                     saveCollectedBytes();
+                    updateHudDataDisplay();
                     bytesDisplay.textContent = `Data: ${formatByteAmount(totalCollectedBytes)}`;
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
@@ -1705,7 +1766,7 @@ window.onload = function () {
           }
 
           // Tooltip: compare stat change if selected vs unselected
-          card.addEventListener("mouseenter", (event) => {
+          card.addEventListener("pointerenter", (event) => {
             // Show stat difference using: (x - a) + y and (x - b) + y
             const statOrder = ["Range", "Power", "Intensity", "Movement", "Health", "Pickup"];
             const statShort = { Range: "Rng:", Power: "Pwr:", Intensity: "Int:", Movement: "Mov:", Health: "HP:", Pickup: "Pick:" };
@@ -1792,21 +1853,52 @@ window.onload = function () {
             html += `</div>`;
             let tooltip = null;
             let lastTooltipEvent = event;
+            let tooltipMoveFrame = null;
             const trackTooltipPointer = (pointerEvent) => {
               lastTooltipEvent = pointerEvent;
             };
+            card._tooltipCleanup = () => {
+              if (card._tooltipTimer) {
+                clearTimeout(card._tooltipTimer);
+                card._tooltipTimer = null;
+              }
+              if (card._tooltipPointerHandler) {
+                card.removeEventListener("pointermove", card._tooltipPointerHandler);
+                card._tooltipPointerHandler = null;
+              }
+              if (tooltipMoveFrame !== null) {
+                window.cancelAnimationFrame(tooltipMoveFrame);
+                tooltipMoveFrame = null;
+              }
+              if (card._tooltip) {
+                card._tooltip.remove();
+                card._tooltip = null;
+              }
+              if (card._tooltipMoveHandler) {
+                card.removeEventListener("pointermove", card._tooltipMoveHandler);
+                card._tooltipMoveHandler = null;
+              }
+              tooltip = null;
+              card._tooltipCleanup = null;
+            };
             function moveTooltip(e) {
-              if (!tooltip) return;
-              const rect = starterOverlay.getBoundingClientRect();
-              const scale = rect.width / GAME_DISPLAY_WIDTH;
-              const left = (e.clientX - rect.left) / scale + 18;
-              const top = (e.clientY - rect.top) / scale + 8;
-              tooltip.style.left = `${Math.max(8, Math.min(left, GAME_DISPLAY_WIDTH - tooltip.offsetWidth - 8))}px`;
-              tooltip.style.top = `${Math.max(8, Math.min(top, GAME_DISPLAY_HEIGHT - tooltip.offsetHeight - 8))}px`;
+              lastTooltipEvent = e;
+              if (!tooltip || tooltipMoveFrame !== null) return;
+              tooltipMoveFrame = window.requestAnimationFrame(() => {
+                tooltipMoveFrame = null;
+                if (!tooltip) return;
+                const rect = starterOverlay.getBoundingClientRect();
+                const scale = rect.width / GAME_DISPLAY_WIDTH;
+                const left = (lastTooltipEvent.clientX - rect.left) / scale + 18;
+                const top = (lastTooltipEvent.clientY - rect.top) / scale + 8;
+                const boundedLeft = Math.max(8, Math.min(left, GAME_DISPLAY_WIDTH - tooltip.offsetWidth - 8));
+                const boundedTop = Math.max(8, Math.min(top, GAME_DISPLAY_HEIGHT - tooltip.offsetHeight - 8));
+                tooltip.style.transform = `translate3d(${boundedLeft}px, ${boundedTop}px, 0)`;
+              });
             }
             card._tooltipMoveHandler = moveTooltip;
             card._tooltipPointerHandler = trackTooltipPointer;
-            card.addEventListener("mousemove", trackTooltipPointer);
+            card.addEventListener("pointermove", trackTooltipPointer);
             card._tooltipTimer = window.setTimeout(() => {
               if (!card.matches(":hover")) return;
               tooltip = document.createElement("div");
@@ -1814,36 +1906,26 @@ window.onload = function () {
               tooltip.style.position = "absolute";
               tooltip.style.zIndex = 29;
               tooltip.style.pointerEvents = "none";
+              tooltip.style.left = "0";
+              tooltip.style.top = "0";
+              tooltip.style.willChange = "transform";
+              tooltip.style.backfaceVisibility = "hidden";
               tooltip.style.maxWidth = "calc(100% - 16px)";
               tooltip.style.maxHeight = "calc(100% - 16px)";
               tooltip.style.overflow = "auto";
               tooltip.style.boxSizing = "border-box";
+              tooltip.style.background = "rgba(4, 17, 28, 0.98)";
               starterOverlay.appendChild(tooltip);
               card._tooltip = tooltip;
               moveTooltip(lastTooltipEvent);
-              card.removeEventListener("mousemove", trackTooltipPointer);
+              card.removeEventListener("pointermove", trackTooltipPointer);
               card._tooltipPointerHandler = null;
-              card.addEventListener("mousemove", moveTooltip);
+              card.addEventListener("pointermove", moveTooltip);
               card._tooltipTimer = null;
             }, TOOLTIP_HOVER_DELAY_MS);
           });
-          card.addEventListener("mouseleave", () => {
-            if (card._tooltipTimer) {
-              clearTimeout(card._tooltipTimer);
-              card._tooltipTimer = null;
-            }
-            if (card._tooltipPointerHandler) {
-              card.removeEventListener("mousemove", card._tooltipPointerHandler);
-              card._tooltipPointerHandler = null;
-            }
-            if (card._tooltip) {
-              card._tooltip.remove();
-              card._tooltip = null;
-            }
-            if (card._tooltipMoveHandler) {
-              card.removeEventListener("mousemove", card._tooltipMoveHandler);
-              card._tooltipMoveHandler = null;
-            }
+          card.addEventListener("pointerleave", () => {
+            if (card._tooltipCleanup) card._tooltipCleanup();
           });
 
           const favoriteBadge = document.createElement("div");
@@ -1909,6 +1991,7 @@ window.onload = function () {
 
           const renderCardState = () => {
             const isSelected = selected.includes(protocolName);
+            card.setAttribute("aria-pressed", String(isSelected));
             card.style.background = rarityBackgroundColor;
             card.style.borderColor = isSelected ? "#00d9ff" : "rgba(0,217,255,0.38)";
             card.style.boxShadow = isSelected ? "0 0 14px rgba(0,217,255,0.3)" : "none";
@@ -2005,7 +2088,7 @@ window.onload = function () {
                   }
                   document.body.removeChild(modal);
                   // Re-render all protocol cards' state and selection count
-                  const allCards = content.querySelectorAll('button');
+                  const allCards = content.querySelectorAll('.protocol-database-card');
                   allCards.forEach(cardBtn => {
                     if (typeof cardBtn.renderCardState === 'function') cardBtn.renderCardState();
                   });
@@ -2065,6 +2148,11 @@ window.onload = function () {
             modal.appendChild(box);
             document.body.appendChild(modal);
           });
+          card.addEventListener("keydown", (event) => {
+            if (event.target !== card || (event.key !== "Enter" && event.key !== " ")) return;
+            event.preventDefault();
+            card.click();
+          });
 
           // Attach renderCardState to card for external refresh
           card.renderCardState = renderCardState;
@@ -2082,6 +2170,7 @@ window.onload = function () {
     actions.style.alignItems = "center";
     actions.style.gap = "12px";
     actions.style.marginTop = "6px";
+    actions.style.marginBottom = "26px";
     actions.style.flexShrink = "0";
     panel.appendChild(actions);
 
@@ -2135,7 +2224,16 @@ window.onload = function () {
   function showMenu() {
     canvas.style.visibility = "hidden";
     hudXrayCanvas.style.visibility = "hidden";
-    hudWaveDisplay.style.display = "none";
+    if (hudWaveDisplay.dataset.displayMode !== "initializing") {
+      hudWaveDisplay.replaceChildren(hudInitializingLabel, ...hudInitializingDots);
+      hudWaveDisplay.style.top = "24px";
+      hudWaveDisplay.style.height = "30px";
+      hudWaveDisplay.style.lineHeight = "30px";
+      hudWaveDisplay.style.font = "bold 14px monospace";
+      hudWaveDisplay.setAttribute("aria-label", "Initializing");
+      hudWaveDisplay.dataset.displayMode = "initializing";
+    }
+    if (hudWaveDisplay.style.display !== "flex") hudWaveDisplay.style.display = "flex";
     const previousMenuOverlay = document.getElementById("menuOverlay");
     if (previousMenuOverlay) previousMenuOverlay.remove();
     const ENEMY_GLOSSARY = {
@@ -2996,14 +3094,15 @@ window.onload = function () {
                 ctx.restore();
               }
             // Draw wave announcement with fade animation
-            function drawWaveAnnouncement() {
+            function drawWaveAnnouncement(delta) {
               if (waveAnnouncementTimer > 0) {
                 ctx.save();
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.font = "bold 44px sans-serif";
-                ctx.fillStyle = "#00ffdd";
-                // Removed shadowColor and shadowBlur for mobs
+                ctx.font = "bold 34px monospace";
+                ctx.fillStyle = "#8cecff";
+                ctx.shadowColor = "#00d9ff";
+                ctx.shadowBlur = 16;
                 // Animation: quick fade-in (first 20 frames), slower fade-out (last 40 frames)
                 let alpha = 1;
                 if (waveAnnouncementTimer > WAVE_ANNOUNCE_DURATION - 20) {
@@ -3012,9 +3111,9 @@ window.onload = function () {
                   alpha = waveAnnouncementTimer / (WAVE_ANNOUNCE_DURATION - 20);
                 }
                 ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-                ctx.fillText("Wave " + wave, canvas.width / 2, canvas.height / 2 - 22);
+                ctx.fillText("WAVE " + wave, canvas.width / 2, canvas.height / 2 - 22);
                 ctx.restore();
-                if (!paused) waveAnnouncementTimer--;
+                if (!paused) waveAnnouncementTimer -= delta * 60;
               }
             }
           let waveAnnouncementTimer = 60; // Show announcement at game start
@@ -3054,6 +3153,9 @@ window.onload = function () {
   const hudStageOverlay = document.createElement("div");
   hudStageOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:21;pointer-events:none;user-select:none;";
   document.body.appendChild(hudStageOverlay);
+  const hudWaveOverlay = document.createElement("div");
+  hudWaveOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:23;pointer-events:none;user-select:none;";
+  document.body.appendChild(hudWaveOverlay);
   const hudXrayCanvas = document.createElement("canvas");
   hudXrayCanvas.width = canvas.width;
   hudXrayCanvas.height = canvas.height;
@@ -3062,9 +3164,24 @@ window.onload = function () {
   const hudXrayCtx = hudXrayCanvas.getContext("2d");
   const hudWaveDisplay = document.createElement("div");
   hudWaveDisplay.id = "hudWaveDisplay";
-  hudWaveDisplay.style.cssText = "position:absolute;top:12px;left:50%;width:1365px;height:52px;transform:translateX(-50%);z-index:1;display:none;color:#00d9ff;font:bold 28px sans-serif;text-align:center;line-height:52px;white-space:nowrap;text-shadow:0 0 18px #00d9ff,0 0 4px #000;pointer-events:none;user-select:none;";
-  hudWaveDisplay.setAttribute("aria-label", "Current wave");
-  hudStageOverlay.appendChild(hudWaveDisplay);
+  hudWaveDisplay.style.cssText = "position:absolute;top:24px;left:50%;width:1365px;height:30px;transform:translateX(-50%);z-index:1;display:flex;align-items:center;justify-content:center;color:#00d9ff;font:bold 14px monospace;text-align:center;line-height:30px;white-space:nowrap;text-shadow:0 0 18px #00d9ff,0 0 4px #000;pointer-events:none;user-select:none;";
+  hudWaveDisplay.setAttribute("aria-label", "Initializing");
+  const hudInitializingLabel = document.createElement("span");
+  hudInitializingLabel.textContent = "INITIALIZING";
+  const hudInitializingDots = Array.from({ length: 3 }, (_, index) => {
+    const dot = document.createElement("span");
+    dot.className = "sentinel-initializing-dot";
+    dot.textContent = ".";
+    dot.style.animationDelay = `${index * 0.18}s`;
+    return dot;
+  });
+  const hudInitializingStyle = document.createElement("style");
+  hudInitializingStyle.textContent = "@keyframes sentinelInitializingDot{0%,20%{opacity:.25}45%,100%{opacity:1}}.sentinel-initializing-dot{display:inline-block;animation:sentinelInitializingDot 2.4s infinite;}";
+  document.head.appendChild(hudInitializingStyle);
+  hudWaveDisplay.replaceChildren(hudInitializingLabel, ...hudInitializingDots);
+  hudWaveDisplay.style.display = "flex";
+  hudWaveDisplay.dataset.displayMode = "initializing";
+  hudWaveOverlay.appendChild(hudWaveDisplay);
   const hudSignalDisplay = document.createElement("div");
   hudSignalDisplay.id = "hudSignalDisplay";
   hudSignalDisplay.style.cssText = "position:absolute;top:24px;left:calc(50% - 150px);height:30px;display:flex;align-items:center;gap:6px;color:#00d9ff;font:10px sans-serif;text-shadow:0 0 6px #00d9ff;pointer-events:none;user-select:none;";
@@ -3086,25 +3203,18 @@ window.onload = function () {
   hudSignalDisplay.appendChild(hudFpsValue);
   hudStageOverlay.appendChild(hudSignalDisplay);
 
-  const hudBatteryDisplay = document.createElement("div");
-  hudBatteryDisplay.id = "hudBatteryDisplay";
-  hudBatteryDisplay.style.cssText = "position:absolute;top:24px;right:calc(50% - 150px);height:30px;display:flex;align-items:center;gap:5px;color:#00d9ff;font:bold 10px sans-serif;text-shadow:0 0 6px #00d9ff;pointer-events:none;user-select:none;";
-  hudBatteryDisplay.setAttribute("aria-label", "Computer battery status");
-  hudBatteryDisplay.title = "Computer battery status";
-  const hudBatteryShell = document.createElement("div");
-  hudBatteryShell.style.cssText = "position:relative;width:24px;height:14px;box-sizing:border-box;padding:2px;border:1.5px solid #00d9ff;box-shadow:0 0 6px rgba(0,217,255,0.45);";
-  const hudBatteryFill = document.createElement("div");
-  hudBatteryFill.style.cssText = "width:0%;height:100%;background:#00d9ff;transition:width 0.3s ease,background 0.3s ease;";
-  hudBatteryShell.appendChild(hudBatteryFill);
-  const hudBatteryTerminal = document.createElement("div");
-  hudBatteryTerminal.style.cssText = "width:3px;height:6px;background:#00d9ff;box-shadow:0 0 5px rgba(0,217,255,0.5);";
-  const hudBatteryValue = document.createElement("span");
-  hudBatteryValue.textContent = "--%";
-  hudBatteryValue.style.cssText = "min-width:30px;white-space:nowrap;";
-  hudBatteryDisplay.appendChild(hudBatteryShell);
-  hudBatteryDisplay.appendChild(hudBatteryTerminal);
-  hudBatteryDisplay.appendChild(hudBatteryValue);
-  hudStageOverlay.appendChild(hudBatteryDisplay);
+  const hudDataDisplay = document.createElement("div");
+  hudDataDisplay.id = "hudDataDisplay";
+  hudDataDisplay.style.cssText = "position:absolute;top:24px;right:calc(50% - 150px);height:30px;display:flex;align-items:center;gap:6px;color:#00d9ff;font:bold 10px monospace;text-shadow:0 0 6px #00d9ff;pointer-events:none;user-select:none;white-space:nowrap;";
+  hudDataDisplay.setAttribute("aria-label", "Collected data: 0 KB");
+  hudDataDisplay.title = "Collected data: 0 KB";
+  const hudDataLabel = document.createElement("span");
+  hudDataLabel.textContent = "DATA";
+  const hudDataValue = document.createElement("span");
+  hudDataValue.textContent = "0 KB";
+  hudDataDisplay.appendChild(hudDataLabel);
+  hudDataDisplay.appendChild(hudDataValue);
+  hudStageOverlay.appendChild(hudDataDisplay);
 
   let hudFpsFrameCount = 0;
   let hudFpsSampleStart = performance.now();
@@ -3126,37 +3236,6 @@ window.onload = function () {
       hudFpsFrameCount = 0;
       hudFpsSampleStart = timestamp;
     }
-  }
-
-  function setHudBatteryStatus(level, charging) {
-    if (!Number.isFinite(level)) {
-      hudBatteryValue.textContent = "--%";
-      hudBatteryFill.style.width = "0%";
-      hudBatteryDisplay.title = "Computer battery status unavailable";
-      hudBatteryDisplay.setAttribute("aria-label", "Computer battery status unavailable");
-      return;
-    }
-    const percent = Math.max(0, Math.min(100, Math.round(level * 100)));
-    const color = percent <= 20 ? "#ff6b6b" : percent <= 40 ? "#ffcc66" : "#00d9ff";
-    hudBatteryValue.textContent = `${percent}%`;
-    hudBatteryFill.style.width = `${percent}%`;
-    hudBatteryFill.style.background = color;
-    hudBatteryDisplay.title = `Computer battery: ${percent}%${charging ? " (charging)" : ""}`;
-    hudBatteryDisplay.setAttribute("aria-label", hudBatteryDisplay.title);
-  }
-
-  if (typeof navigator.getBattery === "function") {
-    navigator.getBattery().then((battery) => {
-      const updateBatteryDisplay = () => setHudBatteryStatus(battery.level, battery.charging);
-      battery.addEventListener("levelchange", updateBatteryDisplay);
-      battery.addEventListener("chargingchange", updateBatteryDisplay);
-      updateBatteryDisplay();
-    }).catch((error) => {
-      console.warn("Unable to read computer battery status.", error);
-      setHudBatteryStatus(Number.NaN, false);
-    });
-  } else {
-    setHudBatteryStatus(Number.NaN, false);
   }
 
   function getCanvasMousePos(e) {
@@ -3256,6 +3335,17 @@ window.onload = function () {
     return `${formattedValue} ${units[unitIndex]}`;
   }
 
+  let lastHudDataDisplayValue = null;
+  function updateHudDataDisplay() {
+    const displayedBytes = totalCollectedBytes + (runBytesFinalized ? 0 : runCollectedBytes);
+    const formattedBytes = formatByteAmount(displayedBytes);
+    if (formattedBytes === lastHudDataDisplayValue) return;
+    lastHudDataDisplayValue = formattedBytes;
+    hudDataValue.textContent = formattedBytes;
+    hudDataDisplay.title = `Collected data, including current run: ${formattedBytes}`;
+    hudDataDisplay.setAttribute("aria-label", hudDataDisplay.title);
+  }
+
   // Milestone waves available across all difficulties: 1, 5, 15, 25, 35, 45
   const MILESTONE_WAVES = [
     { wave: 1, level: 1 },
@@ -3334,6 +3424,7 @@ window.onload = function () {
     const value = Math.max(0, Math.floor(amount || 0));
     if (value <= 0) return;
     runCollectedBytes += value;
+    updateHudDataDisplay();
     bytePickupNotifications.push({
       amount: value,
       timer: 80,
@@ -3351,6 +3442,7 @@ window.onload = function () {
       totalCollectedBytes += runCollectedBytes;
       saveCollectedBytes();
     }
+    updateHudDataDisplay();
   }
 
   function returnToMainMenu() {
@@ -3374,6 +3466,7 @@ window.onload = function () {
   }
 
   totalCollectedBytes = loadCollectedBytes();
+  updateHudDataDisplay();
   let playerLevelUpTimer = 0;
   let showStats = false, gameStarted = false;
   let statsMenuAnimationProgress = 0;
@@ -4753,6 +4846,7 @@ window.onload = function () {
         // Tutorial bonus: reward the player for picking up their first protocol
         const firstProtocolBonus = 35 * BYTE_REWARD_MULTIPLIER;
         runCollectedBytes += firstProtocolBonus;
+        updateHudDataDisplay();
         protocolWarnings.push({ text: `+${formatByteAmount(firstProtocolBonus).toUpperCase()} — FIRST PROTOCOL BONUS`, color: '#00ffaa', timer: 240 });
         while (protocolWarnings.length > 4) protocolWarnings.shift();
       }
@@ -5712,6 +5806,12 @@ const droplifelenght = 280;
 
   function drawHUD() {
     hudWaveDisplay.textContent = "Wave " + wave;
+    hudWaveDisplay.dataset.displayMode = "wave";
+    hudWaveDisplay.style.display = "flex";
+    hudWaveDisplay.style.top = "24px";
+    hudWaveDisplay.style.height = "30px";
+    hudWaveDisplay.style.lineHeight = "30px";
+    hudWaveDisplay.style.font = "bold 28px sans-serif";
     hudWaveDisplay.setAttribute("aria-label", "Wave " + wave);
     // ...existing code...
     const menuSlideProgress = 1 - Math.pow(1 - statsMenuAnimationProgress, 3);
@@ -6677,6 +6777,7 @@ const droplifelenght = 280;
     xp = 0; xpToLevel = 10; level = 1;
     runCollectedBytes = 0;
     runBytesFinalized = false;
+    updateHudDataDisplay();
     runHealthLost = 0;
     runWavesCleared = 0;
     runStartWaves = 0;
@@ -9272,21 +9373,6 @@ const droplifelenght = 280;
     lastTimestamp = currentTimestamp;
 
     // ...existing code...
-        // Draw wave announcement if timer is active
-        // (waveAnnouncementTimer update will be made delta-based in next step)
-        if (waveAnnouncementTimer > 0 && !window._introPhase) {
-          ctx.save();
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.font = "bold 44px sans-serif";
-          ctx.fillStyle = "#00eaff";
-          ctx.shadowColor = "#222";
-          ctx.shadowBlur = 18;
-          ctx.globalAlpha = Math.min(1, waveAnnouncementTimer / WAVE_ANNOUNCE_DURATION);
-          ctx.fillText("Wave " + wave, canvas.width / 2, canvas.height / 2);
-          ctx.restore();
-          waveAnnouncementTimer -= delta * 60; // 60 = original FPS
-        }
     if (tutorialModalPause) {
       paused = true;
     } else if (window._introPhase) {
@@ -9353,9 +9439,8 @@ const droplifelenght = 280;
       ctx.fillText("Sentinel v2.0", canvas.width / 2, canvas.height / 2 - 20);
       ctx.font = "bold 20px sans-serif";
       ctx.fillText("Prepare for battle...", canvas.width / 2, canvas.height / 2 + 20);
-      drawWaveAnnouncement();
+      drawWaveAnnouncement(delta);
     } else {
-      drawWaveAnnouncement();
       if (!gameStarted) {
         spawnWave();
         gameStarted = true;
@@ -9735,7 +9820,7 @@ const droplifelenght = 280;
       let feedbackColor = null;
       let feedbackAlpha = 0;
       if (!window._secondDeathPending && !gameOver && playerLevelUpTimer > 0) {
-        feedbackColor = "#00ffdd";
+        feedbackColor = "#00d9ff";
         // Blink: on for 6 frames, off for 6 frames, fade out in last 60 frames
         const blinkOn = Math.floor(playerLevelUpTimer / 6) % 2 === 0;
         feedbackAlpha = blinkOn ? 0.45 * Math.min(1, playerLevelUpTimer / 60) : 0;
@@ -9814,10 +9899,10 @@ const droplifelenght = 280;
           }
         });
 
-        // Gold glow if stat points available
+        // Cyan glow when stat points are available
         let angle = window._playerToEnemyAngle || 0;
         if (statPoints > 0) {
-          ctx.shadowColor = "#00ffdd";
+          ctx.shadowColor = "#00d9ff";
           ctx.shadowBlur = 32;
         } else {
           ctx.shadowColor = "#222";
@@ -9857,9 +9942,9 @@ const droplifelenght = 280;
       } else {
         ctx.save();
         ctx.globalAlpha = _introAlpha;
-        // Gold glow if stat points available
+        // Cyan glow when stat points are available
         if (statPoints > 0) {
-          ctx.shadowColor = "gold";
+          ctx.shadowColor = "#00d9ff";
           ctx.shadowBlur = 32;
         } else {
           ctx.shadowColor = "#00000071";
@@ -10549,8 +10634,7 @@ const droplifelenght = 280;
 
       drawProjectiles();
 
-
-
+      drawWaveAnnouncement(delta);
 
       //-======================HUD AND STAT ALLOCATION======================-
       drawProtocolWarnings();
@@ -11148,15 +11232,7 @@ const droplifelenght = 280;
       const _cdElapsed = (performance.now() - window._activateUnpauseStart) / 1000;
       const _cdRemaining = Math.max(0, 0.5 - _cdElapsed);
       const _cdText = _cdRemaining.toFixed(1);
-      ctx.save();
-      ctx.font = "bold 20px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.shadowColor = "#000";
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(_cdText, player.x, player.y - player.radius - 8);
-      ctx.restore();
+      drawDisplayPrompt(`ENGAGE ${_cdText}s`, player.x, player.y - player.radius - 18);
     }
     // ---- End activate countdown ----
 
