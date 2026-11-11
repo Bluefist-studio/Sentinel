@@ -5346,7 +5346,7 @@ window.onload = function () {
           }
         }
         if (!noLootDrop && nearest.type === "shielder") {
-          slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
+          slingerDrops.push({ x: nearest.x, y: nearest.y + 2, xp: 4 });
         }
         if (!noLootDrop && nearest.type === "kamikaze") {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
@@ -5447,7 +5447,7 @@ const droplifelenght = 280;
       const d = slingerDrops[i];
       if (Math.hypot(player.x - d.x, player.y - d.y) < player.pickupRadius) {
         playOrbPickupSound();
-        gainXP(2);
+        gainXP(typeof d.xp === "number" ? d.xp : 2);
         // XP pickup feedback: explode into persistent blue pieces
         // Slinger drop tones
         const palette = ["#FFA500", "#ffb84d", "#ff9900", "#ffcc80", "#8b5b00"];
