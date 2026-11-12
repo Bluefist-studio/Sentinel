@@ -3,7 +3,8 @@
     window.resetBytes();
     window.resetAllProtocolDiscovery();
     window.lockAllMilestones();
-    console.log("All progression reset: bytes, protocols, and milestones cleared.");
+    window.resetCompletedTrialRuns();
+    console.log("All progression reset: bytes, protocols, milestones, and trial runs cleared.");
   };
 
   window.resetTutorial = function() {
@@ -3469,6 +3470,15 @@ window.onload = function () {
     }
   }
 
+  window.resetCompletedTrialRuns = function() {
+    completedTrialRuns = 0;
+    try {
+      localStorage.setItem(COMPLETED_TRIAL_RUNS_STORAGE_KEY, String(completedTrialRuns));
+    } catch (error) {
+      console.error("Unable to reset saved trial run count.", error);
+    }
+  };
+
   function formatByteAmount(amount) {
     const units = ["KB", "MB", "GB", "TB", "PB"];
     let value = Math.max(0, Number(amount) || 0);
@@ -4961,6 +4971,7 @@ window.onload = function () {
   function tryDiscoverProtocolFromEnemy(enemyType, x, y, options = {}) {
     const forceDrop = !!(options && options.forceDrop);
     const forcedRarity = options && typeof options.rarity === "string" ? options.rarity : null;
+    const forcedTier = options && typeof options.tier === "string" ? options.tier : null;
     const waveProgress = Number.isFinite(wave) ? Math.max(0, wave - 1) : 0;
     const waveDropBonus = Math.min(0.15, waveProgress * 0.003);
     const specialPoolBaseChance = Math.min(0.2, 0.05 + waveProgress * 0.0025);
@@ -5013,7 +5024,7 @@ window.onload = function () {
 
     let pool = [];
     if (forcedRarity === "Rare" || forcedRarity === "Common") {
-      pool = getPool(forcedRarity);
+      pool = getPool(forcedRarity, forcedTier ? [forcedTier] : null);
     } else if (targetedPools.length > 0 && Math.random() < specialPoolChance) {
       pool = chooseRandom(targetedPools);
     } else if (enemyType === "grunt") {
@@ -5650,10 +5661,11 @@ window.onload = function () {
         if (!noLootDrop && nearest.type === "kamikaze") {
           slingerDrops.push({ x: nearest.x, y: nearest.y + 2 });
         }
-        if (!noLootDrop && (nearest.type === "brute" || nearest.type === "bruteBoss")) {
+        if (!noLootDrop && nearest.type === "brute") {
           slingerDrops.push({ x: nearest.x + 3, y: nearest.y + 5 });
         }
-        if (!noLootDrop && Math.random() < 0.15) {
+        const isFullBoss = ["gruntBoss", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss"].includes(nearest.type);
+        if (!noLootDrop && (isFullBoss || Math.random() < 0.15)) {
           healthDrops.push({ x: nearest.x + 4, y: nearest.y + 6 });
         }
       }
@@ -7515,7 +7527,7 @@ const droplifelenght = 280;
               }
               // Don't drop XP if wave end condition is "boss"
               const isBossWaveEndCondition1 = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
-              // Drop the same rewards for all boss types (rare + 2 common protocols, plus 25 XP drops)
+              // Preserve the Grunt Boss's additional reward set.
               if (!(e.noLoot || e.noXP) && !isBossWaveEndCondition1) {
                 tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
                 for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
@@ -7672,27 +7684,6 @@ const droplifelenght = 280;
                   "enemyDeath"
                 );
               }
-              if (!(e.noLoot || e.noXP)) {
-                const isBossWaveEndConditionStalker = window._timelineWaveState && window._timelineWaveState.endCondition === 'boss';
-                if (!isBossWaveEndConditionStalker) {
-                  tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
-                  for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
-                    const spread = 16;
-                    tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
-                      forceDrop: true,
-                      rarity: "Common"
-                    });
-                  }
-                  for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
-                    const xpAngle = Math.random() * Math.PI * 2;
-                    const xpDist = 14 + Math.random() * 34;
-                    xpDrops.push({
-                      x: e.x + Math.cos(xpAngle) * xpDist,
-                      y: e.y + Math.sin(xpAngle) * xpDist
-                    });
-                  }
-                }
-              }
               // Wave 35 boss gate
               if (wave === 35) {
                 unlockWave(35);
@@ -7808,16 +7799,33 @@ const droplifelenght = 280;
             if (!(e.noLoot || e.noXP)) {
               const isBoss = ["gruntBoss", "bruteBoss", "slingerBoss", "stalkerBoss", "beamerBoss"].includes(e.type);
               if (isBoss) {
-                // Bosses always drop 1 rare + 2 common protocols, plus 25 XP drops.
+                // Every boss gets one random Rare protocol; Beamer also gets a Rare Higher.
                 tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, { forceDrop: true, rarity: "Rare" });
-                for (let dropIndex = 0; dropIndex < 2; dropIndex++) {
+                if (e.type !== "gruntBoss") {
+                  tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, {
+                    forceDrop: true,
+                    rarity: "Rare",
+                    tier: "Standard"
+                  });
+                }
+                if (e.type === "beamerBoss") {
+                  tryDiscoverProtocolFromEnemy(e.type, e.x, e.y, {
+                    forceDrop: true,
+                    rarity: "Rare",
+                    tier: "Higher"
+                  });
+                }
+                const commonProtocolDropCount = e.type === "gruntBoss" ? 2 : 3;
+                for (let dropIndex = 0; dropIndex < commonProtocolDropCount; dropIndex++) {
                   const spread = 16;
                   tryDiscoverProtocolFromEnemy(e.type, e.x + (Math.random() * spread - spread / 2), e.y + (Math.random() * spread - spread / 2), {
                     forceDrop: true,
                     rarity: "Common"
                   });
                 }
-                for (let xpIndex = 0; xpIndex < 25; xpIndex++) {
+                const isBossWaveEndCondition = window._timelineWaveState && window._timelineWaveState.endCondition === "boss";
+                const xpDropCount = e.type === "gruntBoss" && !isBossWaveEndCondition ? 25 : 50;
+                for (let xpIndex = 0; xpIndex < xpDropCount; xpIndex++) {
                   const xpAngle = Math.random() * Math.PI * 2;
                   const xpDist = 14 + Math.random() * 34;
                   xpDrops.push({

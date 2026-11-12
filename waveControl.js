@@ -6,6 +6,8 @@ window.SentinelWaveControl = (function () {
   const CODE_WAVE_MAX = 50;
   const MOB_INTERVAL_KEYS = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss", "beamerBoss"];
   const BOSS_MOB_TYPES = new Set(["gruntBossMinor", "gruntBoss", "slingerBoss", "bruteBoss", "stalkerBoss", "beamerBoss", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss"]);
+  const BOSS_WAVE_SUPPORT_MOBS = { 15: "slingers", 25: "brutes" };
+  const BOSS_WAVE_SUPPORT_SPAWN_INTERVAL = 5;
   const MOB_INTERVAL_KEY_ALIASES = {
     bossMinors: "gruntbossminor",
     bosses: "gruntboss",
@@ -28,19 +30,19 @@ window.SentinelWaveControl = (function () {
 
   // Enemy health balance settings. Modify these values to tune enemy durability.
   const ENEMY_HEALTH_SETTINGS = {
-    gruntBoss: { base: 150, perWave: 50 },
+    gruntBoss: { base: 500, perWave: 0 },
     gruntBossMinor: { base: 120, perWave: 25 },
     grunt: { base: 5, perWave: 1 },
     kamikaze: { base: 20, perWave: 10 },
     slinger: { base: 10, perWave: 1 },
-    slingerBoss: { base: 6000, perWave: 75 },
-    brute: { base: 200, perWave: 25 },
-    bruteBoss: { base: 8000, perWave: 75 },
+    slingerBoss: { base: 12000, perWave: 0 },
+    brute: { base: 200, perWave: 35 },
+    bruteBoss: { base: 18000, perWave: 0 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
-    beamerBoss: { base: 250000, perWave: 100 },
+    beamerBoss: { base: 255000, perWave: 0 },
     shielder: { base: 75, perWave: 25 },
-    stalkerBoss: { base: 10000, perWave: 75 }
+    stalkerBoss: { base: 12500, perWave: 0 }
   };
 
   function getEnemyHealthForType(type, wave) {
@@ -952,6 +954,7 @@ window.SentinelWaveControl = (function () {
         spawnedEventKeys: new Set(),  // Track spawned events by mobType_index key
         endCondition: timeline.endCondition || 'duration',  // Store end condition for access in main loop
         sawBoss: false,
+        nextBossSupportSpawnTime: BOSS_WAVE_SUPPORT_SPAWN_INTERVAL,
         nextApocalypseKamikazeTime: window.sentinelDifficulty === "Apocalypse" ? 2 + Math.random() * 3 : Infinity
       };
     } else if (!window._timelineWaveState) {
@@ -1018,6 +1021,20 @@ window.SentinelWaveControl = (function () {
             if (BOSS_MOB_TYPES.has(mobType)) anyBossEventRemaining = true;
           }
         }
+      }
+    }
+
+    const supportMobType = BOSS_WAVE_SUPPORT_MOBS[wave];
+    if (
+      supportMobType &&
+      timeline.endCondition === "boss" &&
+      state.sawBoss &&
+      state.elapsedTime >= state.nextBossSupportSpawnTime &&
+      ctx.getEnemies().some(enemy => BOSS_MOB_TYPES.has(enemy.type) && enemy.health > 0)
+    ) {
+      while (state.elapsedTime >= state.nextBossSupportSpawnTime) {
+        spawnFunctions[supportMobType](ctx, 1);
+        state.nextBossSupportSpawnTime += BOSS_WAVE_SUPPORT_SPAWN_INTERVAL;
       }
     }
 

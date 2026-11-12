@@ -541,8 +541,10 @@ const ProtocolSystem = {
   // Reset all protocol discovery (permanent and run)
   resetDiscovery: function() {
     Object.keys(this.protocolBoard).forEach(name => {
-      this.protocolBoard[name].discovered = false;
-      this.protocolBoard[name].isNew = false;
+      const protocol = PROTOCOLS[name];
+      const isDefaultDiscovered = protocol.rarity === "Common" && protocol.tier === "Lower";
+      this.protocolBoard[name].discovered = isDefaultDiscovered;
+      this.protocolBoard[name].isNew = isDefaultDiscovered;
       this.protocolBoard[name].upgradeTier = this.getDefaultUpgradeTier();
     });
     this.starterProtocols = [];
