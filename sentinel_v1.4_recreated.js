@@ -231,6 +231,68 @@
     }
     step();
   }
+
+  function stopVictoryMusic() {
+    const music = window._victoryMusicAudio;
+    if (!music) return;
+    music.pause();
+    music.currentTime = 0;
+    window._victoryMusicAudio = null;
+  }
+
+  function playVictoryMusic(duration = 1600) {
+    stopVictoryMusic();
+    try {
+      const music = new Audio(encodeURI("nocopyrightsound633-8-bit-music-no-copyright-background-instrumental-pixel-party-322342.mp3"));
+      const targetVolume = window.sentinelVolume && window.sentinelVolume.gameMusic !== undefined
+        ? window.sentinelVolume.gameMusic
+        : 0.4;
+      music.loop = true;
+      music.volume = 0;
+      window._victoryMusicAudio = music;
+      const playPromise = music.play();
+      if (playPromise) {
+        playPromise.catch(error => {
+          if (window._victoryMusicAudio === music) {
+            console.warn("Victory music could not be played.", error);
+          }
+        });
+      }
+
+      const fadeStartedAt = performance.now();
+      function fadeIn() {
+        if (window._victoryMusicAudio !== music) return;
+        const progress = Math.min(1, (performance.now() - fadeStartedAt) / duration);
+        music.volume = targetVolume * progress;
+        if (progress < 1) requestAnimationFrame(fadeIn);
+      }
+      fadeIn();
+    } catch (error) {
+      console.warn("Victory music could not be started.", error);
+    }
+  }
+
+  function fadeOutVictoryMusic(duration = 1200, callback) {
+    const music = window._victoryMusicAudio;
+    if (!music) {
+      if (callback) callback();
+      return;
+    }
+    const startVolume = music.volume;
+    const fadeStartedAt = performance.now();
+    function fadeOut() {
+      if (window._victoryMusicAudio !== music) return;
+      const progress = Math.min(1, (performance.now() - fadeStartedAt) / duration);
+      music.volume = startVolume * (1 - progress);
+      if (progress < 1) {
+        requestAnimationFrame(fadeOut);
+      } else {
+        stopVictoryMusic();
+        if (callback) callback();
+      }
+    }
+    fadeOut();
+  }
   // ============================================================
   // BOSS MUSIC
   // Plays over the game playlist during boss waves, then fades
@@ -327,7 +389,7 @@
     }
   }
 
-  function stopAllMusic() {
+  function stopAllMusic(preserveVictoryMusic = false) {
     const menuMusic = window._menuMusicAudio;
     if (menuMusic) {
       menuMusic.pause();
@@ -336,6 +398,7 @@
     }
     stopGameMusic();
     stopBossMusic();
+    if (!preserveVictoryMusic) stopVictoryMusic();
   }
 
   const BEAMER_BOSS_SFX_FILES = [
@@ -346,7 +409,7 @@
     "sparky_laser.wav"
   ];
 
-  function stopBossSounds() {
+  function stopBossSounds(preserveMusic = false) {
     if (window._bossSoundsStoppedForEndState) return;
     window._bossSoundsStoppedForEndState = true;
     const beamLoop = window._audioPool && window._audioPool[BEAMER_BOSS_BEAM_SOUND_FILE];
@@ -362,7 +425,7 @@
     }
     window._bossMusicallyActive = false;
     window._beamerBossMusicActive = false;
-    stopAllMusic();
+    if (!preserveMusic) stopAllMusic(!!window._victoryTriggered);
   }
 
   function fadeOutBossMusic(duration = 1200, callback) {
@@ -378,6 +441,32 @@
       else { stopBossMusic(); if (callback) callback(); }
     }
     step();
+  }
+
+  function transitionToMenuMusic(duration = 1200) {
+    const activeFades = [];
+    if (window._gameMusicAudio) activeFades.push(done => fadeOutGameMusic(duration, done));
+    if (window._bossMusicAudio) activeFades.push(done => fadeOutBossMusic(duration, done));
+    if (window._victoryMusicAudio) activeFades.push(done => fadeOutVictoryMusic(duration, done));
+    if (activeFades.length === 0) {
+      playMenuMusic();
+      return;
+    }
+
+    let remaining = activeFades.length;
+    const fadeComplete = () => {
+      remaining -= 1;
+      if (remaining === 0) playMenuMusic();
+    };
+    activeFades.forEach(fade => fade(fadeComplete));
+  }
+
+  function transitionToVictoryMusic(duration = 1600) {
+    window._bossMusicallyActive = false;
+    window._beamerBossMusicActive = false;
+    fadeOutGameMusic(duration);
+    fadeOutBossMusic(duration);
+    playVictoryMusic(duration);
   }
 
   // Speed multiplier for game timing (higher = faster, lower = slower)
@@ -708,19 +797,16 @@ window.onload = function () {
   });
   const introCinematicSlides = [
     {
-      text: "Beneath the surface, behind reinforced steel and concrete, a new era of combat is being forged.",
-      duration: 3000
-    },
-    {
-      text: "The Combat Systems Division has authorized a new generation of autonomous combat machines. Their purpose: adapt, endure, and dominate.",
+      text: "SENTINEL INITIALIZATION // 01\nBoot sequence .......... COMPLETED\nSystem Diagnostic ...... PASS\nCombat Subsystems ...... READY",
       duration: 3500
     },
     {
-      text: "Prototype against prototype. Every machine has weaknesses. Every encounter produces data. Only the strongest configurations survive.",
+      text: "OPERATOR CONFIGURATION // 02\nRun parameters .......... ACCEPTED\nCombat profile .......... LOADING\nAwaiting protocol manifest...",
       duration: 3500
     },
     {
-      text: "Introducing SENTINEL. An experimental combat platform designed to evolve through modular combat protocols. Its limits remain unknown.",
+      text: "",
+      protocolManifest: true,
       duration: 3500
     },
     {
@@ -740,8 +826,6 @@ window.onload = function () {
     let finished = false;
     let transitionPending = false;
     let writingComplete = false;
-    let gameStartedBehindOverlay = false;
-    let currentSlideStartedAt = 0;
 
     const overlay = document.createElement("div");
     overlay.setAttribute("role", "dialog");
@@ -756,7 +840,7 @@ window.onload = function () {
     header.style.cssText = `position:absolute;top:24px;left:24px;right:24px;box-sizing:border-box;padding:10px 12px;border-radius:4px;background:transparent;box-shadow:none;display:flex;justify-content:space-between;align-items:center;gap:16px;color:#8cecff;font-family:${cinematicFont};font-size:13px;font-weight:bold;letter-spacing:.16em;text-shadow:0 0 8px rgba(0,191,255,.7);`;
     header.style.transition = "opacity 450ms ease";
     const designation = document.createElement("span");
-    designation.textContent = "SENTINEL // CLASSIFIED ARCHIVE";
+    designation.textContent = "SENTINEL // SYSTEM INITIALIZATION";
     const slideNumber = document.createElement("span");
     header.append(designation, slideNumber);
     overlay.appendChild(header);
@@ -864,7 +948,8 @@ window.onload = function () {
       setTimeout(() => {
         overlay.remove();
         cinematicBackdrop.remove();
-        if (!gameStartedBehindOverlay) onComplete();
+        onComplete();
+        runMenuTouchButtonReady = true;
       }, 350);
     };
 
@@ -874,28 +959,24 @@ window.onload = function () {
       currentParagraph.textContent = `> ${currentText}`;
       text.scrollTop = text.scrollHeight;
       writingComplete = true;
-      if (introCinematicSlides[currentSlide].trialFinale) beginGameBehindFinalSlide();
-    };
-
-    const beginGameBehindFinalSlide = () => {
-      if (gameStartedBehindOverlay || finished) return;
-      gameStartedBehindOverlay = true;
-      onComplete();
-      const slide = introCinematicSlides[currentSlide];
-      const fadeDuration = Math.max(0, slide.duration - (performance.now() - currentSlideStartedAt));
-      cinematicBackdrop.style.transition = `opacity ${fadeDuration}ms linear`;
-      requestAnimationFrame(() => {
-        if (!finished) cinematicBackdrop.style.opacity = "0";
-      });
     };
 
     const renderSlide = () => {
       const slide = introCinematicSlides[currentSlide];
       if (finished || !slide) return;
-      currentSlideStartedAt = performance.now();
       const trialLabel = String(completedTrialRuns + 1).padStart(2, "0");
+      const selectedProtocols = Array.isArray(window._pendingStarterProtocols)
+        ? window._pendingStarterProtocols.filter(name => typeof name === "string").slice(0, 2)
+        : [];
+      const protocolLoadLines = selectedProtocols.length
+        ? selectedProtocols.map((name, index) =>
+          `SLOT ${String(index + 1).padStart(2, "0")} // ${name}\n     LOAD STATUS ........ INITIALIZED`
+        ).join("\n")
+        : "STARTER SLOTS ......... EMPTY\nPROTOCOL BUS .......... STANDBY";
       const slideText = slide.trialFinale
-        ? `Evaluation sequence authorized.\nCombat systems online.\nTrial ${trialLabel} commencing.`
+        ? `DEPLOYMENT AUTHORIZATION // 04\nTrial ${trialLabel} commencing.\nCombat systems ........ ONLINE\nDeployment status ..... AUTHORIZED`
+        : slide.protocolManifest
+        ? `PROTOCOL MANIFEST // 03 (LOADING)\n${protocolLoadLines}\nStat modifiers ......... APPLIED\nCombat link ............ ONLINE`
         : slide.text;
       clearInterval(typewriterId);
       currentText = slideText;
@@ -905,7 +986,7 @@ window.onload = function () {
       currentParagraph.style.marginBottom = "16px";
       text.appendChild(currentParagraph);
       text.scrollTop = text.scrollHeight;
-      slideNumber.textContent = `TRANSMISSION ${String(currentSlide + 1).padStart(2, "0")} / ${String(introCinematicSlides.length).padStart(2, "0")}`;
+      slideNumber.textContent = `BOOT SEQUENCE ${String(currentSlide + 1).padStart(2, "0")} / ${String(introCinematicSlides.length).padStart(2, "0")}`;
       const slideStart = (currentSlide / introCinematicSlides.length) * 100;
       const slideEnd = ((currentSlide + 1) / introCinematicSlides.length) * 100;
       progress.style.transition = "none";
@@ -926,7 +1007,6 @@ window.onload = function () {
         if (typedCharacters >= slideText.length) {
           clearInterval(typewriterId);
           writingComplete = true;
-          if (slide.trialFinale) beginGameBehindFinalSlide();
         }
       }, typingInterval);
 
@@ -983,9 +1063,12 @@ window.onload = function () {
       event.preventDefault();
       event.stopPropagation();
     });
-    document.addEventListener("click", handleAdvanceInteraction);
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keyup", handleKeyUp);
+    setTimeout(() => {
+      if (finished) return;
+      document.addEventListener("click", handleAdvanceInteraction);
+      document.addEventListener("keydown", handleKeyDown);
+      document.addEventListener("keyup", handleKeyUp);
+    }, 0);
     document.body.appendChild(cinematicBackdrop);
     document.body.appendChild(overlay);
     requestAnimationFrame(() => {
@@ -997,6 +1080,7 @@ window.onload = function () {
 
   // Menu screen
   function startGame(difficulty, startStatPoints, startHealth) {
+    runMenuTouchButtonReady = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     canvas.style.visibility = "visible";
     hudXrayCtx.clearRect(0, 0, hudXrayCanvas.width, hudXrayCanvas.height);
@@ -1006,6 +1090,7 @@ window.onload = function () {
   }
 
   function beginGame(difficulty, startStatPoints, startHealth) {
+    stopVictoryMusic();
     window._editorSessionActive = false;
     window.sentinelDifficulty = difficulty;
     // Reset tutorial in-game hooks so they re-fire on each new run
@@ -1136,18 +1221,22 @@ window.onload = function () {
   }
   function showStarterProtocolModal(difficulty, startStatPoints, startHealth, source = "wave") {
     const discoveredProtocols = ProtocolSystem.getDiscovered();
+    const isProtocolDatabase = source === "mainMenu";
     const starterOverlay = document.createElement("div");
     starterOverlay.id = "starterProtocolOverlay";
     configureDisplayOverlay(starterOverlay);
+    const protocolPanelHeight = GAME_DISPLAY_HEIGHT + GAME_DISPLAY_VERTICAL_MARGIN - 15;
+    const protocolPanelOffset = GAME_DISPLAY_OFFSET_Y + (protocolPanelHeight - GAME_DISPLAY_HEIGHT) / 2;
+    starterOverlay.style.height = `${protocolPanelHeight}px`;
+    starterOverlay.style.top = `calc(50% + ${protocolPanelOffset}px)`;
     starterOverlay.style.background = "transparent";
     starterOverlay.style.display = "flex";
     starterOverlay.style.flexDirection = "column";
     starterOverlay.style.justifyContent = "center";
     starterOverlay.style.alignItems = "center";
-
     const panel = document.createElement("div");
-    panel.style.width = "calc(100% - 12px)";
-    panel.style.maxWidth = `${GAME_DISPLAY_WIDTH - 12}px`;
+    panel.style.width = "100%";
+    panel.style.maxWidth = `${GAME_DISPLAY_WIDTH}px`;
     panel.style.height = "100%";
     panel.style.maxHeight = "none";
     panel.style.background = "transparent";
@@ -1163,7 +1252,7 @@ window.onload = function () {
     panel.style.zIndex = 2;
     panel.style.display = "flex";
     panel.style.flexDirection = "column";
-    panel.style.padding = "4px 6px";
+    panel.style.padding = "4px 12px 0";
     starterOverlay.appendChild(panel);
 
     const title = document.createElement("h2");
@@ -1238,7 +1327,7 @@ window.onload = function () {
     content.style.overflowAnchor = "none";
     content.style.border = "0";
     content.style.borderRadius = "0";
-    content.style.padding = "2px 0";
+    content.style.padding = "6px 4px";
     content.classList.add("scrollbar-themed");
     panel.appendChild(content);
 
@@ -2169,8 +2258,8 @@ window.onload = function () {
     actions.style.justifyContent = "center";
     actions.style.alignItems = "center";
     actions.style.gap = "12px";
-    actions.style.marginTop = "6px";
-    actions.style.marginBottom = "26px";
+    actions.style.marginTop = "11px";
+    actions.style.marginBottom = "15px";
     actions.style.flexShrink = "0";
     panel.appendChild(actions);
 
@@ -2221,7 +2310,7 @@ window.onload = function () {
 
     document.body.appendChild(starterOverlay);
   }
-  function showMenu() {
+  function showMenu(playMusic = true) {
     canvas.style.visibility = "hidden";
     hudXrayCanvas.style.visibility = "hidden";
     if (hudWaveDisplay.dataset.displayMode !== "initializing") {
@@ -2589,7 +2678,7 @@ window.onload = function () {
     menuOverlay.appendChild(buttonContainer);
     document.body.appendChild(menuOverlay);
     fadeMenuElementsIn([buttonContainer]);
-    playMenuMusic();
+    if (playMusic) playMenuMusic();
 
     // Store reference to main menu for back button
     window._showMainMenu = () => {
@@ -3145,6 +3234,43 @@ window.onload = function () {
   updateGameStageScale();
   window.addEventListener("resize", updateGameStageScale);
 
+  const mobileLandscapePrompt = document.createElement("div");
+  mobileLandscapePrompt.setAttribute("role", "alert");
+  mobileLandscapePrompt.setAttribute("aria-live", "assertive");
+  mobileLandscapePrompt.style.cssText = "position:fixed;inset:0;z-index:25000;display:none;align-items:center;justify-content:center;box-sizing:border-box;padding:24px;background:rgba(1,8,14,0.98);color:#c8ffff;font:bold 20px monospace;text-align:center;letter-spacing:.08em;text-shadow:0 0 12px rgba(0,217,255,.7);";
+  mobileLandscapePrompt.textContent = "ROTATE YOUR DEVICE TO LANDSCAPE";
+  document.body.appendChild(mobileLandscapePrompt);
+
+  const isTouchDevice = () => navigator.maxTouchPoints > 0 ||
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  const updateMobileOrientationPrompt = () => {
+    mobileLandscapePrompt.style.display = isTouchDevice() && window.innerHeight > window.innerWidth
+      ? "flex"
+      : "none";
+  };
+  let landscapeLockWarningLogged = false;
+  const requestLandscapeLock = () => {
+    if (!isTouchDevice() || window.innerHeight <= window.innerWidth) return;
+    const orientation = window.screen && window.screen.orientation;
+    if (!orientation || typeof orientation.lock !== "function") return;
+    orientation.lock("landscape").catch(error => {
+      if (!landscapeLockWarningLogged) {
+        landscapeLockWarningLogged = true;
+        console.warn("Landscape orientation lock is unavailable; rotate the device manually.", error);
+      }
+    });
+  };
+  updateMobileOrientationPrompt();
+  window.addEventListener("resize", updateMobileOrientationPrompt);
+  if (window.screen && window.screen.orientation) {
+    window.screen.orientation.addEventListener("change", updateMobileOrientationPrompt);
+  }
+  if ("PointerEvent" in window) {
+    window.addEventListener("pointerdown", requestLandscapeLock);
+  } else {
+    window.addEventListener("touchstart", requestLandscapeLock, { passive: true });
+  }
+
   const hudFrameOverlay = document.createElement("img");
   hudFrameOverlay.src = "lidhud2_16x9.png";
   hudFrameOverlay.alt = "";
@@ -3153,6 +3279,29 @@ window.onload = function () {
   const hudStageOverlay = document.createElement("div");
   hudStageOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:21;pointer-events:none;user-select:none;";
   document.body.appendChild(hudStageOverlay);
+  const runMenuTouchOverlay = document.createElement("div");
+  runMenuTouchOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:30;pointer-events:none;user-select:none;";
+  document.body.appendChild(runMenuTouchOverlay);
+  const runMenuTouchPulseStyle = document.createElement("style");
+  runMenuTouchPulseStyle.textContent = "@keyframes sentinelRunMenuTouchPulse{0%,100%{border-color:rgba(0,156,207,.5);box-shadow:0 0 0 1px rgba(0,156,207,.2),0 0 8px 1px rgba(0,156,207,.2)}50%{border-color:rgba(0,205,255,1);box-shadow:0 0 0 1px rgba(0,205,255,.62),0 0 14px 0 rgba(0,205,255,.7),0 0 22px 1px rgba(0,205,255,.38)}}#sentinelRunMenuTouchButton{border:0;animation:none}#sentinelRunMenuTouchButton::before{content:'';position:absolute;inset:7.5px;border:1px solid rgba(0,156,207,.5);border-radius:50%;pointer-events:none;animation:sentinelRunMenuTouchPulse 1.6s ease-in-out infinite;}";
+  document.head.appendChild(runMenuTouchPulseStyle);
+  let runMenuTouchButtonReady = false;
+  const runMenuTouchButton = document.createElement("button");
+  runMenuTouchButton.id = "sentinelRunMenuTouchButton";
+  runMenuTouchButton.type = "button";
+  runMenuTouchButton.setAttribute("aria-label", "Open run menu, Escape");
+  runMenuTouchButton.title = "Open run menu (Escape)";
+  runMenuTouchButton.style.cssText = "position:absolute;left:1271.55px;top:515.78px;width:42px;height:41px;padding:0;border:0;border-radius:50%;background:transparent;transform:none;touch-action:manipulation;pointer-events:auto;display:none;z-index:5;cursor:pointer;";
+  runMenuTouchButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showReturnToMenuModal();
+  });
+  runMenuTouchOverlay.appendChild(runMenuTouchButton);
+  function updateRunMenuTouchButtonVisibility() {
+    const shouldShow = runMenuTouchButtonReady && gameStarted && !showMenuScreen && !showLoadingScreen && !gameOver;
+    runMenuTouchButton.style.display = shouldShow ? "block" : "none";
+  }
   const hudWaveOverlay = document.createElement("div");
   hudWaveOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:23;pointer-events:none;user-select:none;";
   document.body.appendChild(hudWaveOverlay);
@@ -3205,13 +3354,14 @@ window.onload = function () {
 
   const hudDataDisplay = document.createElement("div");
   hudDataDisplay.id = "hudDataDisplay";
-  hudDataDisplay.style.cssText = "position:absolute;top:24px;right:calc(50% - 150px);height:30px;display:flex;align-items:center;gap:6px;color:#00d9ff;font:bold 10px monospace;text-shadow:0 0 6px #00d9ff;pointer-events:none;user-select:none;white-space:nowrap;";
+  hudDataDisplay.style.cssText = "position:absolute;top:24px;right:calc(50% - 160px);width:80px;height:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;color:#00d9ff;font:bold 10px monospace;line-height:11px;text-align:center;text-shadow:0 0 6px #00d9ff;pointer-events:none;user-select:none;white-space:nowrap;";
   hudDataDisplay.setAttribute("aria-label", "Collected data: 0 KB");
   hudDataDisplay.title = "Collected data: 0 KB";
   const hudDataLabel = document.createElement("span");
   hudDataLabel.textContent = "DATA";
   const hudDataValue = document.createElement("span");
   hudDataValue.textContent = "0 KB";
+  hudDataValue.style.cssText = "max-width:100%;overflow:hidden;text-overflow:ellipsis;text-align:center;";
   hudDataDisplay.appendChild(hudDataLabel);
   hudDataDisplay.appendChild(hudDataValue);
   hudStageOverlay.appendChild(hudDataDisplay);
@@ -3456,13 +3606,11 @@ window.onload = function () {
     paused = false;
     showStats = false;
     showMenuScreen = true;
-    showMenu();
+    showMenu(false);
     window._bossMusicallyActive = false;
     stopBossMusic();
     stopLowHealthSound();
-    fadeOutGameMusic(1200, () => {
-      playMenuMusic();
-    });
+    transitionToMenuMusic(1200);
   }
 
   totalCollectedBytes = loadCollectedBytes();
@@ -3627,28 +3775,75 @@ window.onload = function () {
 
   function clearVictoryConsole() {
     clearInterval(window._victoryConsoleTypewriter);
-    clearTimeout(window._victoryConsoleHoldTimer);
     clearTimeout(window._victoryConsoleFadeTimer);
+    if (window._victoryConsoleKeyHandler) {
+      document.removeEventListener("keydown", window._victoryConsoleKeyHandler, true);
+    }
     window._victoryConsoleOverlay?.remove();
     window._victoryConsoleOverlay = null;
     window._victoryConsoleTypewriter = null;
-    window._victoryConsoleHoldTimer = null;
+    window._victoryConsoleKeyHandler = null;
     window._victoryConsoleFadeTimer = null;
+    window._victoryAwaitingAcknowledgment = false;
   }
 
   function showVictoryConsole(onComplete) {
     clearVictoryConsole();
+    window._victoryAwaitingAcknowledgment = true;
+    let writingComplete = false;
+    let acknowledged = false;
+
+    const overlay = document.createElement("div");
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Victory protocol acknowledgment");
+    configureDisplayOverlay(overlay, 25);
+    overlay.style.top = "50%";
+    overlay.style.cssText += "display:flex;align-items:center;justify-content:center;padding:24px;background:transparent;pointer-events:auto;";
+
     const panel = document.createElement("div");
-    const displayLeft = (GAME_STAGE_WIDTH - canvas.width) / 2 + LOOT_XRAY_CORNER_SIDE_DISTANCE;
-    panel.style.cssText = `position:absolute;left:${displayLeft + GAME_DISPLAY_WIDTH * 0.1}px;top:${LOOT_XRAY_CORNER_TOP_DISTANCE + GAME_DISPLAY_HEIGHT * 0.34}px;width:${GAME_DISPLAY_WIDTH * 0.8}px;box-sizing:border-box;padding:14px 18px;background:transparent;border:0;box-shadow:none;color:#eaffff;z-index:22;pointer-events:none;`;
+    panel.style.cssText = "width:min(680px,100%);box-sizing:border-box;padding:28px 32px;background:linear-gradient(145deg,rgba(5,24,38,.78),rgba(2,10,19,.78));border:1px solid rgba(0,217,255,.82);box-shadow:0 0 26px rgba(0,180,255,.28),inset 0 0 22px rgba(0,180,255,.1);color:#eaffff;font-family:'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;text-align:center;";
     const heading = document.createElement("div");
     heading.textContent = "COMBAT SYSTEMS DIVISION // VICTORY PROTOCOL";
-    heading.style.cssText = "margin-bottom:12px;color:#00d9ff;font:700 13px 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.1em;text-shadow:0 0 7px rgba(0,217,255,.6);";
+    heading.style.cssText = "margin-bottom:18px;color:#8cecff;font-size:13px;font-weight:700;letter-spacing:.12em;text-shadow:0 0 9px rgba(0,217,255,.6);";
     const message = document.createElement("div");
-    message.style.cssText = "color:#eaffff;font:500 18px/1.45 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,200,255,.3);white-space:pre-wrap;";
-    panel.append(heading, message);
-    hudStageOverlay.appendChild(panel);
-    window._victoryConsoleOverlay = panel;
+    message.style.cssText = "min-height:3em;color:#eaffff;font-size:18px;font-weight:500;line-height:1.55;letter-spacing:.025em;text-shadow:0 0 5px rgba(83,200,255,.3);white-space:pre-wrap;";
+    const acknowledgeButton = document.createElement("button");
+    acknowledgeButton.type = "button";
+    acknowledgeButton.textContent = "ACKNOWLEDGE";
+    acknowledgeButton.disabled = true;
+    acknowledgeButton.style.cssText = "display:block;margin:24px auto 0;padding:10px 24px;background:rgba(0,30,44,.8);border:1px solid rgba(0,217,255,.8);color:#b8f5ff;font:700 13px 'Cascadia Code','Cascadia Mono','Lucida Console',Consolas,monospace;letter-spacing:.12em;cursor:pointer;box-shadow:0 0 14px rgba(0,180,255,.18);";
+    panel.append(heading, message, acknowledgeButton);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    window._victoryConsoleOverlay = overlay;
+
+    const acknowledge = () => {
+      if (!writingComplete || acknowledged) return;
+      acknowledged = true;
+      window._victoryAwaitingAcknowledgment = false;
+      if (window._victoryConsoleKeyHandler) {
+        document.removeEventListener("keydown", window._victoryConsoleKeyHandler, true);
+        window._victoryConsoleKeyHandler = null;
+      }
+      overlay.style.transition = "opacity 220ms ease";
+      overlay.style.opacity = "0";
+      window._victoryConsoleFadeTimer = setTimeout(() => {
+        overlay.remove();
+        if (window._victoryConsoleOverlay === overlay) {
+          window._victoryConsoleOverlay = null;
+        }
+        window._victoryConsoleFadeTimer = null;
+        onComplete();
+      }, 220);
+    };
+    acknowledgeButton.addEventListener("click", acknowledge);
+    window._victoryConsoleKeyHandler = event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.key === "Enter" || event.code === "Space") acknowledge();
+    };
+    document.addEventListener("keydown", window._victoryConsoleKeyHandler, true);
 
     const fullMessage = "Trial completed.\nAuto-destruction sequence activated.";
     let typedCharacters = 0;
@@ -3658,26 +3853,21 @@ window.onload = function () {
       if (typedCharacters >= fullMessage.length) {
         clearInterval(window._victoryConsoleTypewriter);
         window._victoryConsoleTypewriter = null;
-        window._victoryConsoleHoldTimer = setTimeout(() => {
-          panel.style.transition = "opacity 450ms ease";
-          panel.style.opacity = "0";
-          window._victoryConsoleFadeTimer = setTimeout(() => {
-            panel.remove();
-            if (window._victoryConsoleOverlay === panel) {
-              window._victoryConsoleOverlay = null;
-            }
-            window._victoryConsoleFadeTimer = null;
-            onComplete();
-          }, 450);
-        }, 900);
+        writingComplete = true;
+        acknowledgeButton.disabled = false;
+        acknowledgeButton.focus();
       }
     }, 30);
   }
 
   function triggerVictoryIfFinalWaveCleared() {
     if (!window._victoryTriggered && !gameOver && wave > FINAL_CAMPAIGN_WAVE) {
+      wave = FINAL_CAMPAIGN_WAVE;
+      interWavePending = false;
+      interWaveDelayTimer = 0;
       window._victoryTriggered = true;
       window._victoryTime = undefined;
+      transitionToVictoryMusic();
       showVictoryConsole(() => {
         if (window._victoryTriggered && !gameOver) {
           window._victoryTime = Date.now();
@@ -3686,6 +3876,53 @@ window.onload = function () {
     }
     return !!window._victoryTriggered;
   }
+
+  window.testVictorySequence = function() {
+    const previousStartWave = window._selectedStartWave;
+    const previousStartLevel = window._selectedStartLevel;
+    loadingOverlay.remove();
+    document.getElementById("menuOverlay")?.remove();
+    showLoadingScreen = false;
+    showMenuScreen = false;
+    fadeOutMenuMusic();
+    window._selectedStartWave = FINAL_CAMPAIGN_WAVE;
+    window._selectedStartLevel = 1;
+    beginGame("Normal", 0, 15);
+    if (previousStartWave === undefined) delete window._selectedStartWave;
+    else window._selectedStartWave = previousStartWave;
+    if (previousStartLevel === undefined) delete window._selectedStartLevel;
+    else window._selectedStartLevel = previousStartLevel;
+
+    clearVictoryConsole();
+    window._gameOverOverlay?.remove();
+    window._gameOverOverlay = null;
+    window._victoryTriggered = false;
+    window._victoryTime = undefined;
+    window._victorySecondBurstDone = false;
+    window._secondDeathPending = false;
+    window._playerUsedContinue = false;
+    window._gameOverTime = undefined;
+    window._gameOverExplosionDone = false;
+    window._gameOverBurstDone = false;
+    window._editorSessionActive = false;
+    window._timelineWaveState = null;
+    window._sentinelWaveState = { burstCount: 0, burstIndex: 0, burstTimer: 0 };
+    burstCount = 0;
+    burstIndex = 0;
+    burstTimer = 0;
+    enemies.length = 0;
+    mines.length = 0;
+    wave = FINAL_CAMPAIGN_WAVE + 1;
+    runWavesCleared = FINAL_CAMPAIGN_WAVE;
+    runStartWaves = 0;
+    gameOver = false;
+    followMouse = true;
+    paused = false;
+    showStats = false;
+    window._introPhase = null;
+    triggerVictoryIfFinalWaveCleared();
+    return "Victory sequence started. Victory should be displayed at Wave 45.";
+  };
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
@@ -4253,6 +4490,68 @@ window.onload = function () {
     }
   }
 
+  canvas.style.touchAction = "none";
+  canvas.addEventListener("touchstart", (event) => {
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    event.preventDefault();
+    const gameMusic = window._gameMusicAudio;
+    if (gameStarted && !showMenuScreen && !gameOver && !window._bossMusicallyActive && gameMusic && gameMusic.paused) {
+      const musicContext = window._gameMusicContext;
+      if (musicContext && musicContext.state === "suspended") {
+        musicContext.resume().catch(error => console.warn("Unable to resume game audio context:", error));
+      }
+      const playPromise = gameMusic.play();
+      if (playPromise) {
+        playPromise.catch(error => console.warn("Unable to resume game music from touch input:", error));
+      }
+    }
+    const position = getCanvasMousePos(touch);
+    mouseX = Math.max(0, Math.min(canvas.width, position.x));
+    mouseY = Math.max(0, Math.min(canvas.height, position.y));
+
+    if (showStats || window._protocolReplaceMode) {
+      rightMouseHeld = true;
+      updateAttackHold();
+      canvas.dispatchEvent(new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      }));
+      return;
+    }
+
+    if (gameOver) {
+      canvas.dispatchEvent(new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 2,
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      }));
+      return;
+    }
+
+    rightMouseHeld = true;
+    updateAttackHold();
+  }, { passive: false });
+  canvas.addEventListener("touchmove", (event) => {
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    event.preventDefault();
+    const position = getCanvasMousePos(touch);
+    mouseX = Math.max(0, Math.min(canvas.width, position.x));
+    mouseY = Math.max(0, Math.min(canvas.height, position.y));
+  }, { passive: false });
+  const releaseTouchAttack = (event) => {
+    event.preventDefault();
+    if (event.touches.length > 0) return;
+    rightMouseHeld = false;
+    updateAttackHold();
+  };
+  canvas.addEventListener("touchend", releaseTouchAttack, { passive: false });
+  canvas.addEventListener("touchcancel", releaseTouchAttack, { passive: false });
+
   canvas.addEventListener("mousedown", (e) => {
     if (e.button === 2) {
       rightMouseHeld = true;
@@ -4339,7 +4638,7 @@ window.onload = function () {
         }
         finalizeRunBytes();
         showMenuScreen = true;
-        showMenu();
+        showMenu(false);
         gameOver = false;
         window._gameOverTime = undefined;
         window._playerUsedContinue = false;
@@ -4347,7 +4646,7 @@ window.onload = function () {
         window._bossMusicallyActive = false;
         stopBossMusic();
         stopLowHealthSound();
-        fadeOutGameMusic(1200, () => { playMenuMusic(); });
+        transitionToMenuMusic(1200);
       }
       // First death - continue with full health if right clicked before 5 seconds
       else if (elapsedSeconds < 5 && !window._victoryTriggered) {
@@ -5758,6 +6057,7 @@ const droplifelenght = 280;
 
   // Main function to spawn waves based on the current wave number, with custom logic for each wave
   function spawnWave() {
+    if (window._victoryTriggered) return;
     if (!window.SentinelWaveControl || typeof window.SentinelWaveControl.spawnWave !== "function") {
       return;
     }
@@ -5768,6 +6068,7 @@ const droplifelenght = 280;
 
 
   function handleWaveSpawning(delta) {
+    if (window._victoryTriggered) return;
     if (!window.SentinelWaveControl || typeof window.SentinelWaveControl.handleWaveSpawning !== "function") {
       return;
     }
@@ -9363,7 +9664,9 @@ const droplifelenght = 280;
   let _lastDebugLog = 0;
   function gameLoop(currentTimestamp) {
     updateHudSignal(currentTimestamp);
+    updateRunMenuTouchButtonVisibility();
     if (typeof isGameBlocked === 'function' && isGameBlocked()) {
+      lastTimestamp = currentTimestamp;
       requestAnimationFrame(gameLoop);
       return;
     }
@@ -9373,7 +9676,10 @@ const droplifelenght = 280;
     lastTimestamp = currentTimestamp;
 
     // ...existing code...
-    if (tutorialModalPause) {
+    if (window._victoryAwaitingAcknowledgment) {
+      paused = true;
+      showStats = false;
+    } else if (tutorialModalPause) {
       paused = true;
     } else if (window._introPhase) {
       paused = true;
@@ -9484,31 +9790,33 @@ const droplifelenght = 280;
         const BOSS_MUSIC_TYPES = ['gruntBoss', 'bruteBoss', 'slingerBoss', 'stalkerBoss'];
         const hasBeamerBoss = enemies.some(en => en.type === 'beamerBoss' && en.health > 0);
         const hasOtherBossEnemy = enemies.some(en => BOSS_MUSIC_TYPES.includes(en.type) && en.health > 0);
-        if (hasBeamerBoss) {
-          if (!window._beamerBossMusicActive) {
-            window._beamerBossMusicActive = true;
+        if (!window._secondDeathPending && !window._bossSoundsStoppedForEndState) {
+          if (hasBeamerBoss) {
+            if (!window._beamerBossMusicActive) {
+              window._beamerBossMusicActive = true;
+              window._bossMusicallyActive = true;
+              stopGameMusic();
+              stopBossMusic();
+              playBossMusic(
+                BEAMER_BOSS_MUSIC_FILE,
+                window.sentinelVolume && window.sentinelVolume.beamerBossMusic !== undefined
+                  ? window.sentinelVolume.beamerBossMusic
+                  : 0.45
+              );
+            }
+          } else if (window._beamerBossMusicActive) {
+            window._beamerBossMusicActive = false;
+            window._bossMusicallyActive = false;
+            stopAllMusic();
+          } else if (hasOtherBossEnemy && !window._bossMusicallyActive) {
             window._bossMusicallyActive = true;
-            stopGameMusic();
-            stopBossMusic();
-            playBossMusic(
-              BEAMER_BOSS_MUSIC_FILE,
-              window.sentinelVolume && window.sentinelVolume.beamerBossMusic !== undefined
-                ? window.sentinelVolume.beamerBossMusic
-                : 0.45
-            );
+            // Pause game music immediately, then start the standard boss music
+            _silenceGameMusicForBoss(() => { playBossMusic(); });
+          } else if (!hasOtherBossEnemy && window._bossMusicallyActive) {
+            window._bossMusicallyActive = false;
+            // Fade out boss music, then resume game music
+            fadeOutBossMusic(1000, () => { _restoreGameMusicFromBoss(800); });
           }
-        } else if (window._beamerBossMusicActive) {
-          window._beamerBossMusicActive = false;
-          window._bossMusicallyActive = false;
-          stopAllMusic();
-        } else if (hasOtherBossEnemy && !window._bossMusicallyActive) {
-          window._bossMusicallyActive = true;
-          // Pause game music immediately, then start the standard boss music
-          _silenceGameMusicForBoss(() => { playBossMusic(); });
-        } else if (!hasOtherBossEnemy && window._bossMusicallyActive) {
-          window._bossMusicallyActive = false;
-          // Fade out boss music, then resume game music
-          fadeOutBossMusic(1000, () => { _restoreGameMusicFromBoss(800); });
         }
         // ----------------------------
         
@@ -9541,7 +9849,7 @@ const droplifelenght = 280;
         // DEBUG: Log wave progression for waves 1-5
         if (wave <= 5 && window.debugWave) {
         }
-        if (allowTimedOrClearAdvance) {
+        if (!window._victoryTriggered && allowTimedOrClearAdvance) {
           if (window.debugWaveTransition) {
           }
           if (!interWavePending) {
@@ -10639,7 +10947,7 @@ const droplifelenght = 280;
       //-======================HUD AND STAT ALLOCATION======================-
       drawProtocolWarnings();
       if (gameStarted && !gameOver && !followMouse && !window._protocolReplaceMode && window._introPhase !== "animating") {
-        drawDisplayPrompt("HOLD RIGHT-CLICK OR SPACE TO PLAY", canvas.width / 2, canvas.height / 2 - 80);
+        drawDisplayPrompt("HOLD TOUCH, RIGHT-CLICK OR SPACE TO PLAY", canvas.width / 2, canvas.height / 2 - 80);
       }
       drawHUD();
       drawLootXray(shakeOffsetX, shakeOffsetY);
@@ -10780,7 +11088,7 @@ const droplifelenght = 280;
           window._gameOverBurstDone = false;
           window._playerUsedContinue = true;
           gameOver = true;
-          stopBossSounds();
+          stopBossSounds(true);
           stopLowHealthSound();
           deactivateAttack();
           showStats = false;
@@ -10974,6 +11282,12 @@ const droplifelenght = 280;
             }
 
             const isVictory = !!window._victoryTriggered;
+            if (isVictory) clearVictoryConsole();
+            else {
+              stopBossSounds(true);
+              if (window._gameMusicAudio) fadeOutGameMusic(1200);
+              if (window._bossMusicAudio) fadeOutBossMusic(1200);
+            }
             if (!isVictory && !runDeathCounted) {
               runDeathCounted = true;
               recordCompletedTrialRun();
@@ -10994,7 +11308,7 @@ const droplifelenght = 280;
             function doReturnToMenu() {
               if (window._gameOverOverlay) { window._gameOverOverlay.remove(); window._gameOverOverlay = null; }
               showMenuScreen = true;
-              showMenu();
+              showMenu(false);
               gameOver = false;
               window._bossSoundsStoppedForEndState = false;
               window._gameOverTime = undefined;
@@ -11003,11 +11317,11 @@ const droplifelenght = 280;
               window._bossMusicallyActive = false;
               stopBossMusic();
               stopLowHealthSound();
-              fadeOutGameMusic(1200, () => { playMenuMusic(); });
+              transitionToMenuMusic(1200);
             }
 
             // --- Build overlay ---
-            const overlay = showMenu();
+            const overlay = showMenu(false);
             if (!overlay) throw new Error("Unable to create the game-over menu.");
             overlay.id = "gameOverOverlay";
             overlay.style.background = "#000";
@@ -11138,8 +11452,14 @@ const droplifelenght = 280;
                   const okBtn = document.createElement("button");
                   okBtn.textContent = "OK";
                   okBtn.style.cssText = "font-size:0.75rem;padding:1px 6px;background:transparent;color:#ffdd00;border:1px solid #ffdd0088;border-radius:0;white-space:nowrap;flex-shrink:0;";
+                  let nameConfirmed = false;
                   const confirmName = () => {
+                    if (nameConfirmed) return;
+                    nameConfirmed = true;
                     const finalName = nameInput.value.trim() || "???";
+                    nameInput.disabled = true;
+                    okBtn.disabled = true;
+                    lbNameInput = null;
                     entry._named = true;
                     delete entry._pending;
                     // Save to localStorage
@@ -11147,6 +11467,7 @@ const droplifelenght = 280;
                     localLb.push({ name: finalName, score: entry.score, waves: entry.waves, bytes: entry.bytes || 0 });
                     localLb.sort((a, b) => b.score - a.score);
                     saveLeaderboard(localLb.slice(0, 25));
+                    renderLbRows(localLb.slice(0, 25), null);
                     // Save to Firestore then refresh table
                     if (window.fbLB) {
                       window.fbLB.save(runDifficulty, { name: finalName, score: entry.score, waves: entry.waves, bytes: entry.bytes || 0 })

@@ -373,7 +373,7 @@
         }
       };
 
-      setStartButtonState(false);
+      updateStartState();
       const countObserver = new MutationObserver(updateStartState);
       countObserver.observe(selectionCountEl, { childList: true, characterData: true, subtree: true });
     }
