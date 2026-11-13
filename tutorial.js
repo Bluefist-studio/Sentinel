@@ -124,6 +124,7 @@
       line-height: 1.5;
       white-space: pre-line;
       text-shadow: 0 1px 5px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 217, 255, 0.28);
+      text-align: center;
     }
     .tut-modal-button {
       display: block;
@@ -135,6 +136,7 @@
       cursor: pointer;
       font: inherit;
       font-weight: bold;
+      text-align: center;
     }
     .tut-modal-button:hover {
       background: rgba(0, 45, 58, 0.94);
