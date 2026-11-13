@@ -1320,13 +1320,17 @@
 			const targetWave = parseInt(waveInput.value, 10);
 			if (!Number.isFinite(targetWave) || targetWave < 1) {
 				waveStatus.textContent = "Enter a valid wave number (1+).";
-				return;
+				return false;
+			}
+			if (spawnImmediately && typeof bridge.spawnWaveNow !== "function") {
+				waveStatus.textContent = "Wave testing is unavailable.";
+				return false;
 			}
 
 			// Get timeline data from the CURRENTLY EDITED wave, not the target wave
 			if (!timelineHelper || typeof timelineHelper.getTimelineData !== "function") {
 				waveStatus.textContent = "Timeline editor not available.";
-				return;
+				return false;
 			}
 
 			// Get the current working copy WITHOUT saving to persistent storage
@@ -1334,7 +1338,7 @@
 			const timelineData = timelineHelper.getTimelineData(currentlyEditedWave);
 			if (!timelineData || !timelineData.mobs) {
 				waveStatus.textContent = "No timeline data found for currently edited wave.";
-				return;
+				return false;
 			}
 			// Convert timeline data to override format compatible with runtime
 			// Store the timeline object for the TARGET wave (without modifying source wave)
@@ -1421,6 +1425,7 @@
 				applyAutoScalePlayerForWave(targetWave);
 				waveStatus.textContent = `Wave ${targetWave} timeline override applied and spawned.`;
 			}
+			return true;
 		};
 
 		const clearWaveInputs = () => {
@@ -1515,8 +1520,9 @@
 			if (window._timelineCompletedWaves) {
 				delete window._timelineCompletedWaves[targetWave];
 			}
-			applyWaveOverride(true);
-			restartGame();
+			if (applyWaveOverride(true)) {
+				closeWaveEditor({ keepEditorSession: true });
+			}
 		});
 		clearInputsBtn.addEventListener("click", clearWaveInputs);
 		clearWaveBtn.addEventListener("click", () => {
@@ -1659,8 +1665,13 @@
 			}
 		});
 		closeBtn.addEventListener("click", () => {
-			// Only collapse/close the editor menu, do not apply or spawn
-			closeWaveEditor({ keepEditorSession: true });
+			if (typeof bridge.isGameActive === "function" && bridge.isGameActive()) {
+				closeWaveEditor({ keepEditorSession: true });
+				return;
+			}
+			if (applyWaveOverride(true)) {
+				closeWaveEditor({ keepEditorSession: true });
+			}
 		});
 
 		waveEditorOverlay.addEventListener("click", (event) => {

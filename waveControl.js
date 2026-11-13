@@ -6,7 +6,7 @@ window.SentinelWaveControl = (function () {
   const CODE_WAVE_MAX = 50;
   const MOB_INTERVAL_KEYS = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss", "beamerBoss"];
   const BOSS_MOB_TYPES = new Set(["gruntBossMinor", "gruntBoss", "slingerBoss", "bruteBoss", "stalkerBoss", "beamerBoss", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss"]);
-  const BOSS_WAVE_SUPPORT_MOBS = { 15: "slingers", 25: "brutes" };
+  const BOSS_WAVE_SUPPORT_MOBS = { 25: "brutes" };
   const BOSS_WAVE_SUPPORT_SPAWN_INTERVAL = 5;
   const MOB_INTERVAL_KEY_ALIASES = {
     bossMinors: "gruntbossminor",
@@ -35,14 +35,14 @@ window.SentinelWaveControl = (function () {
     grunt: { base: 5, perWave: 1 },
     kamikaze: { base: 20, perWave: 10 },
     slinger: { base: 10, perWave: 1 },
-    slingerBoss: { base: 12000, perWave: 0 },
+    slingerBoss: { base: 100000, perWave: 0 },
     brute: { base: 200, perWave: 35 },
-    bruteBoss: { base: 18000, perWave: 0 },
+    bruteBoss: { base: 150000, perWave: 0 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
     beamerBoss: { base: 255000, perWave: 0 },
     shielder: { base: 75, perWave: 25 },
-    stalkerBoss: { base: 12500, perWave: 0 }
+    stalkerBoss: { base: 200000, perWave: 0 }
   };
 
   function getEnemyHealthForType(type, wave) {
@@ -411,7 +411,9 @@ window.SentinelWaveControl = (function () {
       enemy.type = "kamikaze";
       enemy.timer = 60;
       enemy.exploded = false;
+      enemy.explodeOnContact = true;
       enemy.minesPlaced = 0;
+      enemy.minePlacementAttempts = 0;
       enemy.mineInterval = 60;
       enemy.nextMineTime = 60;
       ctx.applyWaveEnemyModifiers(enemy);
@@ -466,10 +468,11 @@ window.SentinelWaveControl = (function () {
     enemy.spinAngle = Math.random() * Math.PI * 2;
     enemy.spinSpeed = (Math.random() - 0.5) * 0.02;
     enemy.sprite = slingerImg;
-    enemy.slingerBossPhase = 1;
-    enemy.slingerBossStage = "telegraph";
-    enemy.slingerBossStageTimer = 48;
-    enemy.slingerBossAttackIndex = 0;
+    enemy.slingerBossHealthStage = 1;
+    enemy.slingerBossAttackPhase = 1;
+    enemy.slingerBossPhaseState = "pause";
+    enemy.slingerBossPhaseTimer = 60;
+    enemy.slingerBossPositionIndex = 1;
     ctx.applyWaveEnemyModifiers(enemy);
     enemy.maxHealth = enemy.health;
   }
@@ -493,6 +496,7 @@ window.SentinelWaveControl = (function () {
       enemy.attackRange = attackRange;
       enemy.color = color;
       enemy.type = "brute";
+      enemy.noLoot = wave === 25;
       enemy.novaRadius = radius + 20;
       enemy.novaState = "minPause";
       enemy.novaCooldown = 120;
@@ -505,10 +509,9 @@ window.SentinelWaveControl = (function () {
     const wave = ctx.getWave();
     const canvasWidth = (ctx && typeof ctx.getCanvasWidth === "function") ? ctx.getCanvasWidth() : 1024;
     const canvasHeight = (ctx && typeof ctx.getCanvasHeight === "function") ? ctx.getCanvasHeight() : 768;
-    const { x, y } = randomEdgeSpawn(canvasWidth, canvasHeight, 220);
     const enemy = ctx.spawnEnemy();
-    enemy.x = x;
-    enemy.y = y;
+    enemy.x = canvasWidth / 2;
+    enemy.y = canvasHeight / 2;
     enemy.radius = 34;
     enemy.collisionRadius = 32;
     enemy.speed = 0.48;
@@ -527,15 +530,38 @@ window.SentinelWaveControl = (function () {
     enemy.novaShrinkSpeed = 2.8;
     enemy.novaMaxMultiplier = 6.6;
     enemy.novaDamage = 2;
-    enemy.bruteBossEdgePaddingX = 90;
-    enemy.bruteBossEdgePaddingY = 135;
-    enemy.bruteBossEntering = true;
-    enemy.bruteBossNormalSpeed = enemy.speed;
-    enemy.bruteBossEntrySpeed = enemy.speed * 2.3;
     ctx.applyWaveEnemyModifiers(enemy);
-    enemy.bruteBossNormalSpeed = enemy.speed;
-    enemy.bruteBossEntrySpeed = enemy.speed * 2.3;
     enemy.maxHealth = enemy.health;
+  }
+
+  function spawnBruteBossKamikaze(ctx, x, y, angle) {
+    const wave = ctx.getWave();
+    const radius = 16;
+    const collisionRadius = 18;
+    const launchDistance = 42;
+    const enemy = ctx.spawnEnemy();
+    enemy.x = x + Math.cos(angle) * launchDistance;
+    enemy.y = y + Math.sin(angle) * launchDistance;
+    enemy.radius = radius;
+    enemy.collisionRadius = collisionRadius;
+    enemy.speed = 2;
+    enemy.color = "#ff4444";
+    enemy.damage = 3;
+    enemy.health = getEnemyHealthForType("kamikaze", wave);
+    enemy.type = "kamikaze";
+    enemy.unkillable = true;
+    enemy.timer = 60;
+    enemy.exploded = false;
+    enemy.explodeOnContact = true;
+    enemy.minesPlaced = 0;
+    enemy.minePlacementAttempts = 0;
+    enemy.mineInterval = 60;
+    enemy.nextMineTime = 60;
+    enemy.mineLifetime = 2000;
+    enemy.bruteBossLaunchVelocityX = Math.cos(angle) * 2.8;
+    enemy.bruteBossLaunchVelocityY = Math.sin(angle) * 2.8;
+    enemy.bruteBossLaunchOutward = true;
+    ctx.applyWaveEnemyModifiers(enemy);
   }
 
   function spawnStalkerBurst(ctx, count) {
@@ -787,12 +813,27 @@ window.SentinelWaveControl = (function () {
     enemy.stalkerEdgePaddingY = 150;
     enemy.stalkerBossEntering = false;
     enemy.stalkerBossEntryStage = "padding";
-    enemy.stalkerBossEdgePaddingX = 120;
-    enemy.stalkerBossEdgePaddingY = 160;
+    enemy.stalkerBossEdgePaddingX = 48;
+    enemy.stalkerBossEdgePaddingY = 48;
     enemy.stalkerBossNormalSpeed = enemy.speed;
     enemy.stalkerBossEntrySpeed = enemy.speed * 2.1;
     enemy.stalkerBurstInterval = 120;
     enemy.stalkerBurstCooldown = 18 + Math.floor(Math.random() * 22);
+    enemy.stalkerBossHealthStage = 1;
+    enemy.stalkerBossAttackPhase = 1;
+    enemy.stalkerBossIllusionPhaseActive = false;
+    enemy.stalkerBossPhase3RevealComplete = false;
+    enemy.stalkerBossPhaseState = "single";
+    enemy.stalkerBossTeleportsThisPhase = 0;
+    enemy.stalkerBossCurrentHexIndex = Math.floor(Math.random() * 6);
+    enemy.stalkerBossPhase1FanCooldown = 0;
+    enemy.stalkerBossPhase1TeleportRequested = false;
+    enemy.stalkerBossPhase1TransitionTeleportRequested = false;
+    enemy.stalkerBossPhase1TransitionTeleporting = false;
+    enemy.stalkerBossPhase1SalvoShotsRemaining = 0;
+    enemy.stalkerBossPhase1SalvoCooldown = 0;
+    enemy.stalkerBossSingleShotCooldown = 0;
+    enemy.stalkerBossIllusionGroupId = {};
     enemy.castFxCooldown = 0;
     enemy.stalkerAlpha = 0;
     enemy.spawnFadeTimer = 0;
@@ -1156,6 +1197,7 @@ window.SentinelWaveControl = (function () {
   return {
     spawnWave,
     handleWaveSpawning,
+    spawnBruteBossKamikaze,
     setMobBurstIntervals: (intervals) => {
       window._customMobBurstIntervals = normalizeMobIntervals(intervals);
       return !!window._customMobBurstIntervals;
