@@ -149,6 +149,7 @@
   // ─── State ─────────────────────────────────────────────────────────────────
   let stage = 'mainMenu'; // updated whenever a known overlay appears
   let hadFirstRun = false; // true after the first Start Run click — skip step 4 on retries
+  let hasShownFullscreenTip = false;
 
   // ─── Body MutationObserver ─────────────────────────────────────────────────
   const bodyObserver = new MutationObserver((mutations) => {
@@ -262,6 +263,14 @@
 
   // ─── Stage 1 · Main Menu ───────────────────────────────────────────────────
   function applyMainMenu(overlay) {
+    if (!hasShownFullscreenTip) {
+      hasShownFullscreenTip = true;
+      showTutorialModal(
+        'FULL SCREEN',
+        'Press F11 to enter full screen mode.'
+      );
+    }
+
     overlay.querySelectorAll('button').forEach((btn) => {
       if (btn.textContent.trim() === 'Play') {
         btn.classList.add('tut-pulse');
@@ -383,6 +392,22 @@
       startBtn.addEventListener('click', () => {
         stage = 'playing';
         hadFirstRun = true;
+        const showGameplayInstructions = () => {
+          if (window._introPhase === 'waiting') {
+            setTimeout(() => {
+              showTutorialModal(
+                'HOW TO PLAY',
+                'Hold RIGHT-CLICK (or SPACE) to play. Move your mouse to guide your Sentinel, and get close enough for it to automatically attack enemies in range.',
+                true,
+                null,
+                'Start Playing'
+              );
+            }, 2000);
+            return;
+          }
+          requestAnimationFrame(showGameplayInstructions);
+        };
+        requestAnimationFrame(showGameplayInstructions);
         // Observer stays connected to catch menu return
       }, { once: true });
     }

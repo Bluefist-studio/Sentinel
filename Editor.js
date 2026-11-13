@@ -1720,5 +1720,11 @@
 		activateWaveCode,
 		getCurrentOverrides: () => cloneOverrides(waveEditorOverrides)
 	};
-	window.openWaveEditor = showWaveEditor;
+	window.openWaveEditor = () => {
+		if (typeof window.showWaveEditorButton !== "function") {
+			console.error("Wave Editor button is unavailable.");
+			return;
+		}
+		window.showWaveEditorButton();
+	};
 })();

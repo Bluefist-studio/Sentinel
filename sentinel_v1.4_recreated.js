@@ -1182,6 +1182,7 @@ window.onload = function () {
     canvas.style.visibility = "visible";
     hudXrayCtx.clearRect(0, 0, hudXrayCanvas.width, hudXrayCanvas.height);
     hudXrayCanvas.style.visibility = "visible";
+    setHudStatus("INITIALIZING", 3, "initializing");
     fadeOutMenuMusic();
     showIntroCinematic(() => beginGame(difficulty, startStatPoints, startHealth));
   }
@@ -2428,16 +2429,7 @@ window.onload = function () {
     triggerLoadingFlash(false, MENU_LOADING_FLASH_DURATION);
     canvas.style.visibility = "hidden";
     hudXrayCanvas.style.visibility = "hidden";
-    if (hudWaveDisplay.dataset.displayMode !== "initializing") {
-      hudWaveDisplay.replaceChildren(hudInitializingLabel, ...hudInitializingDots);
-      hudWaveDisplay.style.top = "24px";
-      hudWaveDisplay.style.height = "30px";
-      hudWaveDisplay.style.lineHeight = "30px";
-      hudWaveDisplay.style.font = "bold 14px monospace";
-      hudWaveDisplay.setAttribute("aria-label", "Initializing");
-      hudWaveDisplay.dataset.displayMode = "initializing";
-    }
-    if (hudWaveDisplay.style.display !== "flex") hudWaveDisplay.style.display = "flex";
+    setHudStatus("AWAITING COMMAND", 2, "menu");
     const previousMenuOverlay = document.getElementById("menuOverlay");
     if (previousMenuOverlay) previousMenuOverlay.remove();
     const ENEMY_GLOSSARY = {
@@ -2784,6 +2776,10 @@ window.onload = function () {
     // Add main menu buttons (Play and Protocols)
     const playBtn = makeMenuButton("Play", "#8cecff");
     const waveEditorBtn = makeMenuButton("Wave Editor", "#8cecff");
+    waveEditorBtn.hidden = true;
+    window.showWaveEditorButton = () => {
+      waveEditorBtn.hidden = false;
+    };
     const protocolBtn = makeMenuButton("Protocols", "#8cecff");
     const enemyGlossaryBtn = makeMenuButton("Enemy Glossary", "#8cecff");
     const leaderboardBtn = makeMenuButton("Leaderboards", "#8cecff");
@@ -3462,9 +3458,18 @@ window.onload = function () {
   const hudInitializingStyle = document.createElement("style");
   hudInitializingStyle.textContent = "@keyframes sentinelInitializingDot{0%,20%{opacity:.25}45%,100%{opacity:1}}.sentinel-initializing-dot{display:inline-block;animation:sentinelInitializingDot 2.4s infinite;}";
   document.head.appendChild(hudInitializingStyle);
-  hudWaveDisplay.replaceChildren(hudInitializingLabel, ...hudInitializingDots);
-  hudWaveDisplay.style.display = "flex";
-  hudWaveDisplay.dataset.displayMode = "initializing";
+  function setHudStatus(label, dotCount, mode) {
+    hudInitializingLabel.textContent = label;
+    hudWaveDisplay.replaceChildren(hudInitializingLabel, ...hudInitializingDots.slice(0, dotCount));
+    hudWaveDisplay.style.top = "24px";
+    hudWaveDisplay.style.height = "30px";
+    hudWaveDisplay.style.lineHeight = "30px";
+    hudWaveDisplay.style.font = "bold 14px monospace";
+    hudWaveDisplay.setAttribute("aria-label", `${label}${".".repeat(dotCount)}`);
+    hudWaveDisplay.dataset.displayMode = mode;
+    hudWaveDisplay.style.display = "flex";
+  }
+  setHudStatus("SENTINEL ONLINE", 3, "title");
   hudWaveOverlay.appendChild(hudWaveDisplay);
   const hudSignalDisplay = document.createElement("div");
   hudSignalDisplay.id = "hudSignalDisplay";

@@ -31,13 +31,13 @@ window.SentinelWaveControl = (function () {
   // Enemy health balance settings. Modify these values to tune enemy durability.
   const ENEMY_HEALTH_SETTINGS = {
     gruntBoss: { base: 500, perWave: 0 },
-    gruntBossMinor: { base: 120, perWave: 25 },
+    gruntBossMinor: { base: 120, perWave: 40 },
     grunt: { base: 5, perWave: 1 },
     kamikaze: { base: 20, perWave: 10 },
     slinger: { base: 10, perWave: 1 },
     slingerBoss: { base: 100000, perWave: 0 },
-    brute: { base: 200, perWave: 35 },
-    bruteBoss: { base: 150000, perWave: 0 },
+    brute: { base: 200, perWave: 45 },
+    bruteBoss: { base: 100000, perWave: 0 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
     beamerBoss: { base: 255000, perWave: 0 },
