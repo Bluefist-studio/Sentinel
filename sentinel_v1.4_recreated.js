@@ -2473,6 +2473,7 @@ window.onload = function () {
       window._pendingStarterProtocols = [...selected];
       starterOverlay.remove();
       if (source === "mainMenu") {
+        setHudTrialSyncStatus();
         showDifficultyMenu();
       } else {
         startGame(difficulty, startStatPoints, startHealth);
@@ -2859,6 +2860,7 @@ window.onload = function () {
 
     // Play button: show difficulty selection
     playBtn.addEventListener("click", function() {
+      setHudTrialSyncStatus();
       fadeMenuElementsOut([buttonContainer], () => {
         menuOverlay.style.display = "none";
         showDifficultyMenu();
@@ -3698,6 +3700,11 @@ window.onload = function () {
     } catch (error) {
       console.error("Unable to save trial run count.", error);
     }
+  }
+
+  function setHudTrialSyncStatus() {
+    const upcomingTrial = String(completedTrialRuns + 1).padStart(2, "0");
+    setHudStatus(`SYNCING TRIAL ${upcomingTrial}`, 3, "syncing");
   }
 
   window.resetCompletedTrialRuns = function() {
@@ -5820,7 +5827,7 @@ window.onload = function () {
     gameMusic: 0.5, // in-game playlist volume
     beamerBossMusic: 0.5, // nickpanek-chiptune-hard-boss-mode-218071.mp3
     menuMusic: 0.4, // menu chiptune volume
-    cinematic: 0.35, // samuelfjohanns-computer-processing-sound-effect-01-122131.mp3
+    cinematic: 0, // muted for now; samuelfjohanns-computer-processing-sound-effect-01-122131.mp3
     teleport: 0.7, // yodguard-energy-beam-blast-4-482514.mp3 (intro teleport)
     continueRevive: 0.5, // dragon-studio-lightning-spell-386163.mp3 (continue after first death)
     healthPickup: 0.2 // ribhavagrawal-energy-drink-effect-230559.mp3
