@@ -85,6 +85,47 @@
     localStorage.setItem('sentinel.unlockedWaves.v1', JSON.stringify(unlocked));
   };
 
+  const MUSIC_MASTER_VOLUME_KEY = "sentinel.musicMasterVolume.v1";
+  let initialMusicMasterVolume = 1;
+  try {
+    const storedMusicMasterVolume = localStorage.getItem(MUSIC_MASTER_VOLUME_KEY);
+    if (storedMusicMasterVolume !== null && Number.isFinite(Number(storedMusicMasterVolume))) {
+      initialMusicMasterVolume = Math.min(1, Math.max(0, Number(storedMusicMasterVolume)));
+    }
+  } catch (error) {
+    console.warn("Music volume setting could not be loaded.", error);
+  }
+  window.sentinelMusicMasterVolume = initialMusicMasterVolume;
+
+  function setMusicLevel(audio, level) {
+    if (!audio || !Number.isFinite(level)) return;
+    const boundedLevel = Math.min(1, Math.max(0, level));
+    audio._sentinelMusicLevel = boundedLevel;
+    audio.volume = boundedLevel * window.sentinelMusicMasterVolume;
+  }
+
+  function setMusicMasterVolume(volume) {
+    if (!Number.isFinite(volume)) return;
+    const masterVolume = Math.min(1, Math.max(0, volume));
+    window.sentinelMusicMasterVolume = masterVolume;
+    [
+      window._menuMusicAudio,
+      window._gameMusicAudio,
+      window._bossMusicAudio,
+      window._victoryMusicAudio,
+      window._cinematicMusicAudio
+    ].forEach(audio => {
+      if (audio && Number.isFinite(audio._sentinelMusicLevel)) {
+        audio.volume = audio._sentinelMusicLevel * masterVolume;
+      }
+    });
+    try {
+      localStorage.setItem(MUSIC_MASTER_VOLUME_KEY, String(masterVolume));
+    } catch (error) {
+      console.warn("Music volume setting could not be saved.", error);
+    }
+  }
+
   // Play looping menu chiptune music
   function playMenuMusic() {
     try {
@@ -96,7 +137,9 @@
         window._menuMusicAudio = null;
       }
       let music = new Audio(encodeURI('nickpanekaiassets-356-8-bit-chiptune-game-music-357518.mp3'));
-      music.volume = (window.sentinelVolume && window.sentinelVolume.menuMusic) || 0.4;
+      setMusicLevel(music, window.sentinelVolume && window.sentinelVolume.menuMusic !== undefined
+        ? window.sentinelVolume.menuMusic
+        : 0.4);
       music.loop = true;
       let playPromise = music.play();
       if (playPromise !== undefined) {
@@ -110,17 +153,17 @@
   function fadeOutMenuMusic(duration = 1000) {
     const music = window._menuMusicAudio;
     if (!music) return;
-    const startVol = music.volume;
+    const startVol = music._sentinelMusicLevel;
     const start = Date.now();
     function step() {
       const elapsed = Date.now() - start;
       const t = Math.min(1, elapsed / duration);
-      music.volume = startVol * (1 - t);
+      setMusicLevel(music, startVol * (1 - t));
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
         music.pause();
-        music.volume = startVol;
+        setMusicLevel(music, startVol);
         window._menuMusicAudio = null;
       }
     }
@@ -158,7 +201,9 @@
       }
       const filename = GAME_MUSIC_PLAYLIST[index];
       const music = new Audio(encodeURI(filename));
-      music.volume = (window.sentinelVolume && window.sentinelVolume.gameMusic) || 0.4;
+      setMusicLevel(music, window.sentinelVolume && window.sentinelVolume.gameMusic !== undefined
+        ? window.sentinelVolume.gameMusic
+        : 0.4);
       music.loop = false;
       // Web Audio chain: source → lowpass filter → output (for muffling)
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -217,12 +262,12 @@
   function fadeOutGameMusic(duration = 1200, callback) {
     const music = window._gameMusicAudio;
     if (!music) { if (callback) callback(); return; }
-    const startVol = music.volume;
+    const startVol = music._sentinelMusicLevel;
     const start = Date.now();
     function step() {
       const elapsed = Date.now() - start;
       const t = Math.min(1, elapsed / duration);
-      music.volume = startVol * (1 - t);
+      setMusicLevel(music, startVol * (1 - t));
       if (t < 1) {
         requestAnimationFrame(step);
       } else {
@@ -249,7 +294,7 @@
         ? window.sentinelVolume.gameMusic
         : 0.4;
       music.loop = true;
-      music.volume = 0;
+      setMusicLevel(music, 0);
       window._victoryMusicAudio = music;
       const playPromise = music.play();
       if (playPromise) {
@@ -264,7 +309,7 @@
       function fadeIn() {
         if (window._victoryMusicAudio !== music) return;
         const progress = Math.min(1, (performance.now() - fadeStartedAt) / duration);
-        music.volume = targetVolume * progress;
+        setMusicLevel(music, targetVolume * progress);
         if (progress < 1) requestAnimationFrame(fadeIn);
       }
       fadeIn();
@@ -279,12 +324,12 @@
       if (callback) callback();
       return;
     }
-    const startVolume = music.volume;
+    const startVolume = music._sentinelMusicLevel;
     const fadeStartedAt = performance.now();
     function fadeOut() {
       if (window._victoryMusicAudio !== music) return;
       const progress = Math.min(1, (performance.now() - fadeStartedAt) / duration);
-      music.volume = startVolume * (1 - progress);
+      setMusicLevel(music, startVolume * (1 - progress));
       if (progress < 1) {
         requestAnimationFrame(fadeOut);
       } else {
@@ -315,7 +360,7 @@
         window._bossMusicFilter = null;
       }
       const music = new Audio(encodeURI(filename));
-      music.volume = 0;
+      setMusicLevel(music, 0);
       music.loop = true;
       const bCtx = new (window.AudioContext || window.webkitAudioContext)();
       // Resume the context if suspended (required on some browsers for autoplay)
@@ -337,7 +382,7 @@
       const start = Date.now();
       function fadeIn() {
         const t = Math.min(1, (Date.now() - start) / duration);
-        if (window._bossMusicAudio === music) music.volume = target * t;
+        if (window._bossMusicAudio === music) setMusicLevel(music, target * t);
         if (t < 1 && window._bossMusicAudio === music) requestAnimationFrame(fadeIn);
       }
       fadeIn();
@@ -355,14 +400,14 @@
   function _restoreGameMusicFromBoss(duration = 800) {
     const music = window._gameMusicAudio;
     if (!music) return;
-    music.volume = 0;
+    setMusicLevel(music, 0);
     const target = (window.sentinelVolume && window.sentinelVolume.gameMusic) || 0.4;
     const start = Date.now();
     const resumePromise = music.play();
     if (resumePromise) resumePromise.catch(() => {});
     function step() {
       const t = Math.min(1, (Date.now() - start) / duration);
-      if (window._gameMusicAudio === music) music.volume = target * t;
+      if (window._gameMusicAudio === music) setMusicLevel(music, target * t);
       if (t < 1 && window._gameMusicAudio === music) requestAnimationFrame(step);
     }
     step();
@@ -432,12 +477,12 @@
   function fadeOutBossMusic(duration = 1200, callback) {
     const music = window._bossMusicAudio;
     if (!music) { if (callback) callback(); return; }
-    const startVol = music.volume;
+    const startVol = music._sentinelMusicLevel;
     const start = Date.now();
     function step() {
       const elapsed = Date.now() - start;
       const t = Math.min(1, elapsed / duration);
-      if (window._bossMusicAudio === music) music.volume = startVol * (1 - t);
+      if (window._bossMusicAudio === music) setMusicLevel(music, startVol * (1 - t));
       if (t < 1) { requestAnimationFrame(step); }
       else { stopBossMusic(); if (callback) callback(); }
     }
@@ -909,9 +954,10 @@ window.onload = function () {
     let currentText = "";
     const cinematicAudio = new Audio(encodeURI("samuelfjohanns-computer-processing-sound-effect-01-122131.mp3"));
     cinematicAudio.loop = true;
-    cinematicAudio.volume = window.sentinelVolume && window.sentinelVolume.cinematic !== undefined
+    setMusicLevel(cinematicAudio, window.sentinelVolume && window.sentinelVolume.cinematic !== undefined
       ? window.sentinelVolume.cinematic
-      : 0.35;
+      : 0.35);
+    window._cinematicMusicAudio = cinematicAudio;
     let timerId;
     let transitionId;
     let typewriterId;
@@ -1031,6 +1077,7 @@ window.onload = function () {
       finished = true;
       clearTimers();
       cinematicAudio.pause();
+      if (window._cinematicMusicAudio === cinematicAudio) window._cinematicMusicAudio = null;
       stopLoadingFlash();
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
@@ -1395,8 +1442,10 @@ window.onload = function () {
     bytesDisplay.style.textAlign = "left";
     bytesDisplay.style.fontSize = "0.82rem";
     bytesDisplay.style.fontWeight = "bold";
-    const playerBytes = totalCollectedBytes || 0;
-    bytesDisplay.textContent = `Data: ${formatByteAmount(playerBytes)}`;
+    const updateProtocolDataDisplays = () => {
+      bytesDisplay.textContent = `Data: ${formatByteAmount(totalCollectedBytes || 0)} / ${formatByteAmount(ProtocolSystem.getTotalUpgradeData())}`;
+    };
+    updateProtocolDataDisplays();
     statusRow.appendChild(bytesDisplay);
 
     const selectionCount = document.createElement("div");
@@ -1618,7 +1667,7 @@ window.onload = function () {
       totalStatDiv.innerHTML = `${statStrings.join(", ")}`;
     };
 
-    if (discoveredProtocols.length === 0) {
+    if (discoveredProtocols.length === 0 && !isProtocolDatabase) {
       const noneMsg = document.createElement("div");
       noneMsg.textContent = "No protocols discovered yet. You will start your run with 0 starter protocols.";
       noneMsg.style.color = "#aaf6ff";
@@ -1633,11 +1682,18 @@ window.onload = function () {
           Object.fromEntries(rarityOrder.map(rarity => [rarity, []]))
         ])
       );
-      discoveredProtocols.forEach(protocolName => {
+      const protocolNames = isProtocolDatabase ? Object.keys(PROTOCOLS) : discoveredProtocols;
+      protocolNames.forEach(protocolName => {
         const proto = PROTOCOLS[protocolName];
         const rarityName = proto && getProtocolRarityName(proto.rarity, proto.tier);
         const rarityGroup = proto && familyGroups[proto.family]?.[rarityName];
-        if (rarityGroup) rarityGroup.push(protocolName);
+        if (rarityGroup) {
+          rarityGroup.push(
+            isProtocolDatabase && !discoveredProtocols.includes(protocolName)
+              ? null
+              : protocolName
+          );
+        }
       });
       const raritySlotCounts = Object.fromEntries(rarityOrder.map(rarity => [
         rarity,
@@ -1807,7 +1863,7 @@ window.onload = function () {
                     saveCollectedBytes();
                     updateHudDataDisplay();
                     window.dispatchEvent(new CustomEvent('tut:protocolUpgraded'));
-                    bytesDisplay.textContent = `Data: ${formatByteAmount(totalCollectedBytes)}`;
+                    updateProtocolDataDisplays();
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
                     const totalTierCount = ProtocolSystem.upgradeTiers.length;
@@ -1896,7 +1952,7 @@ window.onload = function () {
                     totalCollectedBytes += result.refund || 0;
                     saveCollectedBytes();
                     updateHudDataDisplay();
-                    bytesDisplay.textContent = `Data: ${formatByteAmount(totalCollectedBytes)}`;
+                    updateProtocolDataDisplays();
                     // Update the card with new tier info
                     const newTierIndex = ProtocolSystem.getUpgradeTierIndex(result.newTier);
                     const totalTierCount = ProtocolSystem.upgradeTiers.length;
@@ -3410,6 +3466,41 @@ window.onload = function () {
   const hudStageOverlay = document.createElement("div");
   hudStageOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:21;pointer-events:none;user-select:none;";
   document.body.appendChild(hudStageOverlay);
+  const musicVolumeControlStyle = document.createElement("style");
+  musicVolumeControlStyle.textContent = "#sentinelMusicVolumeControl{position:relative;}#sentinelMusicVolumeTrack{display:none;}#sentinelMusicVolumeThumb{position:absolute;left:50%;bottom:calc(var(--music-volume,100%) - 1.5px);width:30px;height:3px;transform:translateX(-50%);border-radius:999px;background:#d9ffff;box-shadow:0 0 8px 2px #00d9ff;pointer-events:none;}#sentinelMusicVolumeSlider{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;appearance:none;-webkit-appearance:none;background:transparent;opacity:0;cursor:pointer;touch-action:none;writing-mode:vertical-lr;direction:rtl;user-select:none;-webkit-user-select:none;}#sentinelMusicVolumeControl:focus-within #sentinelMusicVolumeThumb{background:#fff;box-shadow:0 0 10px 3px #00d9ff;}";
+  document.head.appendChild(musicVolumeControlStyle);
+  const musicVolumeControl = document.createElement("div");
+  musicVolumeControl.id = "sentinelMusicVolumeControl";
+  musicVolumeControl.style.cssText = "position:absolute;left:40px;bottom:120px;width:62px;height:110px;display:flex;align-items:center;justify-content:center;pointer-events:auto;user-select:none;-webkit-user-select:none;z-index:10;";
+  const musicVolumeTrack = document.createElement("div");
+  musicVolumeTrack.id = "sentinelMusicVolumeTrack";
+  const musicVolumeThumb = document.createElement("div");
+  musicVolumeThumb.id = "sentinelMusicVolumeThumb";
+  const musicVolumeSlider = document.createElement("input");
+  musicVolumeSlider.id = "sentinelMusicVolumeSlider";
+  musicVolumeSlider.type = "range";
+  musicVolumeSlider.min = "0";
+  musicVolumeSlider.max = "100";
+  musicVolumeSlider.step = "1";
+  musicVolumeSlider.value = String(Math.round(window.sentinelMusicMasterVolume * 100));
+  musicVolumeSlider.setAttribute("aria-label", "Music volume");
+  function updateMusicVolumeDisplay() {
+    const percent = Number(musicVolumeSlider.value);
+    musicVolumeThumb.style.setProperty("--music-volume", `${percent}%`);
+    musicVolumeSlider.setAttribute("aria-valuetext", `${percent}%`);
+  }
+  musicVolumeSlider.addEventListener("input", () => {
+    setMusicMasterVolume(Number(musicVolumeSlider.value) / 100);
+    updateMusicVolumeDisplay();
+  });
+  musicVolumeControl.addEventListener("pointerdown", event => event.stopPropagation());
+  musicVolumeSlider.addEventListener("pointerdown", () => musicVolumeControl.classList.add("is-dragging"));
+  const finishMusicVolumeDrag = () => musicVolumeControl.classList.remove("is-dragging");
+  window.addEventListener("pointerup", finishMusicVolumeDrag);
+  window.addEventListener("pointercancel", finishMusicVolumeDrag);
+  musicVolumeControl.append(musicVolumeTrack, musicVolumeThumb, musicVolumeSlider);
+  updateMusicVolumeDisplay();
+  hudStageOverlay.appendChild(musicVolumeControl);
   const runMenuTouchOverlay = document.createElement("div");
   runMenuTouchOverlay.style.cssText = "position:fixed;left:50%;top:50%;width:1365px;height:768px;transform:translate(-50%,-50%) scale(var(--game-stage-scale,1));transform-origin:center;z-index:30;pointer-events:none;user-select:none;";
   document.body.appendChild(runMenuTouchOverlay);
@@ -3744,22 +3835,22 @@ window.onload = function () {
     updateHudDataDisplay();
   }
 
-  function returnToMainMenu() {
-    finalizeRunBytes();
-    canvas.style.visibility = "hidden";
-    hudXrayCanvas.style.visibility = "hidden";
-    gameOver = false;
+  function endRunWithGameOver() {
+    gameOver = true;
     window._gameOverTime = undefined;
-    window._playerUsedContinue = false;
+    window._gameOverFinalTime = undefined;
+    window._gameOverExplosionDone = false;
+    window._gameOverBurstDone = false;
+    window._gameOverDeathPos = null;
+    window._playerUsedContinue = true;
+    window._secondDeathPending = false;
+    window._victoryTriggered = false;
+    clearVictoryConsole();
     followMouse = false;
     paused = false;
     showStats = false;
-    showMenuScreen = true;
-    showMenu(false);
-    window._bossMusicallyActive = false;
-    stopBossMusic();
     stopLowHealthSound();
-    transitionToMenuMusic(1200);
+    deactivateAttack();
   }
 
   totalCollectedBytes = loadCollectedBytes();
@@ -3828,7 +3919,7 @@ window.onload = function () {
     confirmOverlay.appendChild(confirmPanel);
 
     const confirmTitle = document.createElement("div");
-    confirmTitle.textContent = "RETURN TO MAIN MENU";
+    confirmTitle.textContent = "END RUN";
     confirmTitle.style.color = "#eaffff";
     confirmTitle.style.fontWeight = "bold";
     confirmTitle.style.fontSize = "1.3rem";
@@ -3838,7 +3929,7 @@ window.onload = function () {
     confirmPanel.appendChild(confirmTitle);
 
     const confirmMessage = document.createElement("div");
-    confirmMessage.textContent = "Do you want to go back to the main menu?";
+    confirmMessage.textContent = "End this run and view your results?";
     confirmMessage.style.color = "#aaf6ff";
     confirmMessage.style.fontSize = "1rem";
     confirmMessage.style.lineHeight = "1.4";
@@ -3864,7 +3955,7 @@ window.onload = function () {
 
     const confirmBtn = document.createElement("button");
     confirmBtn.type = "button";
-    confirmBtn.textContent = "Main Menu";
+    confirmBtn.textContent = "End Run";
     confirmBtn.style.padding = "0.5rem 0.85rem";
     confirmBtn.style.borderRadius = "0";
     confirmBtn.style.border = "1px solid rgba(0,217,255,0.8)";
@@ -3878,12 +3969,12 @@ window.onload = function () {
       returnToMenuModalOpen = false;
       document.removeEventListener("keydown", onModalKeyDown);
       confirmOverlay.remove();
+      canvas.style.visibility = previousCanvasVisibility;
+      hudXrayCanvas.style.visibility = previousXrayVisibility;
+      hudWaveDisplay.style.display = previousWaveDisplay;
       if (confirmed) {
-        returnToMainMenu();
+        endRunWithGameOver();
       } else {
-        canvas.style.visibility = previousCanvasVisibility;
-        hudXrayCanvas.style.visibility = previousXrayVisibility;
-        hudWaveDisplay.style.display = previousWaveDisplay;
         followMouse = previousFollowMouse;
         paused = previousPaused;
         showStats = previousShowStats;

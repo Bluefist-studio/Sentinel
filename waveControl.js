@@ -37,12 +37,12 @@ window.SentinelWaveControl = (function () {
     slinger: { base: 10, perWave: 1 },
     slingerBoss: { base: 100000, perWave: 0 },
     brute: { base: 200, perWave: 45 },
-    bruteBoss: { base: 100000, perWave: 0 },
+    bruteBoss: { base: 80000, perWave: 0 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
     beamerBoss: { base: 255000, perWave: 0 },
     shielder: { base: 75, perWave: 25 },
-    stalkerBoss: { base: 200000, perWave: 0 }
+    stalkerBoss: { base: 80000, perWave: 0 }
   };
 
   function getEnemyHealthForType(type, wave) {

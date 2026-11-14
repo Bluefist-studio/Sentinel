@@ -367,6 +367,27 @@ const ProtocolSystem = {
     return Math.max(10, rounded * 10);
   },
 
+  getTotalUpgradeData: function() {
+    let total = 0;
+    Object.keys(this.protocolBoard).forEach(protocolName => {
+      const state = this.protocolBoard[protocolName];
+      if (!state || !PROTOCOLS[protocolName]) return;
+
+      const currentTierIndex = this.getUpgradeTierIndex(state.upgradeTier || this.getDefaultUpgradeTier());
+      const originalTier = state.upgradeTier;
+      try {
+        for (let tierIndex = 0; tierIndex < currentTierIndex; tierIndex++) {
+          state.upgradeTier = this.upgradeTiers[tierIndex];
+          const cost = this.getNextUpgradeCost(protocolName);
+          if (Number.isFinite(cost)) total += cost;
+        }
+      } finally {
+        state.upgradeTier = originalTier;
+      }
+    });
+    return total;
+  },
+
   // Get next upgrade tier name for protocol, or null when maxed
   getNextUpgradeTierName: function(protocolName) {
     const state = this.protocolBoard[protocolName];
