@@ -454,10 +454,14 @@
     "freesound_community-beam-8-43831.mp3",
     "sparky_laser.wav"
   ];
+  const bruteBossInfernoAudioInstances = new Set();
 
   function stopBossSounds(preserveMusic = false) {
     if (window._bossSoundsStoppedForEndState) return;
     window._bossSoundsStoppedForEndState = true;
+    for (const audio of Array.from(bruteBossInfernoAudioInstances)) {
+      fadeOutBruteBossInfernoAudio(audio);
+    }
     const beamLoop = window._audioPool && window._audioPool[BEAMER_BOSS_BEAM_SOUND_FILE];
     if (beamLoop) {
       beamLoop.pause();
@@ -1241,6 +1245,7 @@ window.onload = function () {
     // Reset tutorial in-game hooks so they re-fire on each new run
     window._tutFirstLevelUpFired = false;
     window._tutFirstProtPickupFired = false;
+    window._tutFirstMobKillFired = false;
     window._tutStatPanelAutoOpened = false;
     window._tutFirstProtActivatedFired = false;
     window._newlyPickedProtocols = new Set();
@@ -4534,7 +4539,56 @@ window.onload = function () {
   const BRUTE_BOSS_INFERNO_SPIN_DURATION = 18 * 60;
   const BRUTE_BOSS_INFERNO_SPIN_START_RATIO = 0.75;
   const BRUTE_BOSS_INFERNO_SPIN_RATE = 0.2;
+  const BRUTE_BOSS_INFERNO_SOUND_FILE = "floraphonic-dragon-breathes-fire-3-191459.mp3";
+
+  function startBruteBossInfernoSound(enemy) {
+    if (enemy.bruteBossInfernoAudio && !enemy.bruteBossInfernoAudio.paused) return;
+    try {
+      const audio = new Audio(encodeURI(BRUTE_BOSS_INFERNO_SOUND_FILE));
+      audio.loop = true;
+      audio.volume = window.sentinelVolume && window.sentinelVolume.bruteNova !== undefined
+        ? window.sentinelVolume.bruteNova
+        : 0.65;
+      enemy.bruteBossInfernoAudio = audio;
+      bruteBossInfernoAudioInstances.add(audio);
+      const playPromise = audio.play();
+      if (playPromise) playPromise.catch(() => {});
+    } catch (error) {
+      console.warn("Brute Boss Inferno sound could not be played.", error);
+    }
+  }
+
+  function stopBruteBossInfernoSound(enemy) {
+    const audio = enemy.bruteBossInfernoAudio;
+    if (!audio) return;
+    enemy.bruteBossInfernoAudio = null;
+    fadeOutBruteBossInfernoAudio(audio);
+  }
+
+  function fadeOutBruteBossInfernoAudio(audio) {
+    bruteBossInfernoAudioInstances.delete(audio);
+    const startVolume = audio.volume;
+    const startTime = performance.now();
+    const fadeDuration = 650;
+    function fadeOut() {
+      const progress = Math.min(1, (performance.now() - startTime) / fadeDuration);
+      audio.volume = startVolume * (1 - progress);
+      if (progress < 1) {
+        requestAnimationFrame(fadeOut);
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    }
+    fadeOut();
+  }
+
   function setBruteBossAttackPhase(enemy, stage, phase) {
+    if (phase === 3) {
+      startBruteBossInfernoSound(enemy);
+    } else {
+      stopBruteBossInfernoSound(enemy);
+    }
     enemy.bruteBossStage = stage;
     enemy.bruteBossAttackPhase = phase;
     enemy.bruteBossAttackPhaseTimer = phase === 1
@@ -5818,6 +5872,9 @@ window.onload = function () {
     mineExplosion: 0.25, // u_b32baquv5u-explosion-9-340460.mp3
     stalkerWarp: 0.6, // u_wzgyzo3pae-warp-306033.mp3
     bruteNova: 0.3, // djartmusic-short-fire-whoosh_1-317280.mp3
+    bruteBossNova: 0.5, // Brute Boss nova sound
+    bruteFireball: 0.1, // fireball launch
+    bruteFireballExplosion: 0.1, // dragon-studio-fire-spell-impact-393921.mp3
     beamerBossBeam: 1.0, // looping Beamer Boss beam sound
     beamerBossBeamStart: .15, // one-shot when the Beamer Boss beams start
     beamerBossNova: 1, // yodguard-energy-beam-blast-4-482514.mp3
@@ -5888,7 +5945,8 @@ window.onload = function () {
       laserAudio.volume = window.sentinelVolume.laser;
       if (laserAudio.paused) {
         laserAudio.currentTime = 0;
-        laserAudio.play();
+        const playPromise = laserAudio.play();
+        if (playPromise) playPromise.catch(() => {});
       }
 
       const laserColors = ["#00bfff", "#00e6ff", "#aaf6ff"];
@@ -5979,7 +6037,7 @@ window.onload = function () {
     if (isAttackFrame) {
       drawLine(player.x, player.y, nearest.x, nearest.y, "LightBlue");
       const shieldReduction = Math.max(0, Math.min(0.8, Number(nearest.shieldReduction) || 0));
-      if (!nearest.unkillable) {
+      if (!nearest.unkillable && !isBossIntroActive(nearest)) {
         nearest.health -= player.damage * (1 - shieldReduction);
       }
       if (
@@ -7549,7 +7607,173 @@ const droplifelenght = 280;
     window._playerUsedContinue = false;
   }
 
+  function isBossIntroActive(enemy) {
+    return typeof enemy.bossIntroTimer === "number" && enemy.bossIntroTimer > 0;
+  }
+
+  function getBossIntroParticleColors(enemy) {
+    if (enemy.type === "stalkerBoss") return ["#168aff", "#ffffff", "#00dfff", "#9cf6ff"];
+    if (enemy.type === "beamerBoss") return ["#168aff", "#00dfff", "#9cf6ff", "#ffffff"];
+    if (enemy.type === "slingerBoss" || enemy.type === "bruteBoss") {
+      return ["#ff3b1f", "#ff6a00", "#ffb000", "#ffe34a"];
+    }
+    return ["#ff33ff", "#ff9f1a", "#ff66ff", "#ffffff"];
+  }
+
+  function emitBossIntroNova(enemy, burstTime, particleCount, speedMin, speedRange, sizeMin, sizeRange) {
+    const bursts = Array.isArray(enemy.bossIntroNovaBursts)
+      ? enemy.bossIntroNovaBursts
+      : (enemy.bossIntroNovaBursts = []);
+    bursts.push(burstTime);
+    const colors = getBossIntroParticleColors(enemy);
+    for (let particleIndex = 0; particleIndex < particleCount; particleIndex++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = speedMin + Math.random() * speedRange;
+      spawnParticle(
+        enemy.x,
+        enemy.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        38 + Math.floor(Math.random() * 18),
+        colors[Math.floor(Math.random() * colors.length)],
+        0.965,
+        sizeMin + Math.random() * sizeRange,
+        "bossIntro"
+      );
+    }
+  }
+
+  function updateBossIntroEffects(delta) {
+    for (const enemy of enemies) {
+      if (typeof enemy.bossIntroTimer !== "number") continue;
+      const duration = Math.max(0.001, enemy.bossIntroDuration || 5);
+      enemy.bossIntroElapsed = Math.min(
+        duration + 1.1,
+        (enemy.bossIntroElapsed || 0) + delta
+      );
+      if (!enemy.bossIntroYodguardPlayed && enemy.bossIntroElapsed >= 3) {
+        enemy.bossIntroYodguardPlayed = true;
+        const introVolume = window.sentinelVolume && window.sentinelVolume.teleport !== undefined
+          ? window.sentinelVolume.teleport
+          : 0.7;
+        playSoundFresh("yodguard-energy-beam-blast-4-482514.mp3", introVolume);
+      }
+      if (!isBossIntroActive(enemy)) {
+        enemy.bossIntroAlpha = 1;
+        if (enemy.type === "stalkerBoss") {
+          enemy.spawnFadeTimer = enemy.spawnFadeDuration;
+          enemy.stalkerAlpha = 0.9;
+        }
+        continue;
+      }
+
+      enemy.bossIntroTimer = Math.max(0, enemy.bossIntroTimer - delta);
+      const progress = 1 - enemy.bossIntroTimer / duration;
+      enemy.bossIntroAlpha = enemy.type === "gruntBoss"
+        ? 1 - Math.pow(1 - progress, 2)
+        : (enemy.bossIntroTimer <= 0 ? 1 : 0);
+      if (enemy.type === "stalkerBoss") {
+        enemy.spawnFadeTimer = enemy.spawnFadeDuration;
+        enemy.stalkerAlpha = 0.9 * enemy.bossIntroAlpha;
+      }
+
+      const burstTimes = enemy.type === "gruntBoss"
+        ? []
+        : [0, duration / 3, (duration * 2) / 3, duration];
+      while (enemy.bossIntroNovaBurstIndex < burstTimes.length) {
+        const burstIndex = enemy.bossIntroNovaBurstIndex;
+        const burstTime = burstTimes[burstIndex];
+        if (
+          enemy.bossIntroElapsed + 0.000001 < burstTime &&
+          !(burstTime === duration && !isBossIntroActive(enemy))
+        ) break;
+        enemy.bossIntroNovaBurstIndex++;
+        if (burstIndex === 0) {
+          const introVolume = window.sentinelVolume && window.sentinelVolume.teleport !== undefined
+            ? window.sentinelVolume.teleport
+            : 0.7;
+          playSoundFresh("sdanezis-hybrid-tech-riser-7-597153.mp3", 0.2);
+        }
+        if (burstIndex === burstTimes.length - 1) {
+          emitBossIntroNova(enemy, burstTime, 72, 7, 4, 12, 12);
+        } else if (burstIndex === 0) {
+          emitBossIntroNova(enemy, burstTime, 48, 5.5, 3, 8, 12);
+        } else {
+          emitBossIntroNova(enemy, burstTime, 28, 4.5, 3, 8, 9);
+        }
+      }
+
+      enemy.bossIntroParticleTimer = Math.max(
+        0,
+        (enemy.bossIntroParticleTimer || 0) - delta
+      );
+      if (enemy.bossIntroParticleTimer > 0) continue;
+
+      enemy.bossIntroParticleTimer = 0.07;
+      const particleColors = getBossIntroParticleColors(enemy);
+      for (let particleIndex = 0; particleIndex < 8; particleIndex++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = enemy.radius * (0.25 + Math.random() * 2.1);
+        const particleX = enemy.x + Math.cos(angle) * distance;
+        const particleY = enemy.y + Math.sin(angle) * distance;
+        const particleAngle = Math.atan2(enemy.y - particleY, enemy.x - particleX);
+        const speed = 2.8 + Math.random() * 1.6;
+        spawnParticle(
+          particleX,
+          particleY,
+          Math.cos(particleAngle) * speed,
+          Math.sin(particleAngle) * speed,
+          44 + Math.floor(Math.random() * 16),
+          particleColors[Math.floor(Math.random() * particleColors.length)],
+          0.98,
+          particleIndex % 4 === 0
+            ? 16 + Math.random() * 8
+            : 9 + Math.random() * 7,
+          "bossIntro"
+        );
+      }
+    }
+  }
+
+  function drawBossIntroNova() {
+    for (const enemy of enemies) {
+      if (typeof enemy.bossIntroTimer !== "number") continue;
+      const duration = Math.max(0.001, enemy.bossIntroDuration || 5);
+      const waveDuration = 0.9;
+
+      const color = enemy.type === "stalkerBoss"
+        ? "#00dfff"
+        : enemy.type === "beamerBoss"
+          ? "#168aff"
+          : enemy.type === "bruteBoss" || enemy.type === "slingerBoss"
+            ? "#ff6a00"
+            : "#ff66ff";
+      const elapsed = enemy.bossIntroElapsed || 0;
+      for (const burstTime of enemy.bossIntroNovaBursts || []) {
+        const burstElapsed = elapsed - burstTime;
+        if (burstElapsed < 0 || burstElapsed > waveDuration + 0.18) continue;
+        for (let wave = 0; wave < 2; wave++) {
+            const waveProgress = (burstElapsed - wave * 0.18) / waveDuration;
+            if (waveProgress < 0 || waveProgress > 1) continue;
+            const radius = enemy.radius + waveProgress * 190;
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = (1 - waveProgress) * 0.85;
+            ctx.strokeStyle = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 24 * (1 - waveProgress);
+            ctx.lineWidth = 12 * (1 - waveProgress) + 2;
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+      }
+    }
+  }
+
   function updateEnemies(delta) {
+    updateBossIntroEffects(delta);
                         for (let e of enemies) {
                           if (typeof e.shieldPersistTimer !== "number") e.shieldPersistTimer = 0;
                           if (e.shieldedBy && e.shieldedBy.type === "shielder" && e.shieldedBy.health <= 0) {
@@ -7580,6 +7804,7 @@ const droplifelenght = 280;
                         }
                         // Grunt boss and grunt boss minor spawn grunts at interval
                         for (let e of enemies) {
+                          if (isBossIntroActive(e)) continue;
                           if ((e.type === "gruntBoss" || e.type === "gruntBossMinor") && e.health > 0) {
                             e.gruntSpawnTimer = (e.gruntSpawnTimer || 0) + 1;
                             if (e.gruntSpawnTimer >= e.gruntSpawnInterval) {
@@ -7738,6 +7963,12 @@ const droplifelenght = 280;
                             if (e.bruteBossAttackPhase === 1) {
                               const volleyShots = stage + 1;
                               if (e.fireballCooldown <= 0) {
+                                playSoundFresh(
+                                  "djartmusic-short-fire-whoosh_1-317280.mp3",
+                                  window.sentinelVolume && window.sentinelVolume.bruteFireball !== undefined
+                                    ? window.sentinelVolume.bruteFireball
+                                    : 0.6
+                                );
                                 for (let shotIndex = 0; shotIndex < volleyShots; shotIndex++) {
                                   const shotAngle = Math.random() * Math.PI * 2;
                                   const projectileSpeed = 1.12;
@@ -7798,6 +8029,7 @@ const droplifelenght = 280;
                         }
                 // Brute nova and boss aura particles
                 for (let e of enemies) {
+                  if (isBossIntroActive(e)) continue;
                   if (e.type === "brute" || e.type === "bruteBoss" || e.type === "stalkerBoss") {
                     if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                     if (e.type === "bruteBoss" && e.bruteBossAttackPhase === 2) continue;
@@ -7872,6 +8104,7 @@ const droplifelenght = 280;
                 }
             // Brute nova visual and collision
             for (let e of enemies) {
+              if (isBossIntroActive(e)) continue;
               if (e.type === "brute" || e.type === "bruteBoss") {
                 if (e.type === "bruteBoss" && e._bossPhaseStunTimer > 0) continue;
                 // Nova animation states
@@ -7922,7 +8155,13 @@ const droplifelenght = 280;
                       // Visual cue: pulse color as nova is about to attack (growing)
                       e.novaCue = e.novaCooldown < 60 && e.novaCooldown % 8 < 4;
                       if (e.novaCooldown === 120) {
-                        playSoundFresh('djartmusic-short-fire-whoosh_1-317280.mp3', (window.sentinelVolume && window.sentinelVolume.bruteNova) || 0.7);
+                        const novaVolume = e.type === "bruteBoss"
+                          ? window.sentinelVolume && window.sentinelVolume.bruteBossNova
+                          : window.sentinelVolume && window.sentinelVolume.bruteNova;
+                        playSoundFresh(
+                          'djartmusic-short-fire-whoosh_1-317280.mp3',
+                          Number.isFinite(novaVolume) ? novaVolume : 0.7
+                        );
                       }
                       if (e.novaCooldown <= 0) {
                         e.novaState = "growing";
@@ -7986,8 +8225,14 @@ const droplifelenght = 280;
       // Dust particles disabled for performance
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
+        if (e.health > 0 && isBossIntroActive(e)) continue;
         if (e.health > 0 && updateBossPhaseEffect(e, delta * SPEED_MULTIPLIER)) continue;
             if (e.health <= 0) {
+        if (!window._tutFirstMobKillFired) {
+          window._tutFirstMobKillFired = true;
+          window.dispatchEvent(new CustomEvent('tut:firstMobKill'));
+        }
+            stopBruteBossInfernoSound(e);
             if (SCREEN_SHAKE_ENEMY_TYPES.has(e.type)) {
               screenShake = Math.max(
                 screenShake,
@@ -8054,7 +8299,8 @@ const droplifelenght = 280;
                     let warnAudio = new Audio('warning.wav');
                     warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
                     warnAudio.playbackRate = 0.7;
-                    warnAudio.play();
+                    const playPromise = warnAudio.play();
+                    if (playPromise) playPromise.catch(() => {});
                   } catch (e) {}
                   spawnWave();
                 }
@@ -8135,7 +8381,8 @@ const droplifelenght = 280;
                     let warnAudio = new Audio('warning.wav');
                     warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
                     warnAudio.playbackRate = 0.7;
-                    warnAudio.play();
+                    const playPromise = warnAudio.play();
+                    if (playPromise) playPromise.catch(() => {});
                   } catch (e) {}
                   spawnWave();
                 }
@@ -8219,7 +8466,8 @@ const droplifelenght = 280;
                     let warnAudio = new Audio('warning.wav');
                     warnAudio.volume = window.sentinelVolume && window.sentinelVolume.warning !== undefined ? window.sentinelVolume.warning : 0.5;
                     warnAudio.playbackRate = 0.7;
-                    warnAudio.play();
+                    const playPromise = warnAudio.play();
+                    if (playPromise) playPromise.catch(() => {});
                   } catch (e) {}
                   spawnWave();
                 }
@@ -10023,6 +10271,12 @@ const droplifelenght = 280;
   function updateProjectiles(delta) {
     const frameScale = delta * SPEED_MULTIPLIER;
     const emitBruteFireballNova = (x, y, areaRadius) => {
+      playSoundFresh(
+        "dragon-studio-fire-spell-impact-393921.mp3",
+        window.sentinelVolume && window.sentinelVolume.bruteFireballExplosion !== undefined
+          ? window.sentinelVolume.bruteFireballExplosion
+          : 0.7
+      );
       const resolvedRadius = Math.max(18, Number.isFinite(areaRadius) ? areaRadius : 72);
       const burstCount = 42;
       for (let burstIndex = 0; burstIndex < burstCount; burstIndex++) {
@@ -11066,6 +11320,7 @@ const droplifelenght = 280;
       // ---- End intro animation ----
 
       enemies.forEach(e => {
+                const bossIntroAlpha = typeof e.bossIntroAlpha === "number" ? e.bossIntroAlpha : 1;
                 const isStalkerIllusion = e.type === "stalkerBoss" && e.stalkerBossIllusion;
                 const showBossHealthBar =
                   (e.type === "gruntBoss" || e.type === "bruteBoss" || e.type === "slingerBoss" || e.type === "stalkerBoss" || e.type === "beamerBoss") &&
@@ -11094,7 +11349,7 @@ const droplifelenght = 280;
                     Math.min(1, healthBarSource.health / Math.max(1, healthBarSource.maxHealth))
                   );
                   ctx.save();
-                  ctx.globalAlpha = 0.92;
+                  ctx.globalAlpha = 0.92 * bossIntroAlpha;
                   ctx.lineWidth = 3;
                   ctx.strokeStyle = "#222";
                   ctx.fillStyle = e.type === "beamerBoss" ? "#27dfff" : (e.type === "bruteBoss" ? "#ff6a00" : (e.type === "slingerBoss" ? "#ff9f1a" : "#e00000"));
@@ -11208,12 +11463,14 @@ const droplifelenght = 280;
         // Draw grunt boss minor (Grunt Heavy) with grunt heavy image
         } else if (e.type === "gruntBossMinor") {
           ctx.save();
+          ctx.globalAlpha = bossIntroAlpha;
           ctx.translate(e.x, e.y);
           // No rotation for grunt heavy
           ctx.drawImage(gruntHeavyImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
         } else if (e.type === "gruntBoss") {
           ctx.save();
+          ctx.globalAlpha = bossIntroAlpha;
           ctx.translate(e.x, e.y);
           ctx.rotate(0); // No rotation for grunt boss
           ctx.drawImage(gruntBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
@@ -11246,20 +11503,21 @@ const droplifelenght = 280;
               ctx.closePath();
               ctx.fill();
               ctx.shadowBlur = 0;
-              ctx.globalAlpha = 0.25;
+              ctx.globalAlpha = 0.25 * bossIntroAlpha;
               ctx.stroke();
               ctx.restore();
             }
           }
           ctx.save();
           ctx.translate(hoverX, hoverY);
+          if (e.type === "bruteBoss") ctx.globalAlpha = bossIntroAlpha;
           const bruteSprite = e.type === "bruteBoss" ? bruteBossImg : bruteImg;
           ctx.drawImage(bruteSprite, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
           // Draw nova circle with cue
           if (e.type !== "bruteBoss" || e.bruteBossAttackPhase === 1) {
             ctx.save();
-            ctx.globalAlpha = 0.32;
+            ctx.globalAlpha = 0.32 * bossIntroAlpha;
             ctx.lineWidth = 4;
             ctx.beginPath();
             ctx.arc(e.x, e.y, e.novaRadius || (e.radius + 8), 0, Math.PI * 2);
@@ -11280,7 +11538,7 @@ const droplifelenght = 280;
           ctx.translate(hoverX, hoverY);
           if (e.type === "slingerBoss") {
             const phaseFlash = e._bossPhaseStunTimer > 0 && Math.floor(Date.now() / 90) % 2 === 0;
-            ctx.globalAlpha = phaseFlash ? 0.6 : 1;
+            ctx.globalAlpha = (phaseFlash ? 0.6 : 1) * bossIntroAlpha;
             ctx.drawImage(slingerBossImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           } else {
             ctx.drawImage(slingerImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
@@ -11298,7 +11556,7 @@ const droplifelenght = 280;
           ctx.save();
           ctx.translate(hoverX, hoverY);
           const stalkerAlpha = typeof e.stalkerAlpha === "number" ? e.stalkerAlpha : 0.9;
-          ctx.globalAlpha = stalkerAlpha;
+          ctx.globalAlpha = stalkerAlpha * bossIntroAlpha;
           if (stalkerImg && stalkerImg.complete && stalkerImg.naturalWidth > 0) {
             const drawScale = 4.1;
             ctx.drawImage(stalkerImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
@@ -11329,7 +11587,7 @@ const droplifelenght = 280;
             ctx.beginPath();
             ctx.arc(0, 0, e.radius * 0.85, 0, Math.PI * 2);
             ctx.fill();
-            ctx.globalAlpha = Math.max(0.15, stalkerAlpha * 0.9);
+            ctx.globalAlpha = Math.max(0, stalkerAlpha * 0.9 * bossIntroAlpha);
             ctx.strokeStyle = "#4a8aaa";
             ctx.lineWidth = 2.5;
             ctx.beginPath();
@@ -11474,7 +11732,7 @@ const droplifelenght = 280;
           ctx.translate(hoverX, hoverY);
           ctx.rotate(angle);
           const phaseFlash = e.beamerBossStunTimer > 0 && Math.floor(Date.now() / 90) % 2 === 0;
-          ctx.globalAlpha = phaseFlash ? 0.75 : 1;
+          ctx.globalAlpha = (phaseFlash ? 0.75 : 1) * bossIntroAlpha;
           if (beamerBossImg && beamerBossImg.complete && beamerBossImg.naturalWidth > 0) {
             const drawScale = 4.2;
             ctx.drawImage(beamerBossImg, -e.radius * drawScale / 2, -e.radius * drawScale / 2, e.radius * drawScale, e.radius * drawScale);
@@ -11634,8 +11892,10 @@ const droplifelenght = 280;
         ctx.restore();
       });
 
+      drawBossIntroNova();
+
       //laser, enemyHit, levelUp, xpDrop, slingerDrop, bruteDrop, healthDrop, enemyDeath, 
-      drawParticlesBatched(["laser","enemyHit","levelUp","playerRevive","playerSmoke"]); // victory pre-smoke visible before gameOver
+      drawParticlesBatched(["laser","enemyHit","levelUp","playerRevive","playerSmoke","bossIntro"]); // victory pre-smoke visible before gameOver
 
       drawProjectiles();
 

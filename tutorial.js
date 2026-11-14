@@ -501,6 +501,17 @@
     }, 150);
   });
 
+  window.addEventListener('tut:firstMobKill', () => {
+    if (stage !== 'playing') return;
+    showTutorialModal(
+      'XP DROPS & PICKUP RANGE',
+      'Defeated enemies drop XP orbs. Move your Sentinel close to collect them automatically. The visible ring around your Sentinel shows its pickup range; XP orbs inside the ring will be collected.',
+      true,
+      null,
+      'Got it'
+    );
+  });
+
   // ─── Stage 6 · Gameplay – Protocol Pickup + Activation ────────────────────
   function installProtocolHighlight(pickedUpName) {
     showBanner('New Protocol discovered! Release Spacebar or right mouse button to open the Stats menu', 'tut-protocol-banner');

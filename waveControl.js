@@ -4,6 +4,7 @@ window.printWaveDebug = function() {
 window.SentinelWaveControl = (function () {
   const CODE_WAVE_MIN = 1;
   const CODE_WAVE_MAX = 50;
+  const BOSS_INTRO_DURATION_SECONDS = 5;
   const MOB_INTERVAL_KEYS = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss", "beamerBoss"];
   const BOSS_MOB_TYPES = new Set(["gruntBossMinor", "gruntBoss", "slingerBoss", "bruteBoss", "stalkerBoss", "beamerBoss", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss"]);
   const BOSS_WAVE_SUPPORT_MOBS = { 25: "brutes" };
@@ -19,6 +20,17 @@ window.SentinelWaveControl = (function () {
     beamerBoss: "beamerBoss",
     beamerboss: "beamerBoss"
   };
+
+  function initializeBossIntro(enemy) {
+    enemy.bossIntroDuration = BOSS_INTRO_DURATION_SECONDS;
+    enemy.bossIntroTimer = BOSS_INTRO_DURATION_SECONDS;
+    enemy.bossIntroElapsed = 0;
+    enemy.bossIntroParticleTimer = 0;
+    enemy.bossIntroAlpha = 0;
+    enemy.bossIntroYodguardPlayed = false;
+    enemy.bossIntroNovaBurstIndex = 0;
+    enemy.bossIntroNovaBursts = [];
+  }
 
   // Timeline wave data storage: { waveNum: { duration, mobs: { mobType: [{time, amount}, ...] } } }
   const timelineWaveData = {};
@@ -452,10 +464,10 @@ window.SentinelWaveControl = (function () {
   function spawnSlingerBoss(ctx) {
     const wave = ctx.getWave();
     const slingerImg = ctx.getSlingerSprite();
-    const { x, y } = randomEdgeSpawn();
+    const canvasWidth = (ctx && typeof ctx.getCanvasWidth === "function") ? ctx.getCanvasWidth() : 1024;
     const enemy = ctx.spawnEnemy();
-    enemy.x = x;
-    enemy.y = y;
+    enemy.x = canvasWidth / 2;
+    enemy.y = 80 + 28 + 185;
     enemy.radius = 28;
     enemy.collisionRadius = 30;
     enemy.speed = 0.65;
@@ -465,6 +477,7 @@ window.SentinelWaveControl = (function () {
     enemy.attackCooldown = 0;
     enemy.color = "#ff9f1a";
     enemy.type = "slingerBoss";
+    initializeBossIntro(enemy);
     enemy.spinAngle = Math.random() * Math.PI * 2;
     enemy.spinSpeed = (Math.random() - 0.5) * 0.02;
     enemy.sprite = slingerImg;
@@ -521,6 +534,7 @@ window.SentinelWaveControl = (function () {
     enemy.attackRange = 34;
     enemy.color = "#ff7a00";
     enemy.type = "bruteBoss";
+    initializeBossIntro(enemy);
     enemy.novaMinRadius = enemy.radius + 56;
     enemy.novaRadius = enemy.novaMinRadius;
     enemy.novaState = "minPause";
@@ -676,11 +690,10 @@ window.SentinelWaveControl = (function () {
     const canvasWidth = (ctx && typeof ctx.getCanvasWidth === "function") ? ctx.getCanvasWidth() : 1024;
     const canvasHeight = (ctx && typeof ctx.getCanvasHeight === "function") ? ctx.getCanvasHeight() : 768;
     const orbitRadius = 220;
-    const { x, y } = randomEdgeSpawn(canvasWidth, canvasHeight, 50);
     const enemy = ctx.spawnEnemy();
 
-    enemy.x = x;
-    enemy.y = y;
+    enemy.x = canvasWidth / 2;
+    enemy.y = canvasHeight / 2;
     enemy.radius = 46;
     enemy.collisionRadius = 50;
     enemy.speed = 0.58;
@@ -690,6 +703,7 @@ window.SentinelWaveControl = (function () {
     enemy.attackRange = 0;
     enemy.color = "#4bc7ff";
     enemy.type = "beamerBoss";
+    initializeBossIntro(enemy);
     enemy.beamerBossPhase = "entry";
     enemy.beamerBossEntering = true;
     enemy.beamerBossEntrySpeed = enemy.speed * 2.1;
@@ -798,6 +812,7 @@ window.SentinelWaveControl = (function () {
     enemy.attackRange = 280;
     enemy.color = "#1a1a1a";
     enemy.type = "stalkerBoss";
+    initializeBossIntro(enemy);
     // Blink/Teleport properties
     enemy.blinkCooldown = 180;
     enemy.blinkCastTimer = 0;
@@ -826,6 +841,29 @@ window.SentinelWaveControl = (function () {
     enemy.stalkerBossPhaseState = "single";
     enemy.stalkerBossTeleportsThisPhase = 0;
     enemy.stalkerBossCurrentHexIndex = Math.floor(Math.random() * 6);
+    const hexIndex = enemy.stalkerBossCurrentHexIndex;
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
+    const paddingX = enemy.stalkerBossEdgePaddingX;
+    const paddingY = enemy.stalkerBossEdgePaddingY;
+    const hexRadius = Math.max(0, Math.min(
+      centerX - paddingX - enemy.radius,
+      centerY - paddingY - enemy.radius
+    ));
+    const angle = -Math.PI / 2 + (hexIndex * Math.PI) / 3;
+    let firstX = centerX + Math.cos(angle) * hexRadius;
+    let firstY = centerY + Math.sin(angle) * hexRadius;
+    if (hexIndex === 0) firstY += 50;
+    else if (hexIndex === 3) firstY -= 50;
+    else firstX += Math.cos(angle) > 0 ? 50 : -50;
+    firstY += 25;
+    const minX = paddingX + enemy.radius;
+    const maxX = canvasWidth - paddingX - enemy.radius;
+    const minY = paddingY + enemy.radius;
+    const maxY = canvasHeight - paddingY - enemy.radius;
+    enemy.x = minX > maxX ? centerX : Math.max(minX, Math.min(maxX, firstX));
+    enemy.y = minY > maxY ? centerY : Math.max(minY, Math.min(maxY, firstY));
+    enemy.stalkerBossPositionInitialized = true;
     enemy.stalkerBossPhase1FanCooldown = 0;
     enemy.stalkerBossPhase1TeleportRequested = false;
     enemy.stalkerBossPhase1TransitionTeleportRequested = false;
