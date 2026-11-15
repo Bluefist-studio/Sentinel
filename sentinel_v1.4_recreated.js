@@ -3507,7 +3507,7 @@ window.onload = function () {
 
     const button = document.createElement("button");
     button.type = "button";
-    button.style.cssText = `position:absolute;left:98px;top:${top}px;width:62px;height:62px;padding:0;border:0;border-radius:50%;background:transparent;pointer-events:auto;touch-action:manipulation;z-index:12;`;
+    button.style.cssText = `position:absolute;left:98px;top:${top}px;width:62px;height:62px;padding:0;border:0;border-radius:50%;outline:none;background:transparent;pointer-events:auto;touch-action:manipulation;z-index:12;`;
     button.setAttribute("aria-pressed", String(getVisible()));
     function updateRangeRingToggleLabel() {
       const visible = getVisible();
