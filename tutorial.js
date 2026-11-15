@@ -399,7 +399,7 @@
             setTimeout(() => {
               showTutorialModal(
                 'HOW TO PLAY',
-                'Hold RIGHT-CLICK (or SPACE) to play. Move your mouse to guide your Sentinel, and get close enough for it to automatically attack enemies in range.',
+                'Hold RIGHT-CLICK (or SPACE) to play. Move your mouse to guide your Sentinel, and get close enough for it to automatically attack enemies in range. The red ring shows your attack range; use the red HUD button to hide or show it.',
                 true,
                 null,
                 'Start Playing'
@@ -505,7 +505,7 @@
     if (stage !== 'playing') return;
     showTutorialModal(
       'XP DROPS & PICKUP RANGE',
-      'Defeated enemies drop XP orbs. Move your Sentinel close to collect them automatically. The visible ring around your Sentinel shows its pickup range; XP orbs inside the ring will be collected.',
+      'Defeated enemies drop XP orbs. Move your Sentinel close to collect them automatically. The cyan ring around your Sentinel shows its pickup range; XP orbs inside the ring will be collected. Use the cyan HUD button to hide or show the ring.',
       true,
       null,
       'Got it'

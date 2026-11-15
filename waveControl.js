@@ -45,10 +45,10 @@ window.SentinelWaveControl = (function () {
     gruntBoss: { base: 500, perWave: 0 },
     gruntBossMinor: { base: 120, perWave: 40 },
     grunt: { base: 5, perWave: 1 },
-    kamikaze: { base: 20, perWave: 10 },
+    kamikaze: { base: 120, perWave: 20 },
     slinger: { base: 10, perWave: 1 },
-    slingerBoss: { base: 100000, perWave: 0 },
-    brute: { base: 200, perWave: 45 },
+    slingerBoss: { base: 70000, perWave: 0 },
+    brute: { base: 300, perWave: 55 },
     bruteBoss: { base: 80000, perWave: 0 },
     stalker: { base: 75, perWave: 5 },
     beamer: { base: 150, perWave: 30 },
@@ -563,7 +563,9 @@ window.SentinelWaveControl = (function () {
     enemy.damage = 3;
     enemy.health = getEnemyHealthForType("kamikaze", wave);
     enemy.type = "kamikaze";
-    enemy.unkillable = true;
+    enemy.noLoot = true;
+    enemy.noXP = true;
+    enemy.unkillable = false;
     enemy.timer = 60;
     enemy.exploded = false;
     enemy.explodeOnContact = true;
