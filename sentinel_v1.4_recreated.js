@@ -3530,7 +3530,7 @@ window.onload = function () {
     showPickupRangeRing = value;
   });
   const musicVolumeControlStyle = document.createElement("style");
-  musicVolumeControlStyle.textContent = "#sentinelMusicVolumeControl{position:relative;}#sentinelMusicVolumeTrack{display:none;}#sentinelMusicVolumeThumb{position:absolute;left:50%;bottom:calc(var(--music-volume,100%) - 1.5px);width:30px;height:3px;transform:translateX(-50%);border-radius:999px;background:#d9ffff;box-shadow:0 0 8px 2px #00d9ff;pointer-events:none;}#sentinelMusicVolumeSlider{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;appearance:none;-webkit-appearance:none;background:transparent;opacity:0;cursor:pointer;touch-action:none;writing-mode:vertical-lr;direction:rtl;user-select:none;-webkit-user-select:none;}#sentinelMusicVolumeControl:focus-within #sentinelMusicVolumeThumb{background:#fff;box-shadow:0 0 10px 3px #00d9ff;}";
+  musicVolumeControlStyle.textContent = "#sentinelMusicVolumeControl{position:relative;}#sentinelMusicVolumeTrack{display:none;}#sentinelMusicVolumeThumb{position:absolute;left:50%;bottom:calc(var(--music-volume,100%) - 1.5px);width:30px;height:3px;transform:translateX(-50%);border-radius:999px;background:#d9ffff;box-shadow:0 0 8px 2px #00d9ff;opacity:0;transition:opacity .12s;pointer-events:none;}#sentinelMusicVolumeControl.is-adjusting #sentinelMusicVolumeThumb{opacity:1;}#sentinelMusicVolumeSlider{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;appearance:none;-webkit-appearance:none;background:transparent;opacity:0;cursor:pointer;touch-action:none;writing-mode:vertical-lr;direction:rtl;user-select:none;-webkit-user-select:none;}";
   document.head.appendChild(musicVolumeControlStyle);
   const musicVolumeControl = document.createElement("div");
   musicVolumeControl.id = "sentinelMusicVolumeControl";
@@ -3552,15 +3552,43 @@ window.onload = function () {
     musicVolumeThumb.style.setProperty("--music-volume", `${percent}%`);
     musicVolumeSlider.setAttribute("aria-valuetext", `${percent}%`);
   }
+  let musicVolumeHandleHideTimer = null;
+  function showMusicVolumeHandle() {
+    clearTimeout(musicVolumeHandleHideTimer);
+    musicVolumeControl.classList.add("is-adjusting");
+  }
+  function finishMusicVolumeAdjustment() {
+    clearTimeout(musicVolumeHandleHideTimer);
+    musicVolumeControl.classList.remove("is-dragging", "is-key-adjusting", "is-adjusting");
+  }
   musicVolumeSlider.addEventListener("input", () => {
     setMusicMasterVolume(Number(musicVolumeSlider.value) / 100);
     updateMusicVolumeDisplay();
+    showMusicVolumeHandle();
+    if (!musicVolumeControl.classList.contains("is-dragging")
+      && !musicVolumeControl.classList.contains("is-key-adjusting")) {
+      musicVolumeHandleHideTimer = setTimeout(() => {
+        musicVolumeControl.classList.remove("is-adjusting");
+      }, 500);
+    }
   });
   musicVolumeControl.addEventListener("pointerdown", event => event.stopPropagation());
-  musicVolumeSlider.addEventListener("pointerdown", () => musicVolumeControl.classList.add("is-dragging"));
-  const finishMusicVolumeDrag = () => musicVolumeControl.classList.remove("is-dragging");
-  window.addEventListener("pointerup", finishMusicVolumeDrag);
-  window.addEventListener("pointercancel", finishMusicVolumeDrag);
+  musicVolumeSlider.addEventListener("pointerdown", () => {
+    musicVolumeControl.classList.add("is-dragging");
+    showMusicVolumeHandle();
+  });
+  const musicVolumeAdjustmentKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"]);
+  musicVolumeSlider.addEventListener("keydown", event => {
+    if (!musicVolumeAdjustmentKeys.has(event.key)) return;
+    musicVolumeControl.classList.add("is-key-adjusting");
+    showMusicVolumeHandle();
+  });
+  musicVolumeSlider.addEventListener("keyup", event => {
+    if (musicVolumeAdjustmentKeys.has(event.key)) finishMusicVolumeAdjustment();
+  });
+  window.addEventListener("pointerup", finishMusicVolumeAdjustment);
+  window.addEventListener("pointercancel", finishMusicVolumeAdjustment);
+  window.addEventListener("blur", finishMusicVolumeAdjustment);
   musicVolumeControl.append(musicVolumeTrack, musicVolumeThumb, musicVolumeSlider);
   updateMusicVolumeDisplay();
   hudStageOverlay.appendChild(musicVolumeControl);
