@@ -5,13 +5,41 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "dist:win": "node build-win.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "build": {
+    "appId": "com.sentinel.game",
+    "productName": "Sentinel",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "sentinel_v1.4_recreated.js",
+      "sentinel_v1.4_recreated.css",
+      "firebase-leaderboard.js",
+      "protocols.js",
+      "waveControl.js",
+      "timelineEditorIntegration.js",
+      "Editor.js",
+      "tutorial.js",
+      "*.png",
+      "*.mp3",
+      "*.wav"
+    ],
+    "win": {
+      "target": "portable",
+      "artifactName": "Sentinel-${version}-Windows-${arch}.${ext}"
+    }
+  },
   "devDependencies": {
-    "electron": "^41.2.0"
+    "electron": "^41.2.0",
+    "electron-builder": "^26.0.12"
   }
 }

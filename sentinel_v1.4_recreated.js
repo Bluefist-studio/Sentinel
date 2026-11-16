@@ -9334,7 +9334,7 @@ const droplifelenght = 280;
                 }
               }
               if (hitBySpinBeam) {
-                damagePlayer(e.beamerBossBeamDamage);
+                applyPlayerDamage(e.beamerBossBeamDamage);
               }
               e.beamerBossBeamTickTimer = 10;
             }
@@ -9372,7 +9372,7 @@ const droplifelenght = 280;
               const shotEndX = e.x + shotX * shotEndDistance;
               const shotEndY = e.y + shotY * shotEndDistance;
               if (distanceToSegment(shotStartX, shotStartY, shotEndX, shotEndY) <= player.radius + 8) {
-                damagePlayer(e.beamerBossShotDamage);
+                applyPlayerDamage(e.beamerBossShotDamage);
               }
               e.beamerBossShotTickTimer = 10;
             }
@@ -9421,7 +9421,7 @@ const droplifelenght = 280;
               playerDistance + player.radius >= e.beamerBossNovaPreviousRadius &&
               playerDistance - player.radius <= e.beamerBossNovaRadius
             ) {
-              damagePlayer(e.damage * 2);
+              applyPlayerDamage(e.damage * 2);
               e.beamerBossNovaHitPlayer = true;
             }
             if (e.beamerBossNovaRadius >= maxRadius) {
