@@ -6512,6 +6512,44 @@ const droplifelenght = 280;
       isInLootXrayCorner(x, y, true, true);
   }
 
+  function getNearestLootXrayBoundaryPoint(x, y) {
+    const boundaryPoints = [
+      [LOOT_XRAY_CORNER_SIDE_DISTANCE, LOOT_XRAY_TOP_DISTANCE],
+      [canvas.width - LOOT_XRAY_CORNER_SIDE_DISTANCE, LOOT_XRAY_TOP_DISTANCE],
+      [canvas.width - LOOT_XRAY_SIDE_DISTANCE, LOOT_XRAY_CORNER_TOP_DISTANCE],
+      [canvas.width - LOOT_XRAY_SIDE_DISTANCE, canvas.height - LOOT_XRAY_CORNER_BOTTOM_DISTANCE],
+      [canvas.width - LOOT_XRAY_CORNER_SIDE_DISTANCE, canvas.height - LOOT_XRAY_BOTTOM_DISTANCE],
+      [LOOT_XRAY_CORNER_SIDE_DISTANCE, canvas.height - LOOT_XRAY_BOTTOM_DISTANCE],
+      [LOOT_XRAY_SIDE_DISTANCE, canvas.height - LOOT_XRAY_CORNER_BOTTOM_DISTANCE],
+      [LOOT_XRAY_SIDE_DISTANCE, LOOT_XRAY_CORNER_TOP_DISTANCE]
+    ];
+    let nearestPoint = null;
+    let nearestDistanceSquared = Infinity;
+
+    for (let i = 0; i < boundaryPoints.length; i++) {
+      const start = boundaryPoints[i];
+      const end = boundaryPoints[(i + 1) % boundaryPoints.length];
+      const segmentX = end[0] - start[0];
+      const segmentY = end[1] - start[1];
+      const segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
+      const progress = segmentLengthSquared > 0
+        ? Math.max(0, Math.min(1, ((x - start[0]) * segmentX + (y - start[1]) * segmentY) / segmentLengthSquared))
+        : 0;
+      const pointX = start[0] + segmentX * progress;
+      const pointY = start[1] + segmentY * progress;
+      const distanceX = x - pointX;
+      const distanceY = y - pointY;
+      const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+
+      if (distanceSquared < nearestDistanceSquared) {
+        nearestDistanceSquared = distanceSquared;
+        nearestPoint = { x: pointX, y: pointY };
+      }
+    }
+
+    return nearestPoint;
+  }
+
   function drawLootXray(shakeOffsetX, shakeOffsetY) {
     hudXrayCtx.clearRect(0, 0, hudXrayCanvas.width, hudXrayCanvas.height);
     if (
@@ -6615,6 +6653,46 @@ const droplifelenght = 280;
         hudXrayCtx.stroke();
         hudXrayCtx.restore();
       }
+    });
+    enemies.forEach(enemy => {
+      const stalkerBossNotFullyRevealed =
+        enemy.type === "stalkerBoss" &&
+        !enemy.stalkerBossPhase3RevealComplete &&
+        (enemy.stalkerBossIllusion || enemy.stalkerBossIllusionPhaseActive);
+      if (
+        enemy.health <= 0 ||
+        enemy.stalkerBossPhase3Hidden ||
+        stalkerBossNotFullyRevealed ||
+        !isEnemyInPlayArea(enemy) ||
+        !isInLootXrayArea(enemy.x, enemy.y)
+      ) {
+        return;
+      }
+
+      const boundaryPoint = getNearestLootXrayBoundaryPoint(enemy.x, enemy.y);
+      if (!boundaryPoint) return;
+      const angle = Math.atan2(enemy.y - boundaryPoint.y, enemy.x - boundaryPoint.x);
+      const arrowOffset = -5;
+
+      hudXrayCtx.save();
+      hudXrayCtx.translate(
+        boundaryPoint.x + Math.cos(angle) * arrowOffset,
+        boundaryPoint.y + Math.sin(angle) * arrowOffset
+      );
+      hudXrayCtx.rotate(angle);
+      hudXrayCtx.globalAlpha = (typeof enemy.bossIntroAlpha === "number" ? enemy.bossIntroAlpha : 1) * 0.48;
+      hudXrayCtx.lineCap = "round";
+      hudXrayCtx.lineJoin = "round";
+      hudXrayCtx.shadowColor = "#00d9ff";
+      hudXrayCtx.shadowBlur = 2;
+      hudXrayCtx.beginPath();
+      hudXrayCtx.moveTo(-2, -10);
+      hudXrayCtx.lineTo(2, 0);
+      hudXrayCtx.lineTo(-2, 10);
+      hudXrayCtx.strokeStyle = "#8cecff";
+      hudXrayCtx.lineWidth = 1.5;
+      hudXrayCtx.stroke();
+      hudXrayCtx.restore();
     });
     hudXrayCtx.restore();
   }
