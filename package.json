@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "preview:splash": "electron preview-splash.js",
     "dist:win": "node build-win.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -20,6 +21,7 @@
     },
     "files": [
       "main.js",
+      "splash.html",
       "index.html",
       "sentinel_v1.4_recreated.js",
       "sentinel_v1.4_recreated.css",
@@ -36,6 +38,9 @@
     "win": {
       "target": "portable",
       "artifactName": "Sentinel-${version}-Windows-${arch}.${ext}"
+    },
+    "portable": {
+      "splashImage": "portable-splash.bmp"
     }
   },
   "devDependencies": {

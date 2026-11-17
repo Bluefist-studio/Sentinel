@@ -2934,8 +2934,10 @@ window.onload = function () {
   }
 
   function showExitConfirmation() {
+    if (document.getElementById("exitConfirmationOverlay")) return;
     triggerLoadingFlash(false, MENU_LOADING_FLASH_DURATION);
     const exitOverlay = document.createElement("div");
+    exitOverlay.id = "exitConfirmationOverlay";
     configureDisplayOverlay(exitOverlay, 15);
     exitOverlay.style.background = "rgba(0, 0, 0, 0.75)";
     exitOverlay.style.display = "flex";
@@ -2971,7 +2973,7 @@ window.onload = function () {
 
     const actionRow = document.createElement("div");
     actionRow.style.display = "flex";
-    actionRow.style.justifyContent = "flex-end";
+    actionRow.style.justifyContent = "center";
     actionRow.style.gap = "8px";
     exitPanel.appendChild(actionRow);
 
@@ -2998,7 +3000,14 @@ window.onload = function () {
     actionRow.appendChild(exitBtnConfirm);
 
     const closeExitModal = () => {
+      document.removeEventListener("keydown", onExitModalKeyDown);
       exitOverlay.remove();
+    };
+    const onExitModalKeyDown = (evt) => {
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        closeExitModal();
+      }
     };
 
     cancelBtn.addEventListener("click", closeExitModal);
@@ -3014,6 +3023,7 @@ window.onload = function () {
       }
     });
 
+    document.addEventListener("keydown", onExitModalKeyDown);
     document.body.appendChild(exitOverlay);
   }
 
@@ -4899,6 +4909,14 @@ window.onload = function () {
     if (k === "escape" && gameStarted && !showMenuScreen) {
       e.preventDefault();
       showReturnToMenuModal();
+      return;
+    }
+    if (k === "escape" && showMenuScreen) {
+      const menuOverlay = document.getElementById("menuOverlay");
+      if (menuOverlay && menuOverlay.style.display !== "none") {
+        e.preventDefault();
+        showExitConfirmation();
+      }
       return;
     }
     if (k === "e") { showStats = !showStats; paused = showStats; }
