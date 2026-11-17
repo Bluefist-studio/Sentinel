@@ -4273,6 +4273,8 @@ window.onload = function () {
   };
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
+  const KAMIKAZE_EXPLOSION_RANGE = 48;
+  const KAMIKAZE_SHOCKWAVE_DURATION = 18;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
   const KAMIKAZE_DEATH_PARTICLE_COUNT = 8;
   const MAX_PARTICLES = 400;
@@ -4466,9 +4468,23 @@ window.onload = function () {
     if (enemy.exploded) return;
     enemy.exploded = true;
     const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    if (distToPlayer < enemy.radius + player.radius + 52) {
+    if (distToPlayer < enemy.radius + player.radius + KAMIKAZE_EXPLOSION_RANGE) {
       applyPlayerDamage(enemy.damage);
     }
+
+    const shockwave = spawnParticle(
+      enemy.x,
+      enemy.y,
+      0,
+      0,
+      KAMIKAZE_SHOCKWAVE_DURATION,
+      "#ffb347",
+      1,
+      2,
+      "kamikazeShockwave"
+    );
+    shockwave.maxLife = KAMIKAZE_SHOCKWAVE_DURATION;
+    shockwave.maxRadius = enemy.radius + KAMIKAZE_EXPLOSION_RANGE;
 
     for (let particleIndex = 0; particleIndex < 24; particleIndex++) {
       const angle = Math.random() * Math.PI * 2;
@@ -4872,8 +4888,8 @@ window.onload = function () {
       // Draw trigger zone ring
       ctx.beginPath();
       ctx.arc(m.x, m.y, MINE_TRIGGER_RADIUS, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255, 187, 0, 0.5)";
-      ctx.globalAlpha = 0.55 + mineRingPulse * 0.2;
+      ctx.strokeStyle = "rgba(255, 68, 68, 0.35)";
+      ctx.globalAlpha = 1;
       ctx.lineWidth = 2 + mineRingPulse * 0.5;
       ctx.setLineDash([8, 8]);
       // Removed shadowColor and shadowBlur for mobs
@@ -5937,6 +5953,25 @@ window.onload = function () {
     }
   }
 
+  function drawKamikazeShockwaves() {
+    for (const particle of particles) {
+      if (particle.type !== "kamikazeShockwave") continue;
+      const progress = 1 - particle.life / particle.maxLife;
+      const fade = particle.life / particle.maxLife;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = "#ffb347";
+      ctx.lineWidth = 2 + fade * 2;
+      ctx.shadowColor = "#ff3c00";
+      ctx.shadowBlur = 14 * fade;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.maxRadius * progress, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   function updatePlayer(delta) {
     if (typeof player._prevX === 'undefined') player._prevX = player.x;
     if (typeof player._prevY === 'undefined') player._prevY = player.y;
@@ -6067,7 +6102,7 @@ window.onload = function () {
         e.type === "stalkerBoss" &&
         !e.stalkerBossPhase3RevealComplete &&
         (e.stalkerBossIllusion || e.stalkerBossIllusionPhaseActive);
-      if (e.health <= 0 || e.stalkerBossPhase3Hidden || stalkerBossNotFullyRevealed || !isEnemyInPlayArea(e)) continue;
+      if (e.health <= 0 || e.stalkerBossPhase3Hidden || stalkerBossNotFullyRevealed || isBossIntroActive(e) || !isEnemyInPlayArea(e)) continue;
       const d = Math.hypot(e.x - player.x, e.y - player.y);
       if (d < minDist) {
         minDist = d;
@@ -11125,6 +11160,7 @@ const droplifelenght = 280;
 
       //laser, enemyHit, levelUp, xpDrop, slingerDrop, bruteDrop, healthDrop, enemyDeath,
       drawParticlesBatched(["xpDrop","slingerDrop","bruteDrop","healthDrop","enemyDeath","dust","novaFlare","burnZone","gruntNova"]);
+      drawKamikazeShockwaves();
 
 
 
@@ -11797,6 +11833,13 @@ const droplifelenght = 280;
           ctx.restore();
         } else if (e.type === "kamikaze") {
           ctx.save();
+          if (!e.exploded) {
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.radius + KAMIKAZE_EXPLOSION_RANGE, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255, 68, 68, 0.15)";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
           ctx.translate(e.x, e.y);
           ctx.drawImage(kamikazeImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
           ctx.restore();
