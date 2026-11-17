@@ -4273,7 +4273,7 @@ window.onload = function () {
   };
   // For future: burstInterval can be scaled for difficulty
   let enemiesToSpawn = 0;
-  const KAMIKAZE_EXPLOSION_RANGE = 48;
+  const KAMIKAZE_EXPLOSION_RANGE = 42;
   const KAMIKAZE_SHOCKWAVE_DURATION = 18;
   const KAMIKAZE_MINE_PARTICLE_COUNT = 12;
   const KAMIKAZE_DEATH_PARTICLE_COUNT = 8;
@@ -4888,10 +4888,9 @@ window.onload = function () {
       // Draw trigger zone ring
       ctx.beginPath();
       ctx.arc(m.x, m.y, MINE_TRIGGER_RADIUS, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255, 68, 68, 0.35)";
-      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "#ff0000";
+      ctx.globalAlpha = 0.25;
       ctx.lineWidth = 2 + mineRingPulse * 0.5;
-      ctx.setLineDash([8, 8]);
       // Removed shadowColor and shadowBlur for mobs
       ctx.stroke();
       ctx.globalAlpha = 1;
@@ -11187,7 +11186,7 @@ const droplifelenght = 280;
         }
           if (showAttackRangeRing) {
             ctx.save();
-            ctx.globalAlpha = 0.05;
+            ctx.globalAlpha = 0.25;
             ctx.strokeStyle = '#ff0000';
             ctx.fillStyle = 'rgb(145, 1, 1)';
             ctx.lineWidth = 2.5;
@@ -11199,7 +11198,7 @@ const droplifelenght = 280;
 
           if (showPickupRangeRing) {
             ctx.save();
-            ctx.globalAlpha = 0.05;
+            ctx.globalAlpha = 0.25;
             ctx.strokeStyle = '#00eaff';
             ctx.fillStyle = 'rgb(1, 133, 145)';
             ctx.lineWidth = 2.5;
@@ -11836,9 +11835,11 @@ const droplifelenght = 280;
           if (!e.exploded) {
             ctx.beginPath();
             ctx.arc(e.x, e.y, e.radius + KAMIKAZE_EXPLOSION_RANGE, 0, Math.PI * 2);
-            ctx.strokeStyle = "rgba(255, 68, 68, 0.15)";
+            ctx.globalAlpha = 0.25;
+            ctx.strokeStyle = "#ff0000";
             ctx.lineWidth = 3;
             ctx.stroke();
+            ctx.globalAlpha = 1;
           }
           ctx.translate(e.x, e.y);
           ctx.drawImage(kamikazeImg, -e.radius * 2, -e.radius * 2, e.radius * 4, e.radius * 4);
