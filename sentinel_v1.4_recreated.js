@@ -8453,7 +8453,7 @@ const droplifelenght = 280;
                         if (e.type === "bruteBoss" && e.bruteBossAttackPhase === 1) {
                           e.bruteBossPhase1NovaCount = (e.bruteBossPhase1NovaCount || 0) + 1;
                           if (e.bruteBossPhase1NovaCount >= 3) {
-                            setBruteBossAttackPhase(e, e.bruteBossStage, 2);
+                              setBruteBossAttackPhase(e, e.bruteBossStage, 2);
                           }
                         }
                       }

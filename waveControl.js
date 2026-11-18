@@ -7,8 +7,6 @@ window.SentinelWaveControl = (function () {
   const BOSS_INTRO_DURATION_SECONDS = 5;
   const MOB_INTERVAL_KEYS = ["grunts", "slingers", "shielders", "beamers", "stalkers", "brutes", "kamikazes", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss", "stalkerBoss", "beamerBoss"];
   const BOSS_MOB_TYPES = new Set(["gruntBossMinor", "gruntBoss", "slingerBoss", "bruteBoss", "stalkerBoss", "beamerBoss", "gruntbossminor", "gruntboss", "slingerboss", "bruteboss"]);
-  const BOSS_WAVE_SUPPORT_MOBS = { 25: "brutes" };
-  const BOSS_WAVE_SUPPORT_SPAWN_INTERVAL = 5;
   const MOB_INTERVAL_KEY_ALIASES = {
     bossMinors: "gruntbossminor",
     bosses: "gruntboss",
@@ -1035,7 +1033,6 @@ window.SentinelWaveControl = (function () {
         spawnedEventKeys: new Set(),  // Track spawned events by mobType_index key
         endCondition: timeline.endCondition || 'duration',  // Store end condition for access in main loop
         sawBoss: false,
-        nextBossSupportSpawnTime: BOSS_WAVE_SUPPORT_SPAWN_INTERVAL,
         nextApocalypseKamikazeTime: window.sentinelDifficulty === "Apocalypse" ? 2 + Math.random() * 3 : Infinity
       };
     } else if (!window._timelineWaveState) {
@@ -1102,20 +1099,6 @@ window.SentinelWaveControl = (function () {
             if (BOSS_MOB_TYPES.has(mobType)) anyBossEventRemaining = true;
           }
         }
-      }
-    }
-
-    const supportMobType = BOSS_WAVE_SUPPORT_MOBS[wave];
-    if (
-      supportMobType &&
-      timeline.endCondition === "boss" &&
-      state.sawBoss &&
-      state.elapsedTime >= state.nextBossSupportSpawnTime &&
-      ctx.getEnemies().some(enemy => BOSS_MOB_TYPES.has(enemy.type) && enemy.health > 0)
-    ) {
-      while (state.elapsedTime >= state.nextBossSupportSpawnTime) {
-        spawnFunctions[supportMobType](ctx, 1);
-        state.nextBossSupportSpawnTime += BOSS_WAVE_SUPPORT_SPAWN_INTERVAL;
       }
     }
 

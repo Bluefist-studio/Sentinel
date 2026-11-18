@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "build:web": "node build-web.js",
     "preview:splash": "electron preview-splash.js",
     "dist:win": "node build-win.js",
     "test": "echo \"Error: no test specified\" && exit 1"
